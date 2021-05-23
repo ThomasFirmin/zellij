@@ -80,7 +80,7 @@ best_point = tornado.run()
 ```
 ### Figures
 
-![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/figures/main/tornado.jpg?raw=true)
+![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/blob/main/figures/tornado.png?raw=true)
 
 ## Fractal Decomposition Algorithm
 
@@ -127,7 +127,7 @@ hypersphere = f.run()
 
 ### Figures
 
-![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/figures/main/fda.jpg?raw=true)
+![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/blob/main/figures/tornado.png?raw=true)
 
 ### Build your own exploration, exploitation and tree search algorithm
 
