@@ -80,6 +80,7 @@ best_point = tornado.run()
 ```
 ### Figures
 
+![](https://github.com/ThomasFirmin/chaotic-optimisation/figures/main/tornado_scb.mp4?raw=true)
 ![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/figures/main/tornado.jpg?raw=true)
 
 ## Fractal Decomposition Algorithm
