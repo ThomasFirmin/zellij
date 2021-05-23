@@ -127,7 +127,7 @@ hypersphere = f.run()
 
 ### Figures
 
-![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/blob/main/figures/tornado.png?raw=true)
+![Fractal decomposition](https://github.com/ThomasFirmin/chaotic-optimisation/blob/main/figures/fda.PNG?raw=true)
 
 ### Build your own exploration, exploitation and tree search algorithm
 
@@ -231,3 +231,7 @@ class Breadth_first_search(Tree_search):
 ## Citing
 
 ## Sources
+
+* Nassime Aslimani, El-Ghazali Talbi, Rachid Ellaia. Tornado: An Autonomous Chaotic Algorithm for Large Scale Global Optimization. 2020
+* Léo Souquet, Amir Nakib, El-Ghazali Talbi. Deterministic multi-objective fractal decomposition algorithm. MIC 2019 - 13th Metaheuristics International Conference, Jul 2019, Cartagena, Colombia. ⟨hal-02304975⟩
+
