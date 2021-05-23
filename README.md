@@ -40,7 +40,7 @@ Parameters | Tornado | CGS | CLS | CFS | Type | Description | Default
 `up_bounds` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `list(float)` | Upper bounds of each dimension of the search space | :x:
 `N_symetric_p` | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | `int` | Determine the number of points for the rotating polygon. (4 square, 5 pentagon...) | `8`
 `choas_map_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `string or list(string)` | Define the chaotic map to use. If a list of maps is given, it shuffles the different maps. | `"henon_map"`
-`f_call` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the number of loss function calls. | `1000`
+`f_call` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `int` | Determine the number of loss function calls. | `1000`
 `M_global` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the global number of iteration | `200`
 `M_local` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the number of exploitation iteration | `50`
 `N_level_cgs` | :heavy_check_mark: | :heavy_check_mark: | :x: | :x: | `int` | Determine the number of chaos level for CGS | `50`
@@ -48,7 +48,7 @@ Parameters | Tornado | CGS | CLS | CFS | Type | Description | Default
 `N_level_cfs` | :heavy_check_mark: | :x: | :x: | :heavy_check_mark: | `int` | Determine the number of chaos level for CFS | `5`
 `red_rate` | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | `float` | Determine the zoom rate for CLS and CFS | `0.5`
 `gds` | :heavy_check_mark: | :x: | :x: | :x: | `Boolean` | Use an adaptative gradient descent search after CLS and CFS | `False`
-`windowed_cgs`| :heavy_check_mark: | :x: | :x: | :x: | `float` | If > 0, the CGS uses a decreasing centered zoom over the search space | `0`
+`windowed_cgs`| :heavy_check_mark: | :heavy_check_mark: | :x: | :x: | `float` | If > 0, the CGS uses a decreasing centered zoom over the search space | `0`
 `penalize` (not yet implemented) | :heavy_check_mark: | :x: | :x: | :x: | `Boolean` | Penalize loss function and area of the search space to avoid overlapping points | `0`
 `return_history`| :heavy_check_mark: | :x: | :x: | :x: | `Boolean` | If True return the history: `[function calls, penalized points, points, values, colors, size, best point]`  | `True`
 
