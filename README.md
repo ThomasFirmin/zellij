@@ -77,6 +77,9 @@ tornado = tornado.Tornado(himmelblau,lo_bounds,up_bounds,"henon",M_global,M_loca
 point = tornado.run()
 
 ```
+### Figures
+
+![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/figures/main/tornado.jpg?raw=true)
 
 ## Fractal Decomposition Algorithm
 
@@ -121,18 +124,22 @@ hypersphere = f.run()
     
 ```
 
+### Figures
+
+![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/figures/main/fda.jpg?raw=true)
+
 ### Build your own exploration, exploitation and tree search algorithm
 
 #### Exploration and exploitation procedures
 
-Exploration and exploitation algorithms must take as parameters an hypervolume `H` and a loss function `loss_func`. It must also compute the loss function and update the hypervolume with the computed points and score using `add_point(score,point, color="black")` method. `color` is only used for ploting.
+Exploration and exploitation algorithms must take as parameters an hypervolume `H` and a loss function `loss_func`. It must also compute the loss function and update the hypervolume with the computed points and score using `add_point(score,point, color="black")` method. `color` is only used for ploting. The function must return the number of loss calls.
 
 ##### Code example
 
 ```python
 
 import numpy as np
-from hypersphere import Hypersphere
+from fractal import Fractal
 
 # Lazy Hypervolume Search
 def LHS(H,loss_func):
@@ -155,3 +162,71 @@ def LHS(H,loss_func):
     return loss_call
     
 ```
+
+#### Tree search algorithm (NOT FINISHED, EXPERIMENTAL)
+
+A tree search algorithm uses:
+* Open list: contains all unexplored nodes
+* Closed list: contains all explored nodes
+
+#### Code example
+
+```python
+
+import numpy as np
+from tree_search import Tree_search
+
+class Breadth_first_search(Tree_search):
+
+    def __init__(self,open,n_fractal):
+
+        super().__init__(open)
+
+        self.n_fractal = n_fractal
+
+        self.actual_level = self.open[0].level
+
+        self.level_size = self.n_fractal**(self.actual_level+1)
+        self.next_frontier = []
+
+        self.beam_length = 1
+
+    def add(self,c):
+
+        self.next_frontier.append(c)
+
+        if len(self.next_frontier) == self.level_size:
+
+            self.actual_level = c.level
+
+            self.level_size = self.n_fractal**(self.actual_level+1)
+
+            self.open = sorted(self.next_frontier,reverse=self.reverse,key= lambda x: x.score)[:]
+
+            self.next_frontier = []
+
+    def get_next(self):
+
+        if len(self.open) > 0:
+
+            if len(self.open) < self.beam_length:
+                idx = len(self.open)
+            else:
+                idx = self.beam_length
+
+            self.how_many = idx
+            self.close += self.open[:idx]
+
+            for _ in range(idx):
+                self.open.pop(0)
+
+            return True,self.close[-idx:]
+
+        else:
+            return False,-1
+
+```
+
+## Citing
+
+## Sources
