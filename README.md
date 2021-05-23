@@ -73,14 +73,14 @@ N_p = 8
 lo_bounds = np.array([-5 for i in range(dim)])
 up_bounds = np.array([5 for i in range(dim)])
 
-tornado = tornado.Tornado(himmelblau, lo_bounds, up_bounds,
- chaos_map_func = "kent_map",
- M_global = M_global,
- M_local = M_local,
- N_level_cgs = N_cgs,
- N_level_cls = N_cls,
- N_level_cfs = N_cfs,
- N_symetric_p = N_p
+tornado = tornado.Tornado(himmelblau, lo_bounds, up_bounds,\
+ chaos_map_func = "kent_map",\
+ M_global = M_global,\
+ M_local = M_local,\
+ N_level_cgs = N_cgs,\
+ N_level_cls = N_cls,\
+ N_level_cfs = N_cfs,\
+ N_symetric_p = N_p,\
  return_history = False)
  
 best_point = tornado.run()
