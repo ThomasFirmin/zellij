@@ -15,7 +15,7 @@ This Python package includes 2 efficients meta-heuristics for large scale global
 
 **chaotic-optimization** requires Numpy for fast computation and Matplotlib for plotting results.
 
-### Lated version
+### Latest version
 Download chaotic-optimization folder and include it into your Python project. You can then import FDA or chaotic-optimization according to your needs.
 
 
