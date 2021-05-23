@@ -39,7 +39,7 @@ Parameters | Tornado | CGS | CLS | CFS | Type | Description | Default
 `lo_bounds` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `list(float)` | Lower bounds of each dimension of the search space | :x:
 `up_bounds` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `list(float)` | Upper bounds of each dimension of the search space | :x:
 `N_symetric_p` | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | `int` | Determine the number of points for the rotating polygon. (4 square, 5 pentagon...) | `8`
-`choas_map_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `string or list(string)` | Define the chaotic map to use. If a list of maps is given, it shuffles the different maps. `henon_map, kent_map, logistic_map, tent_map` | `"henon_map"`
+`chaos_map_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `string or list(string)` | Define the chaotic map to use. If a list of maps is given, it shuffles the different maps. `henon_map, kent_map, logistic_map, tent_map` | `"henon_map"`
 `f_call` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `int` | Determine the number of loss function calls. | `1000`
 `M_global` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the global number of iteration | `200`
 `M_local` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the number of exploitation iteration | `50`
@@ -73,8 +73,17 @@ N_p = 8
 lo_bounds = np.array([-5 for i in range(dim)])
 up_bounds = np.array([5 for i in range(dim)])
 
-tornado = tornado.Tornado(himmelblau,lo_bounds,up_bounds,"henon",M_global,M_local,N_cgs,N_cls,N_cfs,N_p)
-point = tornado.run()
+tornado = tornado.Tornado(himmelblau, lo_bounds, up_bounds,
+ chaos_map_func = "kent_map",
+ M_global = M_global,
+ M_local = M_local,
+ N_level_cgs = N_cgs,
+ N_level_cls = N_cls,
+ N_level_cfs = N_cfs,
+ N_symetric_p = N_p
+ return_history = False)
+ 
+best_point = tornado.run()
 
 ```
 ### Figures
