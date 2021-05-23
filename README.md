@@ -32,14 +32,15 @@ All three strategies are used in the Tornado algorithm. But in they can also be 
 
 ### Parameters
 
+
 Parameters | Tornado | CGS | CLS | CFS | Type | Description | Default
------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | -------------
-`loss_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `function` | Function that takes a vector of float and return a loss value (float) | :x:
+------------ | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | -------------
+`loss_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `function` | Function that takes a vector of float (points) and return a loss value (float) | :x:
 `lo_bounds` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `list(float)` | Lower bounds of each dimension of the search space | :x:
 `up_bounds` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `list(float)` | Upper bounds of each dimension of the search space | :x:
 `gds` | :heavy_check_mark: | :x: | :x: | :x: | `Boolean` | Use an adaptative gradient descent search after CLS and CFS | `False`
 `N_symetric_p` | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | `int` | Determine the number of points for the rotating polygon. (4 square, 5 pentagon...) | `8`
-`choas_map_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `string | list(string)` | Define the chaotic map to use. If a list of maps is given, it shuffle the different maps. | `"henon_map"`
+`choas_map_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `string or list(string)` | Define the chaotic map to use. If a list of maps is given, it shuffles the different maps. | `"henon_map"`
 `f_call` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the number of loss function calls. | `1000`
 `M_global` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the global number of iteration | `200`
 `M_local` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the number of exploitation iteration | `50`
