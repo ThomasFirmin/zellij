@@ -228,6 +228,8 @@ class Breadth_first_search(Tree_search):
 
 ```
 
+## Related works
+
 ## Citing
 
 ## Sources
