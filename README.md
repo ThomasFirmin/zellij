@@ -1,4 +1,4 @@
-# Chaotic Optimisation
+# Chaotic Optimization
 
 ## Description
 
