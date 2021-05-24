@@ -229,7 +229,8 @@ class Breadth_first_search(Tree_search):
 ```
 
 ## Related works
-
+* Tornado
+* Fractal Decomposition Algorithm
 ## Citing
 
 ## Sources
