@@ -1,4 +1,4 @@
-# Chaotic Optimization
+# Zellij
 
 ## Description
 
