@@ -10,7 +10,7 @@ This algorithm is based on a branch and bound strategy to decompose the search s
 * **Decomposition problem:**
   * To decompose the search space, selecting the right hypervolume is essential. (hypercube, hypersphere, dividing rectangles...)
 * **Exploration problem:**
- * To decompose a fractal, a subspace, the algorithm must determine a heuristic value to each of them. To do so an exploration phase is applied to quickly determine if a fractal is promising or not.
+  * To decompose a fractal, a subspace, the algorithm must determine a heuristic value to each of them. To do so an exploration phase is applied to quickly determine if a fractal is promising or not.
 * **Exploitation problem:** 
   * When the algorithm reach the last fractal level, the algorithm applies an intensification phase to exploit the best found solution found into the final fractal.
 * **Tree search problem:**
