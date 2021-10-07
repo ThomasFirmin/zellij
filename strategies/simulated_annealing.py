@@ -24,7 +24,7 @@ class Simulated_annealing:
         self.n_scores = []
         self.n_best = []
 
-        # Determiner the number of violent temperature rises during the decrease
+        # Determine the number of violent temperature rises during the decrease
         self.n_peaks = n_peaks
 
         # Reduction rate of the temperature T = T*red_rate
@@ -36,7 +36,7 @@ class Simulated_annealing:
         self.record_proba = [0]
         self.verbose=verbose
 
-    # Determiner the number of iterations of SA
+    # Determine the number of iterations of SA
     def number_of_iterations(self):
 
         T_init = self.T_0
