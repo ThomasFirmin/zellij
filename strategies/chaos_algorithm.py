@@ -1,7 +1,7 @@
 import numpy as np
 from zellij.strategies.utils import Chaos_map
 
-class CGS:
+class CGS(Metaheuristic):
 
     def __init__(self,loss_func,search_space,f_calls,level,chaos_map,create=False,save=False,verbose=True):
 

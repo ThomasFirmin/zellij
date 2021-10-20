@@ -4,6 +4,7 @@ import os
 class Metaheuristic:
 
     def __init__(self,loss_func, search_space, f_calls,save = False,verbose=False):
+
         self.loss_func = loss_func
         self.search_space = search_space
         self.f_calls = f_calls
@@ -13,6 +14,9 @@ class Metaheuristic:
 
         self.best_found_score = float("inf")
         self.best_found_sol = None
+
+        self.all_solutions = []
+        self.all_scores = []
 
         if self.save:
             if os.path.isfile(self.__class__.__name__+"_save"+".txt"):
