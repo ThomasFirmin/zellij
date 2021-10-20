@@ -35,6 +35,9 @@ class Metaheuristic:
 
     def save_best(self,solution,score):
 
+        self.all_solutions.append(solution)
+        self.all_scores.append(scores)
+        
         if score < self.best_found_score:
             self.best_found_score = score
             self.best_found_sol = solution
