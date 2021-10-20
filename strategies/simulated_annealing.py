@@ -221,7 +221,7 @@ class Simulated_annealing:
 
         import matplotlib.pyplot as plt
         import pandas as pd
-        
+
         if filepath == None:
 
             plt.plot(list(range(len(self.all_scores))),self.all_scores,"-")
