@@ -3,11 +3,10 @@ from zellij.strategies.utils import Chaos_map
 
 class CGS:
 
-    def __init__(self,loss_func,search_space,f_calls,level,chaos_map,create=False):
+    def __init__(self,loss_func,search_space,f_calls,level,chaos_map,create=False,save=False,verbose=True):
 
-        self.loss_func = loss_func
-        self.search_space = search_space
-        self.f_calls = f_calls
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
+
         self.level = level
 
         if create and type(chaos_map)==str:
@@ -78,13 +77,12 @@ class CGS:
 
         return points[idx], ys[idx], points, ys
 
-class CLS:
+class CLS(Metaheuristic):
 
-    def __init__(self,loss_func,search_space,f_calls,level,polygon,chaos_map,red_rate=0.5):
+    def __init__(self,loss_func,search_space,f_calls,level,polygon,chaos_map,red_rate=0.5,save=False,verbose=True):
 
-        self.loss_func = loss_func
-        self.search_space = search_space
-        self.f_calls = f_calls
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
+
         self.level = level
         self.polygon = polygon
         self.map = chaos_map
@@ -165,13 +163,12 @@ class CLS:
         else :
             return [self.X0], [self.Y0], points, ys
 
-class CFS:
+class CFS(Metaheuristic):
 
-    def __init__(self,loss_func,search_space,f_calls,level,polygon,chaos_map,red_rate=0.5):
+    def __init__(self,loss_func,search_space,f_calls,level,polygon,chaos_map,red_rate=0.5,save=False,verbose=True):
 
-        self.loss_func = loss_func
-        self.search_space = search_space
-        self.f_calls = f_calls
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
+
         self.level = level
         self.polygon = polygon
         self.map = chaos_map
@@ -273,13 +270,12 @@ class CFS:
         else :
             return [self.X0], [self.Y0], points, ys
 
-class Chaotic_optimization:
+class Chaotic_optimization(Metaheuristic):
 
-    def __init__(self, loss_func, search_space, f_calls,chaos_map="henon", exploration_ratio = 0.80,levels = (32,8,2), polygon=4, red_rate=0.5,verbose=True,save=False):
+    def __init__(self, loss_func, search_space, f_calls,chaos_map="henon", exploration_ratio = 0.80,levels = (32,8,2), polygon=4, red_rate=0.5,save=False,verbose=True):
 
-        self.loss_func = loss_func
-        self.search_space = search_space
-        self.f_calls = f_calls
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
+
         self.chaos_map = chaos_map
         self.exploration_ratio = exploration_ratio
         self.polygon = polygon
@@ -295,8 +291,6 @@ class Chaotic_optimization:
             f_pop = open("chaos_results.txt","w")
             f_pop.write(str(self.search_space.label)[1:-1].replace(" ","").replace("'","")+",loss_value\n")
             f_poop.close()
-
-        self.verbose = verbose
 
         if self.CGS_level > 0:
             if self.CLS_level != 0 or self.CFS_level !=0:

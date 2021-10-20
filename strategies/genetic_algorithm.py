@@ -3,17 +3,15 @@ from deap import creator
 from deap import tools
 import numpy as np
 
-class Genetic_algorithm:
+class Genetic_algorithm(Metaheuristic):
 
-    def __init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, filename=None, verbose=True):
+    def __init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, filename=None,save=False,verbose=True):
 
-        self.loss_func = loss_func
-        self.search_space = search_space
-        self.f_calls = f_calls
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
+
         self.pop_size = pop_size
         self.generation = generation
         self.filename = filename
-        self.verbose = verbose
 
         self.all_scores = []
 
@@ -234,7 +232,7 @@ class Genetic_algorithm:
         import pandas as pd
         import matplotlib.pyplot as plt
         import seaborn as sns
-        
+
         if filename == None:
             scores = np.array(self.all_scores)
         else:

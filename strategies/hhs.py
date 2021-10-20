@@ -1,12 +1,10 @@
 import numpy as np
 
 # Hypersphere Heuristic Search
-class HHS:
-    def __init__(self, loss_func, search_space, f_calls):
-        self.loss_func = loss_func
-        self.search_space = search_space
+class HHS(Metaheuristic):
+    def __init__(self, loss_func, search_space, f_calls,save=False,verbose=True):
 
-        self.f_calls = f_calls
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
 
         self.up_bounds = np.array([1 for _ in self.search_space.values])
         self.lo_bounds = np.array([0 for _ in self.search_space.values])

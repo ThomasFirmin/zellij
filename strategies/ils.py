@@ -1,13 +1,12 @@
 import numpy as np
 
 # Intensive local search
-class ILS:
+class ILS(Metaheuristic):
 
-    def __init__(self, loss_func, search_space, f_calls,red_rate=0.5,precision=1e-5):
+    def __init__(self, loss_func, search_space, f_calls,red_rate=0.5,precision=1e-5,save=False,verbose=True):
 
-        self.loss_func = loss_func
-        self.search_space = search_space
-        self.f_calls = f_calls
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
+
         self.red_rate = red_rate
         self.precision = precision
 

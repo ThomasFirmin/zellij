@@ -1,20 +1,14 @@
 import numpy as np
 
-class Simulated_annealing:
+class Simulated_annealing(Metaheuristic):
 
     # Initialize simulated annealing
-    def __init__(self,loss_func, search_space, f_calls, max_iter, T_0, T_end, n_peaks=1, red_rate=0.80,verbose=False):
+    def __init__(self,loss_func, search_space, f_calls, max_iter, T_0, T_end, n_peaks=1, red_rate=0.80,save=False,verbose=True):
 
-        # must be a function that can take a list of points
-        self.loss_func = loss_func
-        # must be a search_space object
-        self.search_space = search_space
+        super().__init__(loss_func,search_space,f_calls,save,verbose)
 
         # Max iteration after each temperature decrease
         self.max_iter = max_iter
-
-        # Maximum number of loss_function calls
-        self.f_calls = f_calls
 
         # Initial temperature
         self.T_0 = T_0
@@ -34,7 +28,6 @@ class Simulated_annealing:
         self.all_scores = []
         self.record_temp = [self.T_0]
         self.record_proba = [0]
-        self.verbose=verbose
 
     # Determiner the number of iterations of SA
     def number_of_iterations(self):
