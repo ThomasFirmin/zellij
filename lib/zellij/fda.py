@@ -3,7 +3,7 @@ import copy
 
 from zellij.utils.fractal import fractal_list
 from zellij.utils.tree_search import tree_search_algorithm
-from zellij.utils.heuristic import heuristic_list
+from zellij.utils.heuristics import heuristic_list
 from zellij.utils.loss_func import FDA_loss_func
 
 class FDA:
@@ -42,9 +42,9 @@ class FDA:
         self.max_loss_call = f_calls
 
 
-        ###################
-        # OTHER VARIABLES #
-        ###################
+        #############
+        # VARIABLES #
+        #############
 
         # Working variables
         self.up_bounds = np.array([1.0 for _ in self.search_space.values])
@@ -106,7 +106,7 @@ class FDA:
                     explor_idx = np.min([child.level,len(self.exploration)])-1
                     explor_idx_kwargs = np.min([child.level,len(self.explor_kwargs)])-1
 
-                    # Compute bounds of the children hypervolume
+                    # Compute bounds of child hypervolume
                     lo = self.search_space.convert_to_continuous([child.lo_bounds],True)[0]
                     up = self.search_space.convert_to_continuous([child.up_bounds],True)[0]
 
@@ -146,7 +146,7 @@ class FDA:
                     explor_idx = np.min([child.level,len(self.exploration)])-1
                     explor_idx_kwargs = np.min([child.level,len(self.explor_kwargs)])-1
 
-                    # Compute bounds of the children hypervolume
+                    # Compute bounds of child hypervolume
                     lo = self.search_space.convert_to_continuous([child.lo_bounds],True,True)[0]
                     up = self.search_space.convert_to_continuous([child.up_bounds],True,True)[0]
 
@@ -164,17 +164,17 @@ class FDA:
 
                         print("Best solution found :",child.min_score,"<",self.best_score,"For exploration")
                         self.best_ind = child.best_sol
-                        self.best_ind_c = self.search_space.convert_to_continuous([self.best_ind],True)[0]
+                        self.best_ind_c = self.search_space.convert_to_continuous([self.best_ind])[0]
                         self.best_score = child.min_score
 
-                    child.best_sol_c = self.search_space.convert_to_continuous([child.best_sol],True)[0]
+                    child.best_sol_c = self.search_space.convert_to_continuous([child.best_sol])[0]
                     child.score = self.heuristic(child,self.best_ind_c,self.best_score)
 
                     print(f"\t\t=>Score:{child.score}")
 
                     self.loss_call += modified_loss_func.f_calls
 
-                # Add children to tree search
+                # Add child to tree search
                 self.tree_search.add(child)
 
             i += 1

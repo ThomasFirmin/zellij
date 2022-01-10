@@ -18,10 +18,10 @@ class Simulated_annealing(Metaheuristic):
         self.n_scores = []
         self.n_best = []
 
-        # Determiner the number of violent temperature rises during the decrease
+        # Determine the number of violent temperature rises during the decrease
         self.n_peaks = n_peaks
 
-        # Reduction rate of the temperature T = T*red_rate
+        # Temperature reduction rate T = T*red_rate
         self.red_rate = red_rate
 
 
@@ -29,7 +29,7 @@ class Simulated_annealing(Metaheuristic):
         self.record_temp = [self.T_0]
         self.record_proba = [0]
 
-    # Determiner the number of iterations of SA
+    # Determine the number of iterations
     def number_of_iterations(self):
 
         T_init = self.T_0
@@ -95,7 +95,7 @@ class Simulated_annealing(Metaheuristic):
             g.write(str(self.search_space.label)[1:-1].replace(" ","").replace("'","")+",loss_value,temperature,probability\n")
             g.close()
 
-        # Number of temprature variation
+        # Number of temperature variation
         iteration_temp = 0
         total_iteration = 0
 
@@ -117,7 +117,7 @@ class Simulated_annealing(Metaheuristic):
 
         T_actu = self.T_0
 
-        # Debut recuit simule
+        # Simulated annealing starting
         while iteration_temp < self.n_peaks and total_iteration<self.f_calls:
             iteration = 0
             while iteration < self.max_iter and total_iteration<self.f_calls:
@@ -130,13 +130,6 @@ class Simulated_annealing(Metaheuristic):
                 index_min = np.argmin(loss_values)
                 Y = neighbors[index_min][:]
                 cout_Y = loss_values[index_min]
-
-                # self.n_best = self.n_best + neighbors.tolist()
-                # self.n_scores = self.n_scores + loss_values
-                #
-                # ind_min = np.argsort(self.n_scores)[0:n_process]
-                # self.n_best = np.array(np.array(self.n_best)[ind_min]).tolist()
-                # self.n_scores = np.array(self.n_scores)[ind_min]
 
 
                 # Compute previous cost minus new cost

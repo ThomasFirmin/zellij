@@ -1,9 +1,13 @@
 import numpy as np
-from zellij.strategies.utils import Chaos_map
+from zellij.strategies.utils.chaos_map import Chaos_map
 
 class CGS(Metaheuristic):
 
-    def __init__(self,loss_func,search_space,f_calls,level,chaos_map,create=False,save=False,verbose=True):
+    def __init__(self, loss_func, search_space, f_calls, level, chaos_map, create=False, save=False, verbose=True):
+
+        ##############
+        # PARAMETERS #
+        ##############
 
         super().__init__(loss_func,search_space,f_calls,save,verbose)
 
@@ -14,7 +18,9 @@ class CGS(Metaheuristic):
         elif type(chaos_map) != str:
             self.map = chaos_map
 
-        # Working variables
+        #############
+        # VARIABLES #
+        #############
 
         self.up_bounds = np.array([1 for _ in range(self.search_space.n_variables)])
         self.lo_bounds = np.array([0 for _ in range(self.search_space.n_variables)])
@@ -25,6 +31,9 @@ class CGS(Metaheuristic):
         self.center = np.multiply(0.5,self.up_plus_lo)
         self.radius = np.multiply(0.5,self.up_m_lo)
         self.center_m_lo_bounds = self.center - self.lo_bounds
+
+        if self.save:
+            self.create_file("algorithm")
 
     def run(self,shift=1, n_process=1,f_calls_init = 0):
 
@@ -71,7 +80,7 @@ class CGS(Metaheuristic):
 
             l+= 1
 
-        ys = self.loss_func(self.search_space.convert_to_continuous(points,True))
+        ys = self.loss_func.evaluate(self.search_space.convert_to_continuous(points,True),filename = self.filename, algorithm="CLS")
         ys = np.array(ys)
         idx = np.array(np.argsort(ys))[:n_process]
 
@@ -81,6 +90,10 @@ class CLS(Metaheuristic):
 
     def __init__(self,loss_func,search_space,f_calls,level,polygon,chaos_map,red_rate=0.5,save=False,verbose=True):
 
+        ##############
+        # PARAMETERS #
+        ##############
+
         super().__init__(loss_func,search_space,f_calls,save,verbose)
 
         self.level = level
@@ -88,7 +101,10 @@ class CLS(Metaheuristic):
         self.map = chaos_map
         self.red_rate = red_rate
 
-        # Working variables
+        #############
+        # VARIABLES #
+        #############
+
         self.up_bounds = np.array([1 for _ in self.search_space.values])
         self.lo_bounds = np.array([0 for _ in self.search_space.values])
 
@@ -106,6 +122,9 @@ class CLS(Metaheuristic):
             # Initialize trigonometric part of symetric variables (CLS & CFS)
             self.H[0][i-1] = np.cos(trigo_val*i)
             self.H[1][i-1] = np.sin(trigo_val*i)
+
+        if self.save:
+            self.create_file("algorithm")
 
     def run(self,X0,Y0,chaos_level=0,shift=1, n_process=1, f_calls_init = 0):
 
@@ -153,7 +172,7 @@ class CLS(Metaheuristic):
 
             l+= 1
 
-        ys = self.loss_func(self.search_space.convert_to_continuous(points,True))
+        ys = self.loss_func.evaluate(self.search_space.convert_to_continuous(points,True), filename = self.filename, algorithm="CLS")
 
         ys = np.array(ys)
         idx = np.array(np.argsort(ys))[:n_process]
@@ -167,6 +186,10 @@ class CFS(Metaheuristic):
 
     def __init__(self,loss_func,search_space,f_calls,level,polygon,chaos_map,red_rate=0.5,save=False,verbose=True):
 
+        ##############
+        # PARAMETERS #
+        ##############
+
         super().__init__(loss_func,search_space,f_calls,save,verbose)
 
         self.level = level
@@ -174,7 +197,10 @@ class CFS(Metaheuristic):
         self.map = chaos_map
         self.red_rate = red_rate
 
-        # Working variables
+        #############
+        # VARIABLES #
+        #############
+
         self.up_bounds = np.array([1 for _ in self.search_space.values])
         self.lo_bounds = np.array([0 for _ in self.search_space.values])
 
@@ -192,6 +218,9 @@ class CFS(Metaheuristic):
             # Initialize trigonometric part of symetric variables (CLS & CFS)
             self.H[0][i-1] = np.cos(trigo_val*i)
             self.H[1][i-1] = np.sin(trigo_val*i)
+
+        if self.save:
+            self.create_file("algorithm")
 
     def stochastic_round(self, solution, k):
 
@@ -260,7 +289,7 @@ class CFS(Metaheuristic):
 
             l += 1
 
-        ys = self.loss_func(self.search_space.convert_to_continuous(points,True))
+        ys = self.loss_func.evaluate(self.search_space.convert_to_continuous(points,True), filename = self.filename, algorithm="CFS")
 
         ys = np.array(ys)
         idx = np.array(np.argsort(ys))[:n_process]
@@ -273,6 +302,10 @@ class CFS(Metaheuristic):
 class Chaotic_optimization(Metaheuristic):
 
     def __init__(self, loss_func, search_space, f_calls,chaos_map="henon", exploration_ratio = 0.80,levels = (32,8,2), polygon=4, red_rate=0.5,save=False,verbose=True):
+
+        ##############
+        # PARAMETERS #
+        ##############
 
         super().__init__(loss_func,search_space,f_calls,save,verbose)
 
@@ -287,10 +320,9 @@ class Chaotic_optimization(Metaheuristic):
 
         self.save = save
 
-        if save:
-            f_pop = open("chaos_results.txt","w")
-            f_pop.write(str(self.search_space.label)[1:-1].replace(" ","").replace("'","")+",loss_value\n")
-            f_poop.close()
+        #############
+        # VARIABLES #
+        #############
 
         if self.CGS_level > 0:
             if self.CLS_level != 0 or self.CFS_level !=0:
@@ -313,6 +345,9 @@ class Chaotic_optimization(Metaheuristic):
         self.Y = []
         self.min = float("inf")
 
+        if self.save:
+            self.create_file()
+
         if self.verbose:
             print(str(self))
 
@@ -321,54 +356,40 @@ class Chaotic_optimization(Metaheuristic):
         cgs = CGS(self.loss_func,self.search_space,self.f_calls,self.CGS_level,self.map)
         cls = CLS(self.loss_func,self.search_space,self.f_calls,self.CLS_level,self.polygon,self.map,self.red_rate)
         cfs = CFS(self.loss_func,self.search_space,self.f_calls,self.CFS_level,self.polygon,self.map,self.red_rate)
+        cgs.filename, cls.filename, cfs.filename = self.filename, self.filename, self.filename
 
         k = 1
-        f_calls = 0
 
-        while k <= self.iterations and f_calls < self.f_calls:
+        while k <= self.iterations and self.loss_func.calls < self.f_calls:
 
             if self.CGS_level > 0:
                 x_inter,loss_value,X,Y = cgs.run(k,f_calls_init = f_calls)
-                f_calls += 4*self.CGS_level
 
-                if len(Y) > 0:
-                    r = self.save_points(self.search_space.convert_to_continuous(X,True), Y)
-
-                if self.verbose:
-                    out = "\n\n=======>   Iterations | Loss function calls | Best value from CGS"
-                    out += "\n=======>"+str(k)+"<"+str(self.iterations)+"|"+str(f_calls)+"<"+str(self.f_calls)+" |"+str(loss_value)
-                    if r : out += "\n=======> !!--!! New best solution found !!--!! "
-                    print(out)
             else:
                 x_inter = [np.random.random(self.search_space.n_variables)]
-                loss_value = self.loss_func(x_inter)
+                loss_value = self.loss_func.evaluate(x_inter)
+
+            if self.verbose:
+                out = "\n\n=======>   Iterations | Loss function calls | Best value from CGS"
+                out += "\n=======>"+str(k)+"<"+str(self.iterations)+"|"+str(self.loss_func.calls)+"<"+str(self.f_calls)+" |"+str(loss_value)
+                if self.loss_func.new_best : out += "\n=======> !!--!! New best solution found !!--!! "
+                print(out)
+
 
             inner = 0
 
-            while inner < self.inner_iterations and f_calls <self.f_calls:
-
-                r1,r2=False,False
+            while inner < self.inner_iterations and self.loss_func.calls <self.f_calls:
 
                 if self.CLS_level > 0:
-                    x_inter,loss_value,X,Y = cls.run(x_inter[0],loss_value[0],inner,k, f_calls_init = f_calls)
-
-                    f_calls += self.CLS_level*self.polygon
-
-                    if len(Y) > 0:
-                        r1 = self.save_points(self.search_space.convert_to_continuous(X,True),Y)
+                    x_inter,loss_value,X,Y = cls.run(x_inter[0],loss_value[0],inner,k, f_calls_init = self.loss_func.calls)
 
                 if self.CFS_level > 0:
-                    x_inter,loss_value,X,Y = cfs.run(x_inter[0],loss_value[0],inner,k, f_calls_init = f_calls)
-
-                    f_calls += self.CFS_level*self.polygon
-
-                    if len(Y) > 0:
-                        r2 = self.save_points(self.search_space.convert_to_continuous(X,True),Y)
+                    x_inter,loss_value,X,Y = cfs.run(x_inter[0],loss_value[0],inner,k, f_calls_init =  self.loss_func.calls)
 
                 if self.verbose:
                     out = "-->"+str(inner)+"<"+str(self.inner_iterations)+"  |"+str(f_calls)+"<"+str(self.f_calls)+" |"+str(loss_value)
                     out += "\n=======>"+str(k)+"<"+str(self.iterations)+"|"+str(f_calls)+"<"+str(self.f_calls)+" |"+str(loss_value)
-                    if r1 or r2 : out += "\n=======> !!--!! New best solution found !!--!! "
+                    if self.loss_func.new_best : out += "\n=======> !!--!! New best solution found !!--!! "
                     print(out)
 
                 inner += 1
@@ -379,28 +400,6 @@ class Chaotic_optimization(Metaheuristic):
         best = np.array(self.X)[ind_min].tolist()
 
         return best,min
-
-
-    def save_points(self,X,Y):
-
-        if self.save:
-            f_pop = open("chaos_results.txt","a")
-            for i in range(len(X)):
-                f_pop.write(str(X[i])[1:-1].replace(" ","").replace("'","")+","+str(Y[i])+"\n")
-            f_pop.close()
-
-        res = False
-
-        self.X += X
-        self.Y += Y.tolist()
-
-        min = np.min(Y)
-
-        if min < self.min:
-            res = True
-            self.min = min
-
-        return res
 
     def show(self, filename=None):
 
@@ -417,8 +416,6 @@ class Chaotic_optimization(Metaheuristic):
             self.search_space.show(data.iloc[:,0:self.search_space.n_variables],scores)
         else:
             self.search_space.show(pd.DataFrame(self.X, columns=self.search_space.label),self.Y)
-
-
 
     def __str__(self):
         return f"Max Loss function calls:{self.f_calls}\nDimensions:{self.search_space.n_variables}\nExploration/Exploitation:{self.exploration_ratio}|{1-self.exploration_ratio}\nRegular polygon:{self.polygon}\nZoom:{self.red_rate}\nIterations:\n\tGlobal:{self.iterations}\n\tInner:{self.inner_iterations}\nChaos Levels:\n\tCGS:{self.CGS_level}\n\tCLS:{self.CLS_level}\n\tCFS:{self.CFS_level}\nMap size:{self.map_size}x{self.search_space.n_variables}"
