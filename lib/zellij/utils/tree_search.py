@@ -3,7 +3,54 @@ import abc
 import copy
 
 class Tree_search(object):
-    def __init__(self,open,max_depth):
+
+    """Tree_search
+
+    Tree_search is an abstract class which determines how to explore the fractal rooted tree, builded during Fractal Decomposition.
+    It is based on the OPEN/CLOSED lists algorithm.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Open list containing not explored nodes from the fractal rooted tree.
+
+    close : list[Fractal]
+        Close list containing explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        Maximum depth of the fractal rooted tree.
+
+    Methods
+    -------
+    __init__(self,open,max_depth)
+        Initialize Tree_search class
+
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    """
+
+    def __init__(self, open, max_depth):
+
+        """__init__(self,open,max_depth)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        """
 
         ##############
         # PARAMETERS #
@@ -15,15 +62,90 @@ class Tree_search(object):
 
     @abc.abstractmethod
     def add(self,c):
+        """__init__(self,open,max_depth)
+
+        Parameters
+        ----------
+        c : Fractal
+            Add a new fractal to the tree
+
+        """
         pass
 
     @abc.abstractmethod
     def get_next(self):
+        """__init__(self, open, max_depth)
+
+        Returns
+        -------
+
+        continue : boolean
+            If True determine if the open list has been fully explored or not
+
+        nodes : {list[Fractal], -1}
+            if -1 no more nodes to explore, else return a list of the next node to explore
+        """
         pass
 
 class Breadth_first_search(Tree_search):
+    """Breadth_first_search
 
-    def __init__(self,open,max_depth,Q=1,reverse=False):
+    Breadth First Search algorithm (BFS), computationally inefficient with fractal decomposition algorithm, because it is a greedy algorithm doing only exploration of the fractal tree,\
+     exploring entirely each fractal level.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    __init__(self,open,max_depth)
+        Initialize Breadth_first_search class
+
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Depth_first_search : Tree search Depth based startegy
+    """
+
+    def __init__(self, open, max_depth, Q=1, reverse=False):
+
+        """__init__(self, open, max_depth, Q=1, reverse=False)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        """
 
         super().__init__(open,max_depth)
 
@@ -64,9 +186,64 @@ class Breadth_first_search(Tree_search):
             return False,-1
 
 class Depth_first_search(Tree_search):
+    """Depth_first_search
+
+    Depth First Search algorithm (DFS), computationally inefficient with fractal decomposition algorithm, because it is a greedy algorithm doing only exploitation of the fractal tree,\
+    by trying to go has deep as possible.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    __init__(self,open,max_depth)
+        Initialize Breadth_first_search class
+
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Breadth_first_search : Tree search Breadth based startegy
+    Cyclic_best_first_search : Hybrid between DFS and BestFS
+    """
 
     def __init__(self,open,max_depth,Q=1,reverse=False):
+        """__init__(self, open, max_depth, Q=1, reverse=False)
 
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        """
         super().__init__(open,max_depth)
 
         ##############
@@ -108,8 +285,63 @@ class Depth_first_search(Tree_search):
 
 class Best_first_search(Tree_search):
 
-        def __init__(self,open,max_depth,Q=1,reverse=False):
+        """Best_first_search
 
+        Best First Search algorithm (BestFS), BestFS is better than BFS and DFS, because it tries to explore and exploit only the best current node in the tree.
+
+        Attributes
+        ----------
+
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        Methods
+        -------
+        __init__(self,open,max_depth)
+            Initialize Breadth_first_search class
+
+        add(self,c)
+            Add a node c to the fractal tree
+
+        get_next(self)
+            Get the next node to evaluate
+
+        See Also
+        --------
+        Fractal : Abstract class defining what a fractal is.
+        FDA : Fractal Decomposition Algorithm
+        Tree_search : Base class
+        Beam_search : Memory efficient tree search algorithm based on BestFS
+        Cyclic_best_first_search : Hybrid between DFS and BestFS
+        """
+
+        def __init__(self,open,max_depth,Q=1,reverse=False):
+            """__init__(self, open, max_depth, Q=1, reverse=False)
+
+            Parameters
+            ----------
+            open : list[Fractal]
+                Initial Open list containing not explored nodes from the fractal rooted tree.
+
+            max_depth : int
+                maximum depth of the fractal rooted tree.
+
+            Q : int, default=1
+                Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+            reverse : boolean, default=False
+                if False do a descending sort the open list, else do an ascending sort
+
+            """
             super().__init__(open,max_depth)
 
             ##############
@@ -150,7 +382,71 @@ class Best_first_search(Tree_search):
 
 class Beam_search(Tree_search):
 
+    """Beam_search
+
+    Beam Search algorithm (BS). BS is an improvement of BestFS. It includes a beam length (resp. open list length),\
+    which allows to prune the worst nodes and only keep in memory a certain number of the best found nodes.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    __init__(self,open,max_depth)
+        Initialize Breadth_first_search class
+
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    beam_length : int, default=10
+        Determines the length of the open list for memory and prunning issues.
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Best_first_search : Tree search algorithm based on the best node from the open list
+    Cyclic_best_first_search : Hybrid between DFS and BestFS, which can also perform pruning.
+    """
+
     def __init__(self,open,max_depth,Q=1,reverse=False, beam_length = 10):
+
+        """__init__(self, open, max_depth, Q=1, reverse=False)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            If False do a descending sort the open list, else do an ascending sort
+
+        beam_length : int, default=10
+            Determines the length of the open list for memory and prunning issues.
+
+        """
 
         super().__init__(open,max_depth)
 
@@ -194,7 +490,77 @@ class Beam_search(Tree_search):
 
 class Diverse_best_first_search(Tree_search):
 
+    """Diverse_best_first_search
+
+    Diverse Best First Search (DBFS). DBFS is an improvement of BestFS. When a node is badly evaluated, this one has no more chance to be explored.\
+    DBFS tries to tackle this problem by randomly selecting nodes according to a probability computed with its heuristic value (score) and its parents scores,\
+    or according to a probability P.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    P : float, default=0.1
+        Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration DBFS does.
+
+    T : float, default=0.5
+        Influences the probability of a node to be selected according to its score compared to the best score from the open list.
+        
+    Methods
+    -------
+    __init__(self,open,max_depth)
+        Initialize Breadth_first_search class
+
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Best_first_search : Tree search algorithm based on the best node from the open list
+    Epsilon_greedy_search : Based on BestFS, allows to randomly select a node.
+    """
+
     def __init__(self,open,max_depth,Q=1,reverse=False, P=0.1, T=0.5):
+
+        """__init__(self, open, max_depth, Q=1, reverse=False)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            If False do a descending sort the open list, else do an ascending sort
+
+        P : float, default=0.1
+            Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration DBFS does.
+
+        T : float, default=0.5
+            Influences the probability of a node to be selected according to its score compared to the best score from the open list.
+        """
 
         super().__init__(open,max_depth)
 
@@ -283,7 +649,66 @@ class Diverse_best_first_search(Tree_search):
 
 class Cyclic_best_first_search(Tree_search):
 
+    """Cyclic_best_first_search
+
+    Cyclic Best First Search (CBFS). CBFS is an hybrid of DFS and BestFS. First, CBFS tries to reach a leaf of the fractal tree to quickly determine a base score.
+    Then CBFS will do pruning according to this value, and it will decompose the problem into subproblems by inserting nodes into contours (collection of unexplored subproblems).
+    At each iteration CBFS select the best subproblem according to an heuristic value. Then the child subproblems will be inserted into their respective contours, according to a labelling function.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    __init__(self,open,max_depth)
+        Initialize Breadth_first_search class
+
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Best_first_search : Tree search algorithm based on the best node from the open list
+    Depth_first_search : Tree search Depth based startegy
+    """
+
     def __init__(self,open,max_depth,Q=1,reverse=False):
+
+        """__init__(self, open, max_depth, Q=1, reverse=False)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            If False do a descending sort the open list, else do an ascending sort
+
+        """
 
         super().__init__(open,max_depth)
 
@@ -386,7 +811,70 @@ class Cyclic_best_first_search(Tree_search):
 
 class Epsilon_greedy_search(Tree_search):
 
-        def __init__(self,open,max_depth,epsilon=0.1,reverse=False):
+    """Epsilon_greedy_search
+
+    Epsilon Greedy Search (EGS). EGS is an improvement of BestFS. At each iteration nodes are selected randomly or according to their best score.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    epsilon : float, default=0.1
+        Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration EGS does.
+
+    Methods
+    -------
+    __init__(self,open,max_depth)
+        Initialize Breadth_first_search class
+
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Best_first_search : Tree search algorithm based on the best node from the open list
+    Diverse_best_first_search : Tree search strategy based on an adaptative probability to select random nodes.
+    """
+
+        def __init__(self, open, max_depth, reverse=False, epsilon=0.1):
+
+            """__init__(self, open, max_depth, Q=1, reverse=False)
+
+            Parameters
+            ----------
+            open : list[Fractal]
+                Initial Open list containing not explored nodes from the fractal rooted tree.
+
+            max_depth : int
+                maximum depth of the fractal rooted tree.
+
+            Q : int, default=1
+                Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+
+            reverse : boolean, default=False
+                If False do a descending sort the open list, else do an ascending sort
+
+            epsilon : float, default=0.1
+                Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration EGS does.
+
+            """
 
             super().__init__(open,max_depth)
 

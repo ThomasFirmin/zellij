@@ -3,6 +3,40 @@ import os
 
 class Metaheuristic:
 
+    """Metaheuristic
+
+    Metaheuristic is a core object which define the structure of a metaheuristic in zellij.
+
+    Attributes
+    ----------
+
+    loss_func : Loss
+        Loss function to optimize. must be of type f(x)=y
+
+    search_space : Searchspace
+        Search space object containing bounds of the search space.
+
+    f_calls : int
+        Maximum number of loss_func calls
+
+    save : boolean, optional
+        if True save results into a file
+
+    verbose : boolean, default=True
+        Algorithm verbosity
+
+    Methods
+    -------
+    create_file(self, *args)
+        Create a saving file.
+
+
+    See Also
+    --------
+    LossFunc : Parent class for a loss function.
+    Searchspace : Define what a search space is in Zellij.
+    """
+
     def __init__(self,loss_func, search_space, f_calls,save = False,verbose=False):
 
         ##############
@@ -20,9 +54,20 @@ class Metaheuristic:
         # VARIABLES #
         #############
 
-        self.filename = ""
+        self.file_name = ""
 
     def create_file(self, *args):
+
+        """create_file(self, *args)s
+
+        Create a saving file.
+
+        Parameters
+        ----------
+        *args : list[label]
+            list of additionnal labels to add before the score/evaluation of a point.
+
+        """
 
         if self.save:
 

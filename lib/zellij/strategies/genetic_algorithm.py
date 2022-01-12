@@ -5,31 +5,111 @@ import numpy as np
 
 class Genetic_algorithm(Metaheuristic):
 
-    def __init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, filename=None,save=False,verbose=True):
+    """Genetic_algorithm
+
+    Genetic_algorithm (GA) implements a steady state genetic algorithm. It can be used for exploration and exploitation.
+    Indeed when the population has converged, GA can ,thanks to the mutation and crossover operators, perform an intensification phase arround best solutions.
+    It is algorithm which can work with a mixed search space, by adapting its operator.
+
+    Here the mutation operator is the neighborhood defined in the Searchspace object.
+    Available crossover operator are those compatible with a mixed individual (1-point, 2-points...). Same with the slection.
+
+    It uses DEAP.
+    See Metaheuristic for more info.
+
+    Attributes
+    ----------
+
+    pop_size : int
+        Population size of the GA.\
+        In a distributed environment (e.g. MPILoss), it has an influence on the parallelization quality.\
+        It must be tuned according the available hardware.
+
+    generation : int
+        Generation number of the GA.
+
+    Methods
+    -------
+
+    run(self, n_process=1)
+        Runs Genetic_algorithm
+
+    show(filename=None)
+        Plots results
+
+    See Also
+    --------
+    Metaheuristic : Parent class defining what a Metaheuristic is
+    LossFunc : Describes what a loss function is in Zellij
+    Searchspace : Describes what a loss function is in Zellij
+    """
+
+    def __init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, save=False, verbose=True):
+
+        """__init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, save=False, verbose=True)
+
+        Initialize Genetic_algorithm class
+
+        Parameters
+        ----------
+        loss_func : Loss
+            Loss function to optimize. must be of type f(x)=y
+
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+
+        f_calls : int
+            Maximum number of loss_func calls
+
+        pop_size : int
+            Population size of the GA.\
+            In a distributed environment (e.g. MPILoss), it has an influence on the parallelization quality.\
+            It must be tuned according the available hardware.
+
+        generation : int
+            Generation number of the GA.
+
+        save : boolean, optional
+            if True save results into a file
+
+        verbose : boolean, default=True
+            Algorithm verbosity
+
+        """
 
         super().__init__(loss_func,search_space,f_calls,save,verbose)
 
         self.pop_size = pop_size
         self.generation = generation
-        self.filename = filename
-
-        self.all_scores = []
 
     # Define what an individual is
     def define_individual(self):
+        """define_individual(self)
 
+        Describe how an individual should be initialized. Here a random point from SearchSpace is sampled.
+
+        """
         # Select one random point from the search space
         solution = self.search_space.random_point()[0]
 
         return solution
 
     # Initialize an individual extracted from a file
-    def initIndividual(self,icls, content):
+    def initIndividual(self, icls, content):
+        """initIndividual(self, icls, content)
+
+        Initialize an individual to DEAP.
+
+        """
         return icls([content.to_list()])
 
     # Initialize a population extracted from a file
-    def initPopulation(self,pcls, ind_init, filename):
+    def initPopulation(self, pcls, ind_init, filename):
+        """initPopulation(self, pcls, ind_init, filename)
 
+        Initialize a population of individual, from a file, to DEAP.
+
+        """
         data = pd.read_csv(filename, sep = ",", decimal=".", usecols = self.search_space.n_variables)
         contents = data.tail(taille_population)
 
@@ -37,6 +117,26 @@ class Genetic_algorithm(Metaheuristic):
 
     # Mutate operator
     def mutate(self,individual,proba):
+
+        """mutate(self, individual, proba)
+
+        Mutate a given individual, using Searchspace neighborhood.
+
+        Parameters
+        ----------
+        individual : list[{int, float, str}]
+            Individual to mutate, in the mixed format.
+
+        proba : float
+            Probability to mutate a gene.
+
+        Returns
+        -------
+
+        individual : list[{int, float, str}]
+            Mutated individual
+
+        """
 
         # For each dimension of a solution draw a probability to be muted
         for index,label in enumerate(self.search_space.label):
@@ -50,6 +150,28 @@ class Genetic_algorithm(Metaheuristic):
 
     # Run GA
     def run(self, n_process = 1,save=False):
+
+        """run(self, n_process = 1,save=False)
+
+        Runs GA
+
+        Parameters
+        ----------
+        n_process : int, default=1
+            Determine the number of best solution found to return.
+
+        save : boolean, default=False
+            Deprecated must be removed.
+
+        Returns
+        -------
+        best_sol : list[float]
+            Returns a list of the <n_process> best found points to the continuous format
+
+        best_scores : list[float]
+            Returns a list of the <n_process> best found scores associated to best_sol
+
+        """
 
         # Save file
         if save:
@@ -136,7 +258,7 @@ class Genetic_algorithm(Metaheuristic):
 
         print("Evolution starting...")
         g=0
-        while g < self.generation:
+        while g < self.generation: # A revoir avec self.loss_func.call
             g += 1
 
             # Optionnel, mets à jour le HallOfFame avec les n meilleurs individus
@@ -229,12 +351,24 @@ class Genetic_algorithm(Metaheuristic):
 
     def show(self, filename = None):
 
+        """show(self, filename=None)
+
+        Plots solutions and scores evaluated during the optimization
+
+        Parameters
+        ----------
+        filename : str, default=None
+            If a filepath is given, the method will read the file and will try to plot contents.
+
+        """
+
+
         import pandas as pd
         import matplotlib.pyplot as plt
         import seaborn as sns
 
         if filename == None:
-            scores = np.array(self.all_scores)
+            scores = np.array(self.loss_func.all_scores)
         else:
             data = pd.read_table(filename,sep=",",decimal   =".")
             scores = data["loss_value"].to_numpy()

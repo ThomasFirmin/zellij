@@ -1,6 +1,32 @@
 import numpy as np
 
-class Chaos_map:
+class Chaos_map(object):
+
+    """Chaos_map Global search
+
+    Chaos_map is used to build the chaotic map according to the give name, the level and dimensions of the Searchspace.
+    See Chaotic_optimization for more info. Th chaotic map is matrix of shape: (level, dimension).
+
+    Attributes
+    ----------
+    level : int
+        Chaotic level corresponds to the number of iteration of the chaotic map
+    dimension : int
+        Dimension of the Searchspace.
+    map_kwargs : dict
+        Keyword arguments associated to the selected map.
+    map : np.array(dtype=np.array(dtype=float))
+        Contains the chaotic map of size level*dimension.
+
+    Methods
+    -------
+    __init__(self,name,level,dimension,map_kwargs=None)
+        Initializes Chaos_map
+
+    See Also
+    --------
+    Chaotic_optimization : Chaos map is used here.
+    """
 
     def __init__(self,name,level,dimension,map_kwargs=None):
 

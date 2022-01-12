@@ -6,14 +6,143 @@ from zellij.utils.tree_search import tree_search_algorithm
 from zellij.utils.heuristics import heuristic_list
 from zellij.utils.loss_func import FDA_loss_func
 
-class FDA:
+class FDA(Metaheuristic):
 
-    def __init__(self,loss_func, search_space, f_calls,exploration,exploitation,fractal="hypersphere",heuristic="best",level=5,tree_search="BS",volume_kwargs={},explor_kwargs={},exploi_kwargs={},ts_kwargs={},verbose=True):
+    """FDA
+
+    Fractal Decomposition Algorithm (FDA) is composed of 4 part:
+        –  Fractal decomposition : FDA uses hyper-spheres or hyper-cubes to decompose the search-space into smaller sub-spaces in a fractal way.
+        –  Tree search algorithm : Fractals form a tree, so FDA is also a tree search problem. It can use Best First Search, Beam Search or others algorithms from the A* family.
+        –  Exploration : To explore a fractal, FDA requires an exploration algorithm, for example GA,or in our case CGS.
+        –  Exploitation : At the final fractal level (e.g. a leaf of the rooted tree) FDA performs an exploitation.
+        –  Scoring method: To score a fractal, FDA can use the best score found, the median, ... See heuristics.py.
+
+    It a continuous optimization algorithm. SO the search space is converted to continuous.
+
+    Attributes
+    ----------
+
+    heuristic : Heuristic
+        Determine using all points evaluated inside a fractal, how to score this fractal.
+
+    exploration : Metaheuristic
+        At each node of a fractal FDA applies an exploration algorithm to determine if this fractal is promising or not.
+
+    exploitation : Metaheuristic
+        At a leaf of the rooted fractal tree, FDA applies an exploitation algorithm, which ignores subspace bounds (not SearchSpace bounds),
+        to refine the best solution found inside this fractal.
+
+    level : int
+        Depth of the fractal tree
+
+    max_loss_call : int
+        Maximum number of calls to the loss function
+
+    up_bounds : list
+        List of float containing the upper bounds of the search space converted to continuous
+
+    lo_bounds : list
+        List of float containing the lower bounds of the search space converted to continuous
+
+    fractal_name : str
+        Name of the type of fractal to use (hypersphere, hypercube...)
+
+    fractal : Fractal
+        Fractal object used to build the fractal tree
+
+    explor_kwargs : list[dict]
+        List of keyword arguments to pass to the exploration strategy at each level of the tree.
+        If len(explor_kwargs) < level, then that last element of the list will be used for the next levels.
+
+    explor_kwargs : dict
+        Keyword arguments to pass to the exploitation strategy.
+
+    start_H : Fractal
+        Root of the fractal tree
+
+    tree_search : Tree_search
+        Tree_search object to use to explore and exploit the fractal tree.
+
+    n_h : int
+        Number of explored nodes of the tree
+
+    total_h : int
+        Theoretical number of nodes.
+
+
+    Methods
+    -------
+    __init__(self, loss_func, search_space, f_calls, level, chaos_map, create=False, save=False, verbose=True)
+        Initializes CGS
+
+    run(self,shift=1, n_process=1)
+        Runs CGS
+
+    See Also
+    --------
+    Metaheuristic : Parent class defining what a Metaheuristic is
+    LossFunc : Describes what a loss function is in Zellij
+    Searchspace : Describes what a loss function is in Zellij
+    Tree_search : Tree search algorithm to explore and exploit the fractal tree.
+    Fractal : Base class which defines what a fractal is.
+    """
+
+    def __init__(self,loss_func, search_space, f_calls, exploration, exploitation, fractal="hypersphere", heuristic="best", level=5, tree_search="BS", volume_kwargs={}, explor_kwargs={}, exploi_kwargs={}, ts_kwargs={}, verbose=True):
+
+        """__init__(self,loss_func, search_space, f_calls, exploration, exploitation, fractal="hypersphere", heuristic="best", level=5, tree_search="BS", volume_kwargs={}, explor_kwargs={}, exploi_kwargs={}, ts_kwargs={}, verbose=True)
+
+        Initialize FDA class
+
+        Parameters
+        ----------
+        loss_func : Loss
+            Loss function to optimize. must be of type f(x)=y
+
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+
+        f_calls : int
+            Maximum number of loss_func calls
+
+
+        level : int, default=5
+            Depth of the fractal tree
+
+        fractal : Fractal
+            Fractal object used to build the fractal tree
+
+        tree_search : Tree_search
+            Tree_search object to use to explore and exploit the fractal tree.
+
+        heuristic : Heuristic
+            Determine using all points evaluated inside a fractal, how to score this fractal.
+
+        exploration : Metaheuristic
+            At each node of a fractal FDA applies an exploration algorithm to determine if this fractal is promising or not.
+
+        exploitation : Metaheuristic
+            At a leaf of the rooted fractal tree, FDA applies an exploitation algorithm, which ignores subspace bounds (not SearchSpace bounds),
+            to refine the best solution found inside this fractal.
+
+        explor_kwargs : list[dict]
+            List of keyword arguments to pass to the exploration strategy at each level of the tree.
+            If len(explor_kwargs) < level, then that last element of the list will be used for the next levels.
+
+        explor_kwargs : dict
+            Keyword arguments to pass to the exploitation strategy.
+
+        save : boolean, optional
+            if True save results into a file
+
+        verbose : boolean, default=True
+            Algorithm verbosity
+
+        """
 
         assert level >= 1, "Fractal level must be >= 1"
 
         ##############
-        # PARAMETERS #
+        # PARAMETERS DEPRECATED MUST IMPLEMENT Metaheuristic #
         ##############
 
         self.loss_func = loss_func
@@ -39,7 +168,7 @@ class FDA:
 
 
         self.level = level
-        self.max_loss_call = f_calls
+        self.max_loss_call = f_calls # A voir name=f_calls ?
 
 
         #############
@@ -50,32 +179,42 @@ class FDA:
         self.up_bounds = np.array([1.0 for _ in self.search_space.values])
         self.lo_bounds = np.array([0.0 for _ in self.search_space.values])
 
-        self.fractal_name= fractal
-        self.fractal = fractal_list[fractal]
+        self.fractal_name= fractal # A voir
+        self.fractal = fractal_list[fractal] # A voir
 
         # Initialize first fractal
-        self.start_H = self.fractal("God",self.lo_bounds, self.up_bounds,0,0,**volume_kwargs)
+        self.start_H = self.fractal("God",self.lo_bounds, self.up_bounds,0,0,**volume_kwargs) # A voir NAME = root ?
 
         # Initialize tree search
-        self.tree_algo = tree_search_algorithm[tree_search]
-        self.tree_search = self.tree_algo([self.start_H],self.level,**ts_kwargs)
+        self.tree_search = tree_search_algorithm[tree_search]([self.start_H],self.level,**ts_kwargs) # A voir
 
 
         # Initialize scoring and criterion variables
-        self.best_score = float("inf")
-        self.best_ind = None
+        self.best_score = float("inf") # A voir
+        self.best_ind = None # A voir
 
         # Number of explored hypersphere
         self.n_h = 0
         # Number of loss function call
-        self.loss_call = 0
+        self.loss_call = 0 # A voir
 
 
-        self.executed = False
+        self.executed = False # A voir
         self.total_h = int(((self.search_space.n_variables*2)**(self.level+1)-1)/((self.search_space.n_variables*2)-1))-1
 
     # Evaluate a list of hypervolumes
     def evaluate(self,hypervolumes):
+
+        """evaluate(self,hypervolumes)
+
+        Perform exploration or exploitation of a list of hypervolumes.
+
+        Parameters
+        ----------
+        hypervolumes : list[Fractal]
+            list of hypervolume to evaluate with exploration and/or exploitation
+
+        """
 
         # While there are hypervolumes to evaluate do...
         i = 0
@@ -94,7 +233,7 @@ class FDA:
                 j += 1
 
                 # Link the loss function to the actual hypervolume (children)
-                modified_loss_func = FDA_loss_func(child,self.loss_func)
+                modified_loss_func = FDA_loss_func(child,self.loss_func) # A voir, add_attribute ?
 
                 # Count the number of explored hypervolume
                 self.n_h += 1
@@ -179,7 +318,29 @@ class FDA:
 
             i += 1
 
-    def run(self, save=False):
+    def run(self, save=False): # A voir, modifier avec n_process
+
+        """run(self, n_process = 1,save=False)
+
+        Runs FDA. Must be modified...
+
+        Parameters
+        ----------
+        n_process : int, default=1
+            Determine the number of best solution found to return.
+
+        save : boolean, default=False
+            Deprecated must be removed.
+
+        Returns
+        -------
+        best_sol : list[float]
+            Returns a list of the <n_process> best found points to the continuous format
+
+        best_scores : list[float]
+            Returns a list of the <n_process> best found scores associated to best_sol
+
+        """
 
         self.n_h = 0
 
@@ -211,6 +372,17 @@ class FDA:
         return self.start_H
 
     def show(self, function = False, circles = False):
+
+        """show(self, filename=None)
+
+        Plots solutions and scores evaluated during the optimization
+
+        Parameters
+        ----------
+        filename : str, default=None
+            If a filepath is given, the method will read the file and will try to plot contents.
+
+        """
 
         import matplotlib.pyplot as plt
         from mpl_toolkits.mplot3d import Axes3D

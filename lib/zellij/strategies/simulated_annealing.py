@@ -2,8 +2,107 @@ import numpy as np
 
 class Simulated_annealing(Metaheuristic):
 
+    """Simulated_annealing
+
+    Simulated_annealing (SA) is an exploitation strategy allowing to do hill climbing by starting from\
+    an initial solution and iteratively moving to next one,\
+     better than the previous one, or slightly worse to escape from local optima.
+
+    It uses a cooling schedule which partially drives the acceptance probability. This is the probability\
+    to accept a worse solution according to the temperature, the best solution found so far and the actual solution.
+
+    Attributes
+    ----------
+
+    max_iter : int
+        Maximum iterations of the inner loop. Determine how long the algorithm should sampled neighbors of a solution,\
+        before decreasing the temperature.
+
+    T_0 : float
+        Initial temperature of the cooling schedule.\
+         Higher temperature leads to higher acceptance of a worse solution. (more exploration)
+
+    T_end : float
+        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        T_0. It allows to periodically easily escape from local optima.
+
+    n_peaks : int
+        Maximum number of crossed threshold according to T_end. The temperature will be increased\
+        <n_peaks> times.
+
+    red_rate : float
+        Reduction rate of the initial temperature.
+        Each time the threshold is crossed, temperature is increased by <red_rate>*<T_0>.
+
+
+    Methods
+    -------
+
+    run(self, n_process=1)
+        Runs Genetic_algorithm
+
+    decrease_temperature(self, T)
+        Linear cooling schedule. Deprecated. Must be replaced by a cooling schedule object.
+
+    number_of_iterations(self)
+        Determine the number of iterations with the actual parameters.
+
+    show(filename=None)
+        Plots results
+
+    See Also
+    --------
+    Metaheuristic : Parent class defining what a Metaheuristic is
+    LossFunc : Describes what a loss function is in Zellij
+    Searchspace : Describes what a loss function is in Zellij
+    """
+
     # Initialize simulated annealing
     def __init__(self,loss_func, search_space, f_calls, max_iter, T_0, T_end, n_peaks=1, red_rate=0.80,save=False,verbose=True):
+
+        """__init__(self,loss_func, search_space, f_calls, max_iter, T_0, T_end, n_peaks=1, red_rate=0.80,save=False,verbose=True)
+
+        Initialize Genetic_algorithm class
+
+        Parameters
+        ----------
+        loss_func : Loss
+            Loss function to optimize. must be of type f(x)=y
+
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+
+        f_calls : int
+            Maximum number of loss_func calls
+
+        max_iter : int
+            Maximum iterations of the inner loop. Determine how long the algorithm should sampled neighbors of a solution,\
+            before decreasing the temperature.
+
+        T_0 : float
+            Initial temperature of the cooling schedule.\
+             Higher temperature leads to higher acceptance of a worse solution. (more exploration)
+
+        T_end : float
+            Temperature threshold. When reached the temperature is violently increased proportionately to\
+            T_0. It allows to periodically easily escape from local optima.
+
+        n_peaks : int, default=1
+            Maximum number of crossed threshold according to T_end. The temperature will be increased\
+            <n_peaks> times.
+
+        red_rate : float, default=0.80
+            Reduction rate of the initial temperature.
+            Each time the threshold is crossed, temperature is increased by <red_rate>*<T_0>.
+
+        save : boolean, optional
+            if True save results into a file
+
+        verbose : boolean, default=True
+            Algorithm verbosity
+
+
+        """
 
         super().__init__(loss_func,search_space,f_calls,save,verbose)
 
@@ -32,6 +131,18 @@ class Simulated_annealing(Metaheuristic):
     # Determine the number of iterations
     def number_of_iterations(self):
 
+        """number_of_iterations(self)
+
+        Determine the number of iteration with the current parametrization.
+
+        Returns
+        -------
+
+        iteration : int
+            Total number of iteration.
+
+        """
+
         T_init = self.T_0
 
         T_actu = self.T_0
@@ -54,6 +165,14 @@ class Simulated_annealing(Metaheuristic):
     # Decreasing function for the temperature
     def decrease_temperature(self, T):
 
+        """decrease_temperature(self, T)
+
+        Cooling schedule.
+
+        Deprecated must be replaced by a cooling schedule object.
+
+        """
+
         if T < self.T_end:
             self.T_0 = self.T_0 * self.red_rate
             T = self.T_0
@@ -67,13 +186,40 @@ class Simulated_annealing(Metaheuristic):
         return T, res
 
     # RUN SA
-    def run(self,X_0 , Y_0, n_process=1,save=False):
+    def run(self, X0 , Y0, n_process=1,save=False):
+
+        """run(self,shift=1, n_process=1)
+
+        Parameters
+        ----------
+        X0 : list[float]
+            Initial solution
+        Y0 : {int, float}
+            Score of the initial solution
+        chaos_level : int, default=0
+            Determine at which level of the chaos map, the algorithm starts
+        shift : int, default=1
+            Determine the starting point of the chaotic map.
+        n_process : int, default=1
+            Determine the number of best solution found to return.
+        save: boolean, default=False
+            Deprecated must be removed.
+
+        Returns
+        -------
+        best_sol : list[float]
+            Returns a list of the <n_process> best found points to the continuous format
+
+        best_scores : list[float]
+            Returns a list of the <n_process> best found scores associated to best_sol
+
+        """
 
         # Initial solution
-        self.X_0 = X_0
+        self.X_0 = X0
 
         # Score of the initial solution
-        self.Y_0 = Y_0
+        self.Y_0 = Y0
 
         print("Simulated Annealing starting")
         print(self.X_0,self.Y_0)
@@ -97,7 +243,7 @@ class Simulated_annealing(Metaheuristic):
 
         # Number of temperature variation
         iteration_temp = 0
-        total_iteration = 0
+        total_iteration = 0 # A revoir avec self.loss_func.call
 
         # Initialize variable for simulated annealing
         # Best solution so far
@@ -204,6 +350,17 @@ class Simulated_annealing(Metaheuristic):
         #return self.n_best,self.n_scores
 
     def show(self, filepath = None):
+
+        """show(self, filename=None)
+
+        Plots solutions and scores evaluated during the optimization
+
+        Parameters
+        ----------
+        filename : str, default=None
+            If a filepath is given, the method will read the file and will try to plot contents.
+
+        """
 
         import matplotlib.pyplot as plt
         import pandas as pd

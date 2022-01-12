@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
 
+# To modify
 def parallel_coordinates(frame, class_column, cols=None, ax=None, color=None,use_columns=False, xticks=None, colormap=None,**kwds):
 
     n = len(frame)
@@ -61,8 +62,131 @@ def parallel_coordinates(frame, class_column, cols=None, ax=None, color=None,use
 # TYPES: REAL: R, DISCRETE: D, CATEGORICAL: C, CONSTANT: K
 class Searchspace:
 
+    """Searchspace
+
+    Search is an essential class for Zellij. You can determine your search space with this object.
+
+    Attributes
+    ----------
+
+    label : list[str]
+        Labels associated to each dimension of the search space
+    type : list[{'R','D','C','K'}]
+        Types associated to each dimension of the search space.
+        R : Real dimension (e.g. float)
+        D : Discrete dimension (e.g. int)
+        C : Categorical dimension (e.g. {'dog', 'cats', 'rabbit'})
+        K : Constant dimension, used to define an unvariable dimension. \
+         Used in space decomposition when a dimension cannot be decomposed because it became too small (e.g. discrete).\
+         For a constant value, implementing it directly to the loss function is preferable.
+
+    values : list[{[float, float], [int, int], [{str, int, float}, {str, int, float}...]}]
+        Bounds associated to each dimension.\
+        For R, D types, values must be of form [a:{float,int}, b:{float,int}] with a < b.\
+        For C type, values must be of form [{str, int, float}, {str, int, float}...]
+        For K type, values can be of any type because it will not be used and only passed to the loss function.
+
+    neighborhood : list[{float, int, -1}]
+        Neighborhood  of a solution for each dimension. For a solution x=[v1, v2], bounds of the neighborhood of vi of x are computed by [max(vi-n, lower bound), min(vi+n, upper bound)],\
+        except for C dimension, a neighbor is computed by drawing a random value assoiated to the dimension. For K dimension there is no neighborhood.
+
+        For R type, the neighborhood can be a float, or an int.
+        For D type, the neighborhood is an int.
+        For C,K types, the neighborhood must be -1.
+
+
+    sub_values : list[{[float, float], [int, int], [{str, int, float}, {str, int, float}...]}]
+        When building a subspace. Original values are saved in sub_values, so it can easily convert a subspace into a mixed or continuous search space. See values
+    n_variables : list
+        Number of dimensions
+    k_index : list[int]
+        Indexes of constant dimensions.
+
+    Methods
+    -------
+    __init__(self, model, save='')
+        Initialize SearchSpace class
+
+    _create_neighborhood(self,neighborhood)
+        Create the neighborhood. See Searchspace.__init__
+        
+    random_attribute(self,size=1,replace=True, exclude=None)
+        Draw random features from the search space. Features of type K, cannot be drawn (i.e. their probability are set to 0).
+
+    random_value(self, attribute, size=1, replace = True, exclude=None)
+        Draw random values of an attribute from the search space, using uniform distribution. Features of type K return their constant value.
+
+    _get_real_neighbor(self, x, i)
+        Draw a neighbor of a Real attribute from the search space, using uniform distribution. According to its lower and upper bounds
+
+    _get_discrete_neighbor(self, x, i)
+        Draw a neighbor of a Discrete attribute from the search space, using discrete uniform distribution. According to its lower and upper bounds
+
+    _get_categorical_neighbor(self, x, i)
+        Draw a neighbor of a Categorical attribute from the search space, using discrete uniform distribution. According to all its possible value
+
+    get_neighbor(self, point, size=1, attribute=None)
+        Draw a neighbor of an initial solution, according to the search space bounds and dimensions types.
+
+    random_point(self,size=1)
+        Return a random point from the search space
+
+    convert_to_continuous(self,points,reverse=False,sub_values=False)
+        Convert given points from mixed to continuous, or, from continuous to mixed.
+
+    general_convert(self)
+        Convert the search space by building a continuous one.
+
+    subspace(self,lo_bounds,up_bounds)
+        Build a sub space according to the actual Searchspace using two vectors containing lower and upper bounds of the subspace.
+
+    show(self,X,Y)
+        Show solutions X associated to their values Y, according to the Searchspace
+
+
+    See Also
+    --------
+    LossFunc : Parent class for a loss function.
+    """
+
     # Initialize the search space
     def __init__(self, labels, types, values, neighborhood = 0.10):
+
+        """__init__(self, labels, types, values, neighborhood = 0.10 )
+
+        Parameters
+        ----------
+        label : list[str]
+            Labels associated to each dimension of the search space
+        type : list[{'R','D','C','K'}]
+            Types associated to each dimension of the search space.
+            R : Real dimension (e.g. float)
+            D : Discrete dimension (e.g. int)
+            C : Categorical dimension (e.g. {'dog', 'cats', 'rabbit'})
+            K : Constant dimension, used to define an unvariable dimension. \
+             Used in space decomposition when a dimension cannot be decomposed because it became too small (e.g. discrete).\
+             For a constant value, implementing it directly to the loss function is preferable.
+
+        values : list[{[float, float], [int, int], [{str, int, float}, {str, int, float}...]}]
+            Bounds associated to each dimension.\
+            For R, D types, values must be of form [a:{float,int}, b:{float,int}] with a < b.\
+            For C type, values must be of form [{str, int, float}, {str, int, float}...]
+            For K type, values can be of any type because it will not be used and only passed to the loss function.
+
+        neighborhood : {float, list[{float, int, -1}]}, default=0.10
+            Neighborhood  of a solution for each dimension.\
+            For a solution x=[v1, v2], bounds of the neighborhood of vi of x are computed by [max(vi-n, lower bound), min(vi+n, upper bound)],\
+            except for C dimension, a neighbor is computed by drawing a random value assoiated to the dimension. For K dimension there is no neighborhood.
+
+            If a float, N, between 0 and 1 is given. The neighborhood will be computed according to precedent rules, n = N*(upper bounds - lower bounds).
+            The neighborhood for R, D dimension will be a percentage of the dimension size.
+
+            You can manually determine the neighborhood according to following rules:
+                - neighborhood must be of type list[{float, int, -1}], each value of the list determine the type of neighborhood for each dimension:
+                    - For R type, the neighborhood can be a float, or an int.
+                    - For D type, the neighborhood is an int.
+                    - For C,K types, the neighborhood must be -1.
+        """
 
         ##############
         # ASSERTIONS #
@@ -144,6 +268,16 @@ class Searchspace:
     # Create the neighborhood for each variables
     def _create_neighborhood(self,neighborhood):
 
+        """_create_neighborhood(self,neighborhood)
+
+        Create the neighborhood. See Searchspace.__init__
+
+        Parameters
+        ----------
+        neighborhood : {float, list[{float, int, -1}]}
+
+        """
+
         self.neighborhood = []
 
         if type(neighborhood) == float:
@@ -161,6 +295,28 @@ class Searchspace:
     # Return 1 or size=n random attribute from the search space, can exclude one attribute
     def random_attribute(self,size=1,replace=True, exclude=None):
 
+        """random_attribute(self,size=1,replace=True, exclude=None)
+
+        Draw random features from the search space. Features of type K, cannot be drawn (i.e. their probability are set to 0).
+
+        Parameters
+        ----------
+        size : int, default=1
+            Select randomly <size> features.
+        replace : boolean, default=True
+            Select randomly <size> features with replacement if True, without else.
+            See numpy.random.choice
+        exclude : str, default=None
+            Exclude dimension of label==<exclude> from the drawing.
+
+        Returns
+        -------
+
+        _ : numpy.array(dtype=int)
+            Array of selected dimension index.
+
+        """
+
         try:
             index = self.label.index(exclude)
             p = np.full(self.n_variables, 1/(self.n_variables-(len(self.k_index)+1)))
@@ -176,6 +332,31 @@ class Searchspace:
 
     # Return a or size=n random value from an attribute, can exclude one value
     def random_value(self, attribute, size=1, replace = True, exclude=None):
+
+        """random_value(self, attribute, size=1, replace = True, exclude=None)
+
+        Draw random values of an attribute from the search space, using uniform distribution. Features of type K return their constant value.
+
+        Parameters
+        ----------
+
+        attribute : str
+            Select dimension of label==<exclude> from which to draw a random value.
+        size : int, default=1
+            Select randomly <size> features.
+        replace : boolean, default=True
+            Select randomly <size> features with replacement if True, without else.
+            See numpy.random.choice
+        exclude : str, default=None
+            Exclude dimension of label==<exclude> from the drawing.
+
+        Returns
+        -------
+
+        _ : numpy.array(dtype={int, float})
+            Array of floats for R dimension, ints for D, indexes (int) for C.
+
+        """
 
         index = self.label.index(attribute)
 
@@ -201,6 +382,26 @@ class Searchspace:
 
     def _get_real_neighbor(self, x, i):
 
+        """_get_real_neighbor(self, x, i)
+
+        Draw a neighbor of a Real attribute from the search space, using uniform distribution. According to its lower and upper bounds
+
+        Parameters
+        ----------
+
+        x : float
+            Initial value
+        i : int
+            Dimension index
+
+        Returns
+        -------
+
+        v : float
+            Random neighbor of x
+
+        """
+
         upper = np.min([x+self.neighborhood[i],self.values[i][1]])
         lower = np.max([x-self.neighborhood[i],self.values[i][0]])
         v = np.random.uniform(lower,upper)
@@ -211,6 +412,26 @@ class Searchspace:
         return float(v)
 
     def _get_discrete_neighbor(self, x, i):
+
+        """_get_discrete_neighbor(self, x, i)
+
+        Draw a neighbor of a Discrete attribute from the search space, using discrete uniform distribution. According to its lower and upper bounds
+
+        Parameters
+        ----------
+
+        x : float
+            Initial value
+        i : int
+            Dimension index
+
+        Returns
+        -------
+
+        v : int
+            Random neighbor of x
+
+        """
 
         upper = int(np.min([x+self.neighborhood[i],self.values[i][1]]))+1
         lower = int(np.max([x-self.neighborhood[i],self.values[i][0]]))
@@ -223,15 +444,59 @@ class Searchspace:
 
     def _get_categorical_neighbor(self, x, i):
 
+        """_get_categorical_neighbor(self, x, i)
+
+        Draw a neighbor of a Categorical attribute from the search space, using discrete uniform distribution. According to all its possible value
+
+        Parameters
+        ----------
+
+        x : float
+            Initial value
+        i : int
+            Dimension index
+
+        Returns
+        -------
+
+        v : float
+            Random neighbor of x
+
+        """
+
         idx = np.random.randint(len(self.values[i]))
 
         while self.values[i][idx] == x:
             idx = np.random.randint(len(self.values[i]))
 
-        return self.values[i][idx]
+        v = self.values[i][idx]
+
+        return v
 
     # Return a neighbor of a given point in the search space, can select neighbor of a particular attribute
     def get_neighbor(self, point, size=1, attribute=None):
+
+        """get_neighbor(self, point, size=1, attribute=None)
+
+        Draw a neighbor of an initial solution, according to the search space bounds and dimensions types.
+
+        Parameters
+        ----------
+
+        point : list[{int, float, str}, {int, float, str}...]
+            Initial point.
+        size : int, default=1
+            Draw <size> neighbors of <point>.
+        size : str, default=None
+            Draw a neighbor of <point> at dimension of label <attribute>
+
+        Returns
+        -------
+
+        points : list[list[{int, float, str}, {int, float, str}...], ...]
+            List of neighbors of <point>.
+
+        """
 
         points = []
 
@@ -273,6 +538,25 @@ class Searchspace:
 
     # Return a random point of the search space
     def random_point(self,size=1):
+
+        """random_point(self, size=1)
+
+        Return a random point from the search space
+
+        Parameters
+        ----------
+
+        size : int, default=1
+            Draw <size> points.
+
+        Returns
+        -------
+
+        points : list[list[{int, float, str}, {int, float, str}...], ...]
+            List of neighbors of <point>.
+
+        """
+
         points = []
 
         for i in range(size):
@@ -285,6 +569,29 @@ class Searchspace:
 
     # Convert a point to continuous, or convert a continuous point to a point from the search space
     def convert_to_continuous(self,points,reverse=False,sub_values=False):
+
+        """convert_to_continuous(self,points,reverse=False,sub_values=False)
+
+        Convert given points from mixed to continuous, or, from continuous to mixed.
+
+        Parameters
+        ----------
+
+        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
+            List of points to convert
+        reverse : boolean, default=False
+            If False convert points from mixed to continuous, if True, from continuous to mixed
+        sub_values : boolean, default=True
+            If the search space is a subspace, uses the original values to convert if True, else uses its own bounds.
+            See Searchspace
+
+        Returns
+        -------
+
+        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
+            List of converted points. Points are list of float if converted to continuous, else list of mixed variables.
+
+        """
 
         # If Searchspace is a subspace and want to convert inside it, use sub bounds to convert
         if sub_values and self.sub_values != None:
@@ -348,6 +655,20 @@ class Searchspace:
 
     def general_convert(self):
 
+        """general_convert()
+
+        Convert the search space by building a continuous one.
+        labels are identical, all types are converted to R, and all bounds are between [0,1].
+        Build an adptated neighborhood
+
+        Returns
+        -------
+
+        sp : Searchspace
+            Continuous Searchspace.
+
+        """
+
         label = self.label[:]
         type = ["R"]*self.n_variables
         values = [[0,1]]*self.n_variables
@@ -368,6 +689,33 @@ class Searchspace:
         return sp
 
     def subspace(self,lo_bounds,up_bounds):
+
+        """convert_to_continuous(self,points,reverse=False,sub_values=False)
+
+        Build a sub space according to the actual Searchspace using two vectors containing lower and upper bounds of the subspace.
+        Transforms types to K if necessary.
+        Builds an adaptated neighborhood to avoid large neighborhood compare to the subspace size.
+        Categorical lower and upper bounds of the subspace are determined according to a slice of the vector containing values:
+            Original: ["dog", "cat", "rabbit", "horse"]
+            lo_bounds = ["dog"]
+            up_bounds = ["rabbit"]
+            Subspace: ["dog", "cat", "rabbit"]
+
+        Parameters
+        ----------
+
+        lo_bounds : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
+            List of points to convert
+        up_bounds : boolean, default=False
+            If False convert points from mixed to continuous, if True, from continuous to mixed
+
+        Returns
+        -------
+
+        subspace : Searchspace
+            Return a subspace of the actual Searchspace.
+
+        """
 
         new_values = []
         new_neighborhood = []
@@ -422,6 +770,20 @@ class Searchspace:
         return subspace
 
     def show(self,X,Y):
+
+        """show(self,X,Y)
+
+        Show solutions X associated to their values Y, according to the Searchspace
+
+        Parameters
+        ----------
+
+        X : list[list[{int, float, str}, {int, float, str}...], ...]
+            List of points to plot
+        Y : list[{float, int}]
+            Scores associated to X.
+
+        """
 
         f, plots = plt.subplots(self.n_variables,self.n_variables)
 
