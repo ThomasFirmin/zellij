@@ -192,7 +192,7 @@ class Genetic_algorithm(Metaheuristic):
         # Toolbox contains all the operator of GA. (mutate, select, crossover...)
         toolbox = base.Toolbox()
 
-        # Ici on part d'une population tirée aléatoirement.
+        # Start from a random population
         if self.filename == None:
 
             # Determine what is an individual
@@ -210,7 +210,7 @@ class Genetic_algorithm(Metaheuristic):
             pop = toolbox.population(n=self.pop_size)
 
 
-        # Ici on peut partir d'une population initiale enregistrée dans un fichier, on continue l'exécution d'un algorithme
+        # Start from a saved population
         else:
 
             toolbox.register("individual_guess", self.initIndividual, creator.Individual)
@@ -219,11 +219,11 @@ class Genetic_algorithm(Metaheuristic):
             print("Creation of the initial population...")
             pop = toolbox.population_guess()
 
-        # Create the crossover tool
+        # Create crossover tool
         toolbox.register("mate", tools.cxOnePoint)
-        # Create the mutation tool
+        # Create mutation tool
         toolbox.register("mutate", self.mutate, proba=1/self.search_space.n_variables)
-        # Create the selection tool
+        # Create selection tool
         toolbox.register("select", tools.selTournament, tournsize=3)
 
         # Create a tool to select best individuals from a population
@@ -261,13 +261,13 @@ class Genetic_algorithm(Metaheuristic):
         while g < self.generation: # A revoir avec self.loss_func.call
             g += 1
 
-            # Optionnel, mets à jour le HallOfFame avec les n meilleurs individus
+            # Update all of fame
             best_of_all.update(pop)
 
             if self.verbose:
                 print("Génération: "+str(g))
 
-                # Opération de selection, on selectionne taille_pop individus
+                # Selection operator
                 print("Selection...")
 
             offspring = toolbox.select(pop,k=len(pop))
@@ -277,28 +277,28 @@ class Genetic_algorithm(Metaheuristic):
 
             children = []
 
-            # Reproduction de la population
+            # Crossover operator
             if self.verbose:
                 print("Crossover...")
 
             i = 0
             for child1,child2 in zip(offspring[::2],offspring[1::2]):
 
-                # /!\ On clone les individus selectionnée pour la reproduction
+                # Clone individuals from crossover
                 children1 = toolbox.clone(child1)
                 children2 = toolbox.clone(child2)
 
-                # Operateur de reproduction, on reproduit les 2 parents, les caractéristique sont directement modifié (d'où le clonage)
+                # Apply crossover
                 toolbox.mate(children1[0],children2[0])
-                # On supprime les scores des enfants, les scores sont ceux des parents (à cause du clonage)
+                # Delete children fitness inherited from the parents
                 del children1.fitness.values
                 del children2.fitness.values
 
-                # On ajoute les enfant créé à la list des enfants
+                # Add new children to list
                 children.append(children1)
                 children.append(children2)
 
-            # On fait muter les enfants
+            # Mutate children
             if self.verbose:
                 print("Mutation...")
             for mutant in children:
@@ -317,21 +317,22 @@ class Genetic_algorithm(Metaheuristic):
                 ind.fitness.values = fit,
 
 
-            # On reconstruit une population à partir des meilleurs parents et des meilleurs enfants
+            # Build new population
             pop[:] = toolbox.best(offspring)+toolbox.best(children)
 
-            # Recupération des scores des individus de la population
+            # Get fitnesses from the new population
             fits = [ind.fitness.values[0] for ind in pop]
 
             self.all_scores += fits
-            # Sauvegarde de la population
+
+            # Save new population
             if save:
                 f_pop = open("ga_population.txt","a")
                 for ind,cout in zip(pop,fits):
                     f_pop.write(str(ind)[2:-2].replace(" ","").replace("'","")+","+str(cout).replace(" ","")+"\n")
                 f_pop.close()
 
-            # Fin d'évalutation de la population g
+            # End populaiton evaluation
             if self.verbose:
                 print("Evaluation n°"+str(g)+"ending...")
 
