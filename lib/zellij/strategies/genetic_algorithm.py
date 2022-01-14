@@ -1,7 +1,13 @@
+from zellij.core.metaheuristic import Metaheuristic
 from deap import base
 from deap import creator
 from deap import tools
 import numpy as np
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 
 class Genetic_algorithm(Metaheuristic):
 
@@ -44,9 +50,19 @@ class Genetic_algorithm(Metaheuristic):
     Searchspace : Describes what a loss function is in Zellij
     """
 
-    def __init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, save=False, verbose=True):
+    def __init__(
+        self,
+        loss_func,
+        search_space,
+        f_calls,
+        pop_size=10,
+        generation=1000,
+        elitism=0.5,
+        filename="",
+        verbose=True,
+    ):
 
-        """__init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, save=False, verbose=True)
+        """__init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, verbose=True)
 
         Initialize Genetic_algorithm class
 
@@ -69,6 +85,9 @@ class Genetic_algorithm(Metaheuristic):
         generation : int
             Generation number of the GA.
 
+        elitism : float
+            Percentage of the best parents to keep in the next population by replacing the worst children.
+
         save : boolean, optional
             if True save results into a file
 
@@ -77,10 +96,18 @@ class Genetic_algorithm(Metaheuristic):
 
         """
 
-        super().__init__(loss_func,search_space,f_calls,save,verbose)
+        super().__init__(loss_func, search_space, f_calls, verbose)
 
         self.pop_size = pop_size
         self.generation = generation
+        self.elitism = elitism
+
+        self.pop_historic = []
+        self.fitness_historic = []
+
+        # Population save
+        self.filename = filename
+        self.ga_save = ""
 
     # Define what an individual is
     def define_individual(self):
@@ -110,13 +137,13 @@ class Genetic_algorithm(Metaheuristic):
         Initialize a population of individual, from a file, to DEAP.
 
         """
-        data = pd.read_csv(filename, sep = ",", decimal=".", usecols = self.search_space.n_variables)
+        data = pd.read_csv(filename, sep=",", decimal=".", usecols=self.search_space.n_variables)
         contents = data.tail(taille_population)
 
-        return pcls(ind_init(c) for index,c in contents.iterrows())
+        return pcls(ind_init(c) for index, c in contents.iterrows())
 
     # Mutate operator
-    def mutate(self,individual,proba):
+    def mutate(self, individual, proba):
 
         """mutate(self, individual, proba)
 
@@ -139,17 +166,17 @@ class Genetic_algorithm(Metaheuristic):
         """
 
         # For each dimension of a solution draw a probability to be muted
-        for index,label in enumerate(self.search_space.label):
+        for index, label in enumerate(self.search_space.labels):
             t = np.random.random()
             if t < proba:
 
                 # Get the a neighbor of the selected attribute
-                individual[0][index] = self.search_space.get_neighbor(individual[0],attribute = label)[0]
+                individual[0][index] = self.search_space.get_neighbor(individual[0], attribute=label)[0]
 
-        return individual,
+        return (individual,)
 
     # Run GA
-    def run(self, n_process = 1,save=False):
+    def run(self, n_process=1):
 
         """run(self, n_process = 1,save=False)
 
@@ -159,9 +186,6 @@ class Genetic_algorithm(Metaheuristic):
         ----------
         n_process : int, default=1
             Determine the number of best solution found to return.
-
-        save : boolean, default=False
-            Deprecated must be removed.
 
         Returns
         -------
@@ -173,11 +197,7 @@ class Genetic_algorithm(Metaheuristic):
 
         """
 
-        # Save file
-        if save:
-            f_pop = open("ga_population.txt","w")
-            f_pop.write(str(self.search_space.label)[1:-1].replace(" ","").replace("'","")+",loss_value\n")
-            f_pop.close()
+        self.loss_func.file_created = False
 
         print("Genetic Algorithm starting")
 
@@ -192,14 +212,34 @@ class Genetic_algorithm(Metaheuristic):
         # Toolbox contains all the operator of GA. (mutate, select, crossover...)
         toolbox = base.Toolbox()
 
-        # Start from a random population
-        if self.filename == None:
+        # Start from a saved population
+        if self.filename:
 
+            toolbox.register("individual_guess", self.initIndividual, creator.Individual)
+            toolbox.register(
+                "population_guess",
+                self.initPopulation,
+                list,
+                toolbox.individual_guess,
+                self.filename,
+            )
+
+            print("Creation of the initial population...")
+            pop = toolbox.population_guess()
+
+        # Start from a random population
+        else:
             # Determine what is an individual
             toolbox.register("hyperparameters", self.define_individual)
 
             # Determine the way to build individuals for the population
-            toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.hyperparameters, n=1)
+            toolbox.register(
+                "individual",
+                tools.initRepeat,
+                creator.Individual,
+                toolbox.hyperparameters,
+                n=1,
+            )
 
             # Determine the way to build a population
             toolbox.register("population", tools.initRepeat, list, toolbox.individual)
@@ -209,25 +249,18 @@ class Genetic_algorithm(Metaheuristic):
             # Build the population
             pop = toolbox.population(n=self.pop_size)
 
-
-        # Start from a saved population
-        else:
-
-            toolbox.register("individual_guess", self.initIndividual, creator.Individual)
-            toolbox.register("population_guess", self.initPopulation, list, toolbox.individual_guess, self.filename)
-
-            print("Creation of the initial population...")
-            pop = toolbox.population_guess()
-
         # Create crossover tool
         toolbox.register("mate", tools.cxOnePoint)
         # Create mutation tool
-        toolbox.register("mutate", self.mutate, proba=1/self.search_space.n_variables)
+        toolbox.register("mutate", self.mutate, proba=1 / self.search_space.n_variables)
         # Create selection tool
         toolbox.register("select", tools.selTournament, tournsize=3)
 
         # Create a tool to select best individuals from a population
-        toolbox.register("best",tools.selBest, k=int(self.pop_size/2))
+        bpn = int(self.pop_size * self.elitism)
+        bcn = self.pop_size - bpn
+        toolbox.register("best_p", tools.selBest, k=bpn)
+        toolbox.register("best_c", tools.selBest, k=bcn)
 
         best_of_all = tools.HallOfFame(n_process)
 
@@ -237,43 +270,45 @@ class Genetic_algorithm(Metaheuristic):
         # Compute dynamically fitnesses
         solutions = []
         solutions = [p[0] for p in pop]
-        fitnesses = self.loss_func(solutions)
-
-        self.all_scores += fitnesses
+        fitnesses = self.loss_func(solutions, generation=0)
 
         # Map computed fitness to individual fitness value
-        for ind,fit in zip(pop,fitnesses):
-            ind.fitness.values = fit,
+        for ind, fit in zip(pop, fitnesses):
+            ind.fitness.values = (fit,)
 
         fits = [ind.fitness.values[0] for ind in pop]
 
-        if save:
-            f_pop = open("ga_population.txt","a")
-            for ind,cout in zip(pop,fits):
-                f_pop.write(str(ind)[2:-2].replace(" ","").replace("'","")+","+str(cout).replace(" ","")+"\n")
-            f_pop.close()
+        # Save file
+        if self.loss_func.save:
+            self.ga_save = os.path.join(self.loss_func.outputs_path, "ga_population.csv")
+            with open(self.ga_save, "a") as f:
+                f.write(",".join(e for e in self.search_space.labels) + ",loss\n")
+                for ind, cout in zip(pop, fits):
+                    f.write(",".join(str(e) for e in ind[0]) + "," + str(cout) + "\n")
 
+        for ind, cout in zip(pop, fits):
+            self.pop_historic.append(ind[0])
+            self.fitness_historic.append(cout)
 
         print("Initial population evaluated")
 
         print("Evolution starting...")
-        g=0
-        while g < self.generation: # A revoir avec self.loss_func.call
+        g = 0
+        while g < self.generation and self.loss_func.calls < self.f_calls:
             g += 1
 
             # Update all of fame
             best_of_all.update(pop)
 
             if self.verbose:
-                print("Génération: "+str(g))
+                print("Génération: " + str(g))
 
                 # Selection operator
                 print("Selection...")
 
-            offspring = toolbox.select(pop,k=len(pop))
+            offspring = toolbox.select(pop, k=len(pop))
 
-            # /!\ On clone (copy), la population selectionnée, pour pouvoir la faire reproduire et la muté sans impacter les individus selectionner
-            offspring = list(map(toolbox.clone,offspring))
+            offspring = list(map(toolbox.clone, offspring))
 
             children = []
 
@@ -282,14 +317,14 @@ class Genetic_algorithm(Metaheuristic):
                 print("Crossover...")
 
             i = 0
-            for child1,child2 in zip(offspring[::2],offspring[1::2]):
+            for child1, child2 in zip(offspring[::2], offspring[1::2]):
 
                 # Clone individuals from crossover
                 children1 = toolbox.clone(child1)
                 children2 = toolbox.clone(child2)
 
                 # Apply crossover
-                toolbox.mate(children1[0],children2[0])
+                toolbox.mate(children1[0], children2[0])
                 # Delete children fitness inherited from the parents
                 del children1.fitness.values
                 del children2.fitness.values
@@ -305,37 +340,36 @@ class Genetic_algorithm(Metaheuristic):
                 toolbox.mutate(mutant)
 
             if self.verbose:
-                print("Evaluating population n°"+str(g))
+                print("Evaluating population n°" + str(g))
 
             # Compute dynamically fitnesses
             solutions = []
             solutions = [p[0] for p in children]
-            fitnesses = self.loss_func(solutions)
+            fitnesses = self.loss_func(solutions, generation=g)
 
             # Map computed fitness to individual fitness value
             for ind, fit in zip(children, fitnesses):
-                ind.fitness.values = fit,
-
+                ind.fitness.values = (fit,)
 
             # Build new population
-            pop[:] = toolbox.best(offspring)+toolbox.best(children)
+            pop[:] = toolbox.best_p(offspring) + toolbox.best_c(children)
 
             # Get fitnesses from the new population
             fits = [ind.fitness.values[0] for ind in pop]
 
-            self.all_scores += fits
-
             # Save new population
-            if save:
-                f_pop = open("ga_population.txt","a")
-                for ind,cout in zip(pop,fits):
-                    f_pop.write(str(ind)[2:-2].replace(" ","").replace("'","")+","+str(cout).replace(" ","")+"\n")
-                f_pop.close()
+            if self.loss_func.save:
+                with open(self.ga_save, "a") as f:
+                    for ind, cout in zip(pop, fits):
+                        f.write(",".join(str(e) for e in ind[0]) + "," + str(cout) + "\n")
+
+            for ind, cout in zip(pop, fits):
+                self.pop_historic.append(ind[0])
+                self.fitness_historic.append(cout)
 
             # End populaiton evaluation
             if self.verbose:
-                print("Evaluation n°"+str(g)+"ending...")
-
+                print("Evaluation n°" + str(g) + "ending...")
 
         best = []
         min = []
@@ -345,14 +379,14 @@ class Genetic_algorithm(Metaheuristic):
             min.append(b.fitness.values[0])
             best.append(b[0])
 
-            #print best parameters from genetic algorithm
-            print("Best parameters: " + str(b[0])+" | score: "+str(b.fitness.values[0]))
+            # print best parameters from genetic algorithm
+            print("Best parameters: " + str(b[0]) + " | score: " + str(b.fitness.values[0]))
 
         return best, min
 
-    def show(self, filename = None):
+    def show(self, filepath="", save=False):
 
-        """show(self, filename=None)
+        """show(self, filepath="")
 
         Plots solutions and scores evaluated during the optimization
 
@@ -361,44 +395,69 @@ class Genetic_algorithm(Metaheuristic):
         filename : str, default=None
             If a filepath is given, the method will read the file and will try to plot contents.
 
+        save : boolean, default=False
+            Save figures
         """
 
+        all_data, all_scores = super().show(filepath, save)
 
-        import pandas as pd
-        import matplotlib.pyplot as plt
-        import seaborn as sns
-
-        if filename == None:
-            scores = np.array(self.loss_func.all_scores)
+        if filepath:
+            gapth = os.path.join(filepath, "outputs", "ga_population.csv")
+            data = pd.read_table(gapth, sep=",", decimal=".")
+            scores = data["loss"].to_numpy()
         else:
-            data = pd.read_table(filename,sep=",",decimal   =".")
-            scores = data["loss_value"].to_numpy()
+            data = self.pop_historic
+            scores = np.array(self.fitness_historic)
 
-        quantile = np.quantile(scores,0.75)
+        quantile = np.quantile(scores, 0.75)
         argmin = np.argmin(scores)
         min = scores[argmin]
-        heatmap = scores.reshape((int(len(scores)/self.pop_size),self.pop_size))
 
-        minimums = np.min(heatmap,axis=1)
-        means = np.mean(heatmap,axis=1)
+        # Padding missing individual for reshape
+        m, n = int(np.ceil(len(scores) / self.pop_size)), self.pop_size
+        scores = np.pad(scores, (0, m * n - scores.size), mode="constant", constant_values=np.nan)
+
+        heatmap = scores.reshape((m, n))
+
+        minimums = np.min(heatmap, axis=1)
+        means = np.mean(heatmap, axis=1)
 
         heatmap.sort(axis=1)
         heatmap = heatmap.transpose()
 
-        ax = sns.heatmap(heatmap,vmin=min,vmax=quantile, cmap="YlGnBu",cbar_kws={'label': 'Score'})
+        fig, ax = plt.subplots(figsize=(19.2, 14.4))
+        ax = sns.heatmap(heatmap, vmin=min, vmax=quantile, cmap="YlGnBu", cbar_kws={"label": "Fitness"})
         ax.invert_yaxis()
-        ax.set_title("Fitness evolution through generations, mininimum="+str(min))
-        ax.set(xlabel='Generation number', ylabel='Individual number')
-        plt.legend()
-        plt.show()
+        ax.set_title(f"Fitness of each individual through generations")
+        ax.set(xlabel="Generation number", ylabel="Individual number")
 
-        plt.plot(np.arange(len(minimums)),minimums,"-",label="Best individual",color="red")
-        plt.plot(np.arange(len(means)),means,":",label="Mean",color="blue")
+        if save:
+            save_path = os.path.join(self.loss_func.plots_path, f"heatmap_ga.png")
+            plt.savefig(save_path, bbox_inches="tight")
+            plt.close()
+        else:
+            plt.show()
+            plt.close()
+
+        fig, ax = plt.subplots(figsize=(19.2, 14.4))
+        plt.plot(
+            np.arange(len(minimums)),
+            minimums,
+            "-",
+            label="Best individual",
+            color="red",
+        )
+        plt.plot(np.arange(len(means)), means, ":", label="Mean", color="blue")
         plt.title("Best individual and population's mean through generations")
         plt.xlabel("Generations")
         plt.ylabel("Score")
         plt.legend()
-        plt.show()
 
-        if filename != None:
-            self.search_space.show(data,scores)
+        if save:
+            save_path = os.path.join(self.loss_func.plots_path, f"lineplot_ga.png")
+
+            plt.savefig(save_path, bbox_inches="tight")
+            plt.close()
+        else:
+            plt.show()
+            plt.close()
