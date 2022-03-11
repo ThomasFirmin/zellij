@@ -1,8 +1,5 @@
 import numpy as np
-import copy
-
-tree_search_algorithm = {"BFS": Breadth_first_search,"DFS": Depth_first_search, "BS": Beam_search, "BestFS":Best_first_search,\
-"CBFS":Cyclic_best_first_search,"DBFS":Diverse_best_first_search,"EGS":Epsilon_greedy_search}
+import abc
 
 class Tree_search():
     def __init__(self,open,max_depth):
@@ -369,3 +366,6 @@ class Epsilon_greedy_search(Tree_search):
 
             else:
                 return False,-1
+
+tree_search_algorithm = {"BFS": Breadth_first_search,"DFS": Depth_first_search, "BS": Beam_search, "BestFS":Best_first_search,\
+"CBFS":Cyclic_best_first_search,"DBFS":Diverse_best_first_search,"EGS":Epsilon_greedy_search}

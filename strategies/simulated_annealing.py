@@ -3,7 +3,7 @@ import numpy as np
 class Simulated_annealing:
 
     # Initialize simulated annealing
-    def __init__(self,loss_func, search_space, f_calls, max_iter, T_0, T_end, n_peaks=1, red_rate=0.80,verbose=False):
+    def __init__(self,loss_func, search_space, f_calls, max_iter, T_0, T_end, n_peaks=1, red_rate=0.80,verbose=False, logger=None):
 
         # must be a function that can take a list of points
         self.loss_func = loss_func
@@ -35,6 +35,7 @@ class Simulated_annealing:
         self.record_temp = [self.T_0]
         self.record_proba = [0]
         self.verbose=verbose
+        self.logger=logger
 
     # Determine the number of iterations of SA
     def number_of_iterations(self):
@@ -74,7 +75,7 @@ class Simulated_annealing:
         return T, res
 
     # RUN SA
-    def run(self,X_0 , Y_0, n_process=1,save=False):
+    def run(self,X_0 , Y_0, n_process=1,save=None):
 
         # Initial solution
         self.X_0 = X_0
@@ -82,23 +83,32 @@ class Simulated_annealing:
         # Score of the initial solution
         self.Y_0 = Y_0
 
-        print("Simulated Annealing starting")
-        print(self.X_0,self.Y_0)
+        if self.logger:
+            self.logger.info("Simulated Annealing starting")
+            self.logger.info(self.X_0, self.Y_0)
 
-        # Determine the number of iteration according to the function parameters
-        print("Determining number of iterations")
-        nb_iteration = self.number_of_iterations()
-        print("Number of iterations: "+str(nb_iteration))
+            # Determine the number of iteration according to the function parameters
+            self.logger.info("Determining number of iterations")
+            nb_iteration = self.number_of_iterations()
+            self.logger.info("Number of iterations: " + str(nb_iteration))
+        else:
+            print("Simulated Annealing starting")
+            print(self.X_0,self.Y_0)
 
-        if save:
+            # Determine the number of iteration according to the function parameters
+            print("Determining number of iterations")
+            nb_iteration = self.number_of_iterations()
+            print("Number of iterations: "+str(nb_iteration))
+
+        if save != None:
 
             # Initialize an empty file for saving best parameters
-            f = open("simulated_annealing_save.csv", "w")
+            f = open(save + "/simulated_annealing_save.csv", "w")
             f.write(str(self.search_space.label)[1:-1].replace(" ","").replace("'","")+",loss_value\n")
             f.close()
 
             # Initialize an empty file to save analysis data
-            g = open("analyse_rs.csv", "w")
+            g = open(save + "/analyse_rs.csv", "w")
             g.write(str(self.search_space.label)[1:-1].replace(" ","").replace("'","")+",loss_value,temperature,probability\n")
             g.close()
 
@@ -132,7 +142,7 @@ class Simulated_annealing:
                 population = []
 
                 neighbors = self.search_space.get_neighbor(X,size=n_process)
-                loss_values = self.loss_func(neighbors)
+                loss_values = self.loss_func(neighbors, iteration)
 
                 index_min = np.argmin(loss_values)
                 Y = neighbors[index_min][:]
@@ -153,13 +163,13 @@ class Simulated_annealing:
                     cout_X) + "\nBest model score: " + str(cout_X_p)
 
                 # Save the actual best parameters
-                if save:
-                    f = open("simulated_annealing_save.csv", "a")
+                if save != None:
+                    f = open(save + "/simulated_annealing_save.csv", "a")
                     for i,j in zip(neighbors,loss_values):
                         f.write(str(i)[1:-1].replace(" ","").replace("'","")+","+str(j).replace(" ","")+ "\n")
                     f.close()
 
-                    g = open("analyse_rs.csv", "a")
+                    g = open(save + "/analyse_rs.csv", "a")
                     g.write(str(X)[1:-1].replace(" ","").replace("'","")+","+str(cout_X).replace(" ","")+","+str(self.record_temp[-1]).replace(" ","")+","+str(self.record_proba[-1]).replace(" ","") + "\n")
                     g.close()
 
@@ -199,32 +209,36 @@ class Simulated_annealing:
                 iteration += 1
                 total_iteration += 1*n_process
 
-                out += "\nITERATION:"+str(total_iteration)+"/"+str(nb_iteration)
+                out += "\nITERATION:"+str(total_iteration//n_process)+"/"+str(nb_iteration)
                 out += "\n==============================================================\n"
 
                 self.record_temp.append(T_actu)
 
                 if self.verbose:
-                    print(out)
+                    self.logger.info(out)
 
             inter = self.decrease_temperature(T_actu)
             T_actu = inter[0]
             iteration_temp += inter[1]
 
         #print the best solution from the simulated annealing
-        print("Best parameters: " +str(X_p)+" score: "+str(cout_X_p))
-        print("Simulated Annealing ending")
+        if self.logger:
+            self.logger.info("Best parameters: " + str(X_p) + " score: " + str(cout_X_p))
+            self.logger.info("Simulated Annealing ending")
+        else:
+            print("Best parameters: " +str(X_p)+" score: "+str(cout_X_p))
+            print("Simulated Annealing ending")
 
         #return self.n_best,self.n_scores
 
-    def show(self, filepath = None):
+    def show(self, filepath = None, save = None):
 
         import matplotlib.pyplot as plt
         import pandas as pd
         
         if filepath == None:
 
-            plt.plot(list(range(len(self.all_scores))),self.all_scores,"-")
+            plt.plot(list(range(len(self.all_scores))), self.all_scores,"-")
             argmin = np.argmin(self.all_scores)
             plt.scatter(argmin, self.all_scores[argmin], color="red",label="Best score: "+str(self.all_scores[argmin]))
             plt.scatter(0, self.Y_0, color="green",label="Initial score: "+str(self.Y_0))
@@ -235,6 +249,8 @@ class Simulated_annealing:
             plt.legend(loc='upper right')
 
             plt.show()
+            if save !=None:
+                plt.savefig(save + "/results.png")
 
             f, (ax1, ax2) = plt.subplots(1, 2)
             ax1.plot(list(range(len(self.all_scores))),self.record_temp,"-")
@@ -261,6 +277,9 @@ class Simulated_annealing:
             ax2.legend(loc='upper right')
 
             plt.show()
+
+            if save !=None:
+                plt.savefig(save + "/analyse_rs.png")
 
         else:
 

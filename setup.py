@@ -20,7 +20,7 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    packages=['zellij', 'zellij.strategies', 'zellij.strategies.utils', 'zellij.utils'],
+    packages=['zellij', 'zellij.strategies', 'zellij.strategies.transformer_utils', 'zellij.transformer_utils'],
     keywords=["fractal", "continuous optimization", "global optimization", "black-box functions", "decision space partitioning","exploration", "exploitation", "metaheuristics", "tree search"  ],
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),

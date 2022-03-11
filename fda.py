@@ -2,8 +2,9 @@ import numpy as np
 import copy
 
 from zellij.utils.fractal import fractal_list
+from zellij.utils.heuristics import heuristic_list
 from zellij.utils.tree_search import tree_search_algorithm
-from zellij.utils.heuristic import heuristic_list
+# from zellij.transformer_utils.heuristic import heuristic_list
 from zellij.utils.loss_func import FDA_loss_func
 
 class FDA:
@@ -164,10 +165,10 @@ class FDA:
 
                         print("Best solution found :",child.min_score,"<",self.best_score,"For exploration")
                         self.best_ind = child.best_sol
-                        self.best_ind_c = self.search_space.convert_to_continuous([self.best_ind],True)[0]
+                        self.best_ind_c = self.search_space.convert_to_continuous([self.best_ind],False)[0]
                         self.best_score = child.min_score
 
-                    child.best_sol_c = self.search_space.convert_to_continuous([child.best_sol],True)[0]
+                    child.best_sol_c = self.search_space.convert_to_continuous([child.best_sol],False)[0]
                     child.score = self.heuristic(child,self.best_ind_c,self.best_score)
 
                     print(f"\t\t=>Score:{child.score}")

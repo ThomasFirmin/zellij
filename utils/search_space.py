@@ -102,6 +102,8 @@ class Searchspace:
 
         except ValueError:
             p = np.full(self.n_variables, 1/self.n_variables)
+        except IndexError:
+            p = np.full(self.n_variables, 1/self.n_variables)
 
         return np.random.choice(self.label,size=size,replace=replace,p=p)
 
@@ -128,6 +130,9 @@ class Searchspace:
 
             except ValueError:
                 p = np.full(len(self.values[index]), 1/len(self.values[index]))
+            except IndexError:
+                p = np.full(len(self.values[index]), 1/len(self.values[index]))
+
 
             return np.random.choice(self.values[index],size=size,replace=replace,p=p)
 
@@ -144,18 +149,21 @@ class Searchspace:
 
                 if self.type[index]=="R":
                     neighbor[index] = np.random.uniform(np.max([point[index]-self.neighborhood[index],self.values[index][0]]),
-                    np.min([point[index]+self.neighborhood[index],self.values[index][1]]))
+                    np.min([point[index]+self.neighborhood[index], self.values[index][1]]))
 
                 elif self.type[index]=="D":
 
-                    search_list = list(range(int(np.max([point[index]-self.neighborhood[index],self.values[index][0]])),int(np.min([point[index]+self.neighborhood[index],self.values[index][1]]))))
+                    search_list = list(range(int(np.max([point[index]-self.neighborhood[index],self.values[index][0]])),
+                                             int(np.min([point[index]+self.neighborhood[index],self.values[index][1]])+1)))
 
                     try:
                         search_list.remove(point[index])
                     except ValueError:
                         pass
-
+                    except IndexError:
+                        pass
                     neighbor[index] = np.random.choice(search_list)
+
 
                 elif self.type[index]=="C":
 
@@ -166,6 +174,8 @@ class Searchspace:
 
                     except ValueError:
                         p = np.full(len(self.values[index]), 1/len(self.values[index]))
+                    except IndexError:
+                        p = np.full(len(self.values[index]), 1 / len(self.values[index]))
 
                     neighbor[index] = np.random.choice(self.values[index],p=p)
 
@@ -181,7 +191,8 @@ class Searchspace:
 
             elif self.type[index]=="D":
 
-                search_list = list(range(int(np.max([point[index]-self.neighborhood[index],self.values[index][0]])),int(np.min([point[index]+self.neighborhood[index],self.values[index][1]]))))
+                search_list = list(range(int(np.max([point[index]-self.neighborhood[index],self.values[index][0]])),
+                                         int(np.min([point[index]+self.neighborhood[index],self.values[index][1]])+1)))
 
                 try:
 
@@ -189,6 +200,8 @@ class Searchspace:
                         search_list.remove(point[index])
 
                 except ValueError:
+                    pass
+                except IndexError:
                     pass
 
                 for i in range(size):
@@ -203,9 +216,10 @@ class Searchspace:
 
                 except ValueError:
                     p = np.full(len(self.values[index]), 1/len(self.values[index]))
-
+                except IndexError:
+                    p = np.full(len(self.values[index]), 1 / len(self.values[index]))
                 for i in range(size):
-                    points.append(np.random.choice(self.values[index],p=p))
+                    points.append(np.random.choice(self.values[index], p=p))
 
         return points
 
@@ -247,7 +261,7 @@ class Searchspace:
 
                     elif self.type[att]=="C":
 
-                        n_values = len(val[att])
+                        n_values = len(val[att])-1
                         converted.append(val[att][int(point[att]*n_values)])
 
                 res.append(converted[:])
@@ -458,3 +472,4 @@ class Searchspace:
         dataf["loss_value"] = Y
         parallel_coordinates(dataf, "loss_value", colormap="viridis_r")
         plt.show()
+        plt.savefig("search_space.png")

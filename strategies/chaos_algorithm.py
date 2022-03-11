@@ -1,5 +1,7 @@
 import numpy as np
-from zellij.strategies.utils import Chaos_map
+# from zellij.strategies.transformer_utils import Chaos_map
+from zellij.strategies.utils.chaos_map import Chaos_map
+
 
 class CGS:
 
@@ -294,7 +296,7 @@ class Chaotic_optimization:
         if save:
             f_pop = open("chaos_results.txt","w")
             f_pop.write(str(self.search_space.label)[1:-1].replace(" ","").replace("'","")+",loss_value\n")
-            f_poop.close()
+            f_pop.close()
 
         self.verbose = verbose
 
