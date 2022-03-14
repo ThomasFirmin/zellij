@@ -1,5 +1,6 @@
 import numpy as np
 from abc import abstractmethod
+import matplotlib.pyplot as plt
 
 
 class Cooling(object):
@@ -69,14 +70,34 @@ class Cooling(object):
     def cool(self):
         pass
 
-    def reset(self):
-        self.Tcurrent = 0
-        self.k = 0
-        self.cross = 0
-
     @abstractmethod
     def iterations(self):
         pass
+
+    def reset(self):
+        self.Tcurrent = self.T0
+        self.k = 0
+        self.cross = 0
+
+    def show(self, filepath=""):
+
+        pts = [self.cool() for i in range(self.iterations())]
+        self.reset()
+
+        fig, ax = plt.subplots(figsize=(19.2, 14.4))
+        fig.suptitle(f"{self.__class__.__name__} cooling schedule")
+        plt.xlabel("Iterations")
+        plt.ylabel("Temperature")
+        plt.plot(pts, ls="-", color="orange")
+
+        if filepath:
+            save_path = os.path.join(self.loss_func.plots_path, f"cooling_sa.png")
+
+            plt.savefig(save_path, bbox_inches="tight")
+            plt.close()
+        else:
+            plt.show()
+            plt.close()
 
 
 class MulExponential(Cooling):

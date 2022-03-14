@@ -2,14 +2,21 @@ import numpy as np
 import os
 import shutil
 from abc import abstractmethod
+import enlighten
+import zellij.utils.progress_bar as pb
 
 try:
     from mpi4py import MPI
-except ImportError:
-    print(
-        "To use MPILoss class you need to install mpi4py and an MPI distribution\n\
+except ImportError as err:
+    logger.error(
+        "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
     You can use: pip install zellij[Parallel]"
     )
+    raise err
+
+import logging
+
+logger = logging.getLogger("zellij.loss")
 
 
 class LossFunc(object):
@@ -53,7 +60,7 @@ class LossFunc(object):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, save=False):
+    def __init__(self, model, save=False, verbose=True):
 
         """__init__(self, model, save=False)
 
@@ -74,7 +81,7 @@ class LossFunc(object):
 
         self.model = model
         self.save = save
-
+        self.verbose = verbose
         #############
         # VARIABLES #
         #############
@@ -86,7 +93,7 @@ class LossFunc(object):
         self.all_solutions = []
 
         self.calls = 0
-        # Must be private, to modify
+        # Must be private, à voir
         self.new_best = False
 
         self.labels = []
@@ -102,6 +109,36 @@ class LossFunc(object):
         self.loss_file = ""
 
         self.file_created = False
+
+        if self.verbose:
+            self.manager = enlighten.get_manager()
+        else:
+            self.manager = enlighten.get_manager(stream=None, enabled=False)
+
+    def build_bar(self, total):
+        if self.verbose:
+            self.lf_pb = pb.calls_counter_inside(self.manager, total)
+            self.best_pb = pb.best_found(self.manager, self.best_score)
+
+    def close_bar(self):
+        if self.verbose:
+            self.lf_pb.close()
+            self.best_pb.close()
+
+    @abstractmethod
+    def _save_model(self, *args):
+        """ _save_model(self)
+
+        Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
+         y is the results of the evaluation of x by f. model is optional, if you want to save the best found model (e.g. a neural network)\
+         you can return the model. However the model must have a "save" method (e.g. model.save(filename)).
+
+        """
+        pass
+
+    @abstractmethod
+    def __call__(self, X, **kwargs):
+        pass
 
     def _create_file(self, x, *args):
 
@@ -144,7 +181,7 @@ class LossFunc(object):
                 nfolder = f"{self.folder_name}_{i}"
                 os.mkdir(nfolder)
                 created = False
-                print(f"WARNING: Folder {self.folder_name} already exists, results will be saved at {nfolder}")
+                logger.warning(f"WARNING: Folder {self.folder_name} already exists, results will be saved at {nfolder}")
                 self.folder_name = nfolder
             except FileExistsError as error:
                 i += 1
@@ -170,14 +207,14 @@ class LossFunc(object):
 
         # Determine header
         if len(self.labels) != len(x):
-            print("WARNING: Labels are of incorrect size, it will be replaced in the save file header")
+            logger.warning("WARNING: Labels are of incorrect size, it will be replaced in the save file header")
             for i in range(len(x)):
                 self.labels.append(f"attribute{i}")
 
         with open(self.loss_file, "w") as f:
             f.write(",".join(str(e) for e in self.labels) + ",loss" + suffix + "\n")
 
-        print("INFO: Results will be saved at: " + os.path.abspath(self.folder_name))
+        logger.info(f"INFO: Results will be saved at: {os.path.abspath(self.folder_name)}")
 
         self.file_created = True
 
@@ -216,14 +253,18 @@ class LossFunc(object):
     def _save_best(self, x, y):
 
         # historic
-        self.all_solutions.append(x)
+        self.all_solutions.append(list(x)[:])
         self.all_scores.append(y)
 
         # Save best
         if y < self.best_score:
             self.best_score = y
-            self.best_sol = x
+            self.best_sol = list(x)[:]
             self.new_best = True
+
+        if self.verbose:
+            self.lf_pb.update(1)
+            self.best_pb.update("      Current score:{:.3f} | Best score:{:.3f}".format(y, self.best_score), color="white")
 
     def _build_return(self, r):
         """_build_return(self, r)
@@ -249,7 +290,10 @@ class LossFunc(object):
 
         # Separate results and model
         if isinstance(r, tuple):
-            results, model = r
+            if len(r) > 1:
+                results, model = r
+            else:
+                results, model = r, False
         else:
             results, model = r, False
 
@@ -267,21 +311,6 @@ class LossFunc(object):
 
         return rd, model
 
-    @abstractmethod
-    def _save_model(self, *args):
-        """ _save_model(self)
-
-        Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
-         y is the results of the evaluation of x by f. model is optional, if you want to save the best found model (e.g. a neural network)\
-         you can return the model. However the model must have a "save" method (e.g. model.save(filename)).
-
-        """
-        pass
-
-    @abstractmethod
-    def __call__(self, X, **kwargs):
-        pass
-
 
 class FDA_loss_func:
 
@@ -292,7 +321,7 @@ class FDA_loss_func:
     Must be modified
     """
 
-    def __init__(self, model, H):
+    def __init__(self, model, H, sp):
 
         ##############
         # PARAMETERS #
@@ -300,11 +329,76 @@ class FDA_loss_func:
 
         self.loss_func = model
         self.H = H
+        self.search_space = sp
 
-    def __call__(self, X):
-        res = self.loss_func(X)
-        self.H.add_point(res, X)
+    @property
+    def calls(self):
+        return self.loss_func.calls
 
+    @property
+    def save(self):
+        return self.loss_func.save
+
+    @property
+    def best_score(self):
+        return self.loss_func.best_score
+
+    @property
+    def best_sol(self):
+        return self.loss_func.best_sol
+
+    @property
+    def all_scores(self):
+        return self.loss_func.all_scores
+
+    @property
+    def all_solutions(self):
+        return self.loss_func.all_solutions
+
+    @property
+    def new_best(self):
+        return self.loss_func.new_best
+
+    @property
+    def labels(self):
+        return self.loss_func.labels
+
+    @labels.setter
+    def labels(self, v):
+        self.loss_func.labels = v
+
+    @property
+    def folder_name(self):
+        return self.loss_func.folder_name
+
+    @property
+    def outputs_path(self):
+        return self.loss_func.outputs_path
+
+    @property
+    def model_path(self):
+        return self.loss_func.model_path
+
+    @property
+    def plots_path(self):
+        return self.loss_func.plots_path
+
+    @property
+    def loss_file(self):
+        return self.loss_func.loss_file
+
+    @property
+    def file_created(self):
+        return self.loss_func.file_created
+
+    @file_created.setter
+    def file_created(self, v):
+        self.loss_func.file_created = v
+
+    def __call__(self, X, **kwargs):
+        res = self.loss_func(X, **kwargs)
+        X_c = self.search_space.convert_to_continuous(X)
+        self.H.add_point(res, X_c)
         return res
 
 
@@ -349,7 +443,7 @@ class MPILoss(LossFunc):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, save=False):
+    def __init__(self, model, save=False, verbose=True):
 
         """__init__(self, model, save=False)
 
@@ -357,7 +451,7 @@ class MPILoss(LossFunc):
 
         """
 
-        super().__init__(model, save)
+        super().__init__(model, save, verbose)
 
         #################
         # MPI VARIABLES #
@@ -368,13 +462,12 @@ class MPILoss(LossFunc):
             self.status = MPI.Status()
             self.rank = self.comm.Get_rank()
             self.p = self.comm.Get_size()
-        except Exception as e:
-            print(e)
-            print(
+        except Exception as err:
+            logger.error(
                 "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
             You can use: pip install zellij[Parallel]"
             )
-            exit()
+            raise err
 
         # Master or worker process
         self.master = self.rank == 0
@@ -404,7 +497,13 @@ class MPILoss(LossFunc):
 
         """
 
+        logger.info("Master Starting")
+
         assert self.p > 1, "n_process must be > 1"
+
+        self.build_bar(len(X))
+
+        self.new_best = False
 
         res = [None] * len(X)
         send_history = [-1] * (self.p)
@@ -413,7 +512,9 @@ class MPILoss(LossFunc):
 
         # Send a solution to all available processes
         while nb_send < len(X) and nb_send < (self.p - 1):
-            print("MASTER " + str(self.rank) + " sending to" + str(nb_send))
+
+            logger.debug(f"MASTER {self.rank} sending to {nb_send}")
+
             self.comm.send(dest=nb_send + 1, tag=0, obj=X[nb_send])
             send_history[nb_send + 1] = nb_send
             nb_send += 1
@@ -422,10 +523,12 @@ class MPILoss(LossFunc):
         nb_recv = 0
         while nb_send < len(X):
 
-            print("MASTER " + str(self.rank) + " receiving | " + str(nb_recv) + "<" + str(len(X)))
+            logger.debug(f"MASTER {self.rank} receiving | {nb_recv} < {len(X)}")
+
             msg, others = self.comm.recv(source=MPI.ANY_SOURCE, tag=0, status=self.status)
             source = self.status.Get_source()
-            print("MASTER " + str(self.rank) + " received from " + str(source))
+
+            logger.debug(f"MASTER {self.rank} received from {source}")
 
             res[send_history[source]] = msg
 
@@ -442,7 +545,8 @@ class MPILoss(LossFunc):
             nb_recv += 1
             self.calls += 1
 
-            print("MASTER " + str(self.rank) + " sending to" + str(source))
+            logger.debug(f"MASTER {self.rank} sending to {nb_send}")
+
             self.comm.send(dest=source, tag=0, obj=X[nb_send])
             send_history[source] = nb_send
 
@@ -451,10 +555,12 @@ class MPILoss(LossFunc):
         # Receive last results from workers
         while nb_recv < len(X):
 
-            print("MASTER " + str(self.rank) + " end receiving | " + str(nb_recv) + "<" + str(len(X)))
+            logger.debug(f"MASTER {self.rank} last receiving | {nb_recv} < {len(X)}")
+
             msg, others = self.comm.recv(source=MPI.ANY_SOURCE, tag=0, status=self.status)
             source = self.status.Get_source()
-            print("MASTER " + str(self.rank) + " received from " + str(source))
+
+            logger.debug(f"MASTER {self.rank} received from {source}")
 
             nb_recv += 1
             self.calls += 1
@@ -471,7 +577,9 @@ class MPILoss(LossFunc):
             # Save score and solution into the object
             self._save_best(X[send_history[source]], res[send_history[source]])
 
-            print("MASTER FINISHING")
+        self.close_bar()
+
+        logger.info("Master ending")
 
         return res
 
@@ -483,16 +591,18 @@ class MPILoss(LossFunc):
 
         """
 
+        logger.info(f"Worker{self.rank} starting")
+
         stop = True
 
         while stop:
 
-            print("WORKER " + str(self.rank) + " receving")
+            logger.debug(f"WORKER {self.rank} receving")
             msg = self.comm.recv(source=0, tag=0, status=self.status)
 
             if msg != None:
 
-                print("WORKER " + str(self.rank) + " evaluating:\n" + str(msg))
+                logger.debug(f"WORKER {self.rank} evaluating: {msg}")
 
                 res, trained_model = self._build_return(self.model(msg))
 
@@ -506,14 +616,17 @@ class MPILoss(LossFunc):
                         os.system(f"rm -rf {worker_path}")
                         trained_model.save(worker_path)
                     else:
-                        print("Error: model does not have a method called save")
+                        logger.error("Model/loss function does not have a method called `save`")
                         exit()
 
                 # Send results
-                print("WORKER " + str(self.rank) + " sending " + str(score))
+                logger.debug(f"WORKER {self.rank} sending {score}")
+
                 self.comm.send(dest=0, tag=0, obj=[score, others])
             else:
                 stop = False
+
+        logger.info(f"Worker{self.rank} ending")
 
     def stop(self):
 
@@ -563,10 +676,10 @@ class SerialLoss(LossFunc):
     Methods
     -------
 
-    __call__(self, X, filename='', **kwargs)
+    __call__(X, filename='', **kwargs)
         Evaluate a list X of solutions with the original loss function.
 
-    _save_model(self, score, source)
+    _save_model(score, source)
         See LossFunc, save a model according to its score and the worker rank.
 
     See Also
@@ -576,7 +689,7 @@ class SerialLoss(LossFunc):
     MPILoss : Distributed version of LossFunc
     """
 
-    def __init__(self, model, save=False):
+    def __init__(self, model, save=False, verbose=True):
 
         """__init__(self, model, save=False)
 
@@ -584,7 +697,7 @@ class SerialLoss(LossFunc):
 
         """
 
-        super().__init__(model, save)
+        super().__init__(model, save, verbose)
 
     def __call__(self, X, **kwargs):
 
@@ -605,6 +718,8 @@ class SerialLoss(LossFunc):
             Return a list of all the scores corresponding to each evaluated solution of X.
 
         """
+
+        self.build_bar(len(X))
 
         self.new_best = False
 
@@ -627,6 +742,7 @@ class SerialLoss(LossFunc):
 
             self._save_best(x, score)
 
+        self.close_bar()
         return res
 
     def _save_model(self, score, trained_model):
@@ -637,12 +753,12 @@ class SerialLoss(LossFunc):
                 os.system(f"rm -rf {save_path}")
                 trained_model.save(save_path)
             else:
-                print("Error: model does not have a method called save")
+                logger.error("Model/loss function does not have a method called `save`")
                 exit()
 
 
 # Wrap different loss functions
-def Loss(model=None, save=False, MPI=False):
+def Loss(model=None, save=False, verbose=True, MPI=False):
     """Loss(model, save_model='', MPI=False)
 
     Wrap a function of type f(x)=y. See LossFunc for more info.
@@ -670,8 +786,8 @@ def Loss(model=None, save=False, MPI=False):
 
         def wrapper(model):
             if MPI:
-                return MPILoss(model, save)
+                return MPILoss(model, save, verbose)
             else:
-                return SerialLoss(model, save)
+                return SerialLoss(model, save, verbose)
 
         return wrapper

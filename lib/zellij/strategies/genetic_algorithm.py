@@ -8,6 +8,10 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+import logging
+
+logger = logging.getLogger("zellij.GA")
+
 
 class Genetic_algorithm(Metaheuristic):
 
@@ -15,7 +19,7 @@ class Genetic_algorithm(Metaheuristic):
 
     Genetic_algorithm (GA) implements a steady state genetic algorithm. It can be used for exploration and exploitation.
     Indeed when the population has converged, GA can ,thanks to the mutation and crossover operators, perform an intensification phase arround best solutions.
-    It is algorithm which can work with a mixed search space, by adapting its operator.
+    It can work with a mixed search space, by adapting its operator. Used operators are: One-point crossover and Tournament selection of size 3.
 
     Here the mutation operator is the neighborhood defined in the Searchspace object.
     Available crossover operator are those compatible with a mixed individual (1-point, 2-points...). Same with the slection.
@@ -62,7 +66,7 @@ class Genetic_algorithm(Metaheuristic):
         verbose=True,
     ):
 
-        """__init__(self,loss_func, search_space, f_calls, pop_size = 10, generation = 1000, verbose=True)
+        """__init__(loss_func, search_space, f_calls, pop_size = 10, generation = 1000, verbose=True)
 
         Initialize Genetic_algorithm class
 
@@ -88,8 +92,8 @@ class Genetic_algorithm(Metaheuristic):
         elitism : float
             Percentage of the best parents to keep in the next population by replacing the worst children.
 
-        save : boolean, optional
-            if True save results into a file
+        filename : str, optional
+            If a file containing initial solutions. GA will initialize the population with it.
 
         verbose : boolean, default=True
             Algorithm verbosity
@@ -176,7 +180,7 @@ class Genetic_algorithm(Metaheuristic):
         return (individual,)
 
     # Run GA
-    def run(self, n_process=1):
+    def run(self, H=None, n_process=1):
 
         """run(self, n_process = 1,save=False)
 
@@ -184,6 +188,9 @@ class Genetic_algorithm(Metaheuristic):
 
         Parameters
         ----------
+        H : Fractal, default=None
+            When used by FDA, a fractal corresponding to the current subspace is given
+
         n_process : int, default=1
             Determine the number of best solution found to return.
 
@@ -197,11 +204,14 @@ class Genetic_algorithm(Metaheuristic):
 
         """
 
+        # Progress bar
+        self.build_bar(self.generation)
+
         self.loss_func.file_created = False
 
-        print("Genetic Algorithm starting")
+        logger.info("Starting")
 
-        print("Constructing tools...")
+        logger.info("Constructing tools...")
 
         # Define problem type "fitness", weights = -1.0 -> minimization problem
         creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
@@ -224,7 +234,7 @@ class Genetic_algorithm(Metaheuristic):
                 self.filename,
             )
 
-            print("Creation of the initial population...")
+            logger.info("Creation of the initial population...")
             pop = toolbox.population_guess()
 
         # Start from a random population
@@ -244,7 +254,7 @@ class Genetic_algorithm(Metaheuristic):
             # Determine the way to build a population
             toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
-            print("Creation of the initial population...")
+            logger.info("Creation of the initial population...")
 
             # Build the population
             pop = toolbox.population(n=self.pop_size)
@@ -266,11 +276,17 @@ class Genetic_algorithm(Metaheuristic):
 
         # Ga initialization
 
-        print("Evaluating the initial population...")
+        logger.info("Evaluating the initial population...")
         # Compute dynamically fitnesses
         solutions = []
         solutions = [p[0] for p in pop]
+
+        # Progress bar
+        self.pending_pb(len(solutions))
+
         fitnesses = self.loss_func(solutions, generation=0)
+
+        self.update_main_pb(len(solutions), explor=True, best=self.loss_func.new_best)
 
         # Map computed fitness to individual fitness value
         for ind, fit in zip(pop, fitnesses):
@@ -290,21 +306,24 @@ class Genetic_algorithm(Metaheuristic):
             self.pop_historic.append(ind[0])
             self.fitness_historic.append(cout)
 
-        print("Initial population evaluated")
+        logger.info("Initial population evaluated")
 
-        print("Evolution starting...")
+        logger.info("Evolution starting...")
         g = 0
         while g < self.generation and self.loss_func.calls < self.f_calls:
             g += 1
+
+            # Progress bar
+            self.meta_pb.update()
 
             # Update all of fame
             best_of_all.update(pop)
 
             if self.verbose:
-                print("Génération: " + str(g))
+                logger.debug("Generation: " + str(g))
 
                 # Selection operator
-                print("Selection...")
+                logger.debug("Selection...")
 
             offspring = toolbox.select(pop, k=len(pop))
 
@@ -314,7 +333,7 @@ class Genetic_algorithm(Metaheuristic):
 
             # Crossover operator
             if self.verbose:
-                print("Crossover...")
+                logger.debug("Crossover...")
 
             i = 0
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
@@ -335,17 +354,24 @@ class Genetic_algorithm(Metaheuristic):
 
             # Mutate children
             if self.verbose:
-                print("Mutation...")
+                logger.debug("Mutation...")
             for mutant in children:
                 toolbox.mutate(mutant)
 
             if self.verbose:
-                print("Evaluating population n°" + str(g))
+                logger.debug("Evaluating population n°" + str(g))
 
             # Compute dynamically fitnesses
             solutions = []
             solutions = [p[0] for p in children]
+
+            # progress bar
+            self.pending_pb(len(solutions))
+
             fitnesses = self.loss_func(solutions, generation=g)
+
+            # Progress bar
+            self.update_main_pb(len(solutions), explor=True, best=self.loss_func.new_best)
 
             # Map computed fitness to individual fitness value
             for ind, fit in zip(children, fitnesses):
@@ -368,25 +394,25 @@ class Genetic_algorithm(Metaheuristic):
                 self.fitness_historic.append(cout)
 
             # End populaiton evaluation
-            if self.verbose:
-                print("Evaluation n°" + str(g) + "ending...")
+            logger.info(f"Evaluation n°{g} ending...")
 
         best = []
         min = []
 
-        print("Genetic Algorithm ending")
+        logger.info("Ending")
         for b in best_of_all:
             min.append(b.fitness.values[0])
             best.append(b[0])
 
             # print best parameters from genetic algorithm
-            print("Best parameters: " + str(b[0]) + " | score: " + str(b.fitness.values[0]))
+            logger.info("Best parameters: " + str(b[0]) + " | score: " + str(b.fitness.values[0]))
 
+        self.close_bar()
         return best, min
 
     def show(self, filepath="", save=False):
 
-        """show(self, filepath="")
+        """show(filepath="")
 
         Plots solutions and scores evaluated during the optimization
 

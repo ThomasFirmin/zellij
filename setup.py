@@ -24,6 +24,6 @@ setuptools.setup(
     keywords=["fractal", "continuous optimization", "global optimization", "black-box functions", "decision space partitioning","exploration", "exploitation", "metaheuristics", "tree search"  ],
     package_dir={"": "src"},
     packages=setuptools.find_packages(where="src"),
-    install_requires=['numpy', 'deap', 'matplotlib', 'pandas', 'seaborn'],
+    install_requires=['numpy', 'deap', 'matplotlib', 'pandas', 'seaborn', 'enlighten', 'GPy'],
     python_requires=">=3.6"
 )

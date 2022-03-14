@@ -1,4 +1,10 @@
 import numpy as np
+from zellij.core.metaheuristic import Metaheuristic
+from zellij.core.fractals import Hypersphere
+
+import logging
+
+logger = logging.getLogger("zellij.ILS")
 
 # Intensive local search
 class ILS(Metaheuristic):
@@ -42,9 +48,9 @@ class ILS(Metaheuristic):
 
     def __init__(self, loss_func, search_space, f_calls, red_rate=0.5, precision=1e-5, verbose=True):
 
-        """__init__(self, loss_func, search_space, f_calls,save=False,verbose=True)
+        """__init__(loss_func, search_space, f_calls,save=False,verbose=True)
 
-        Initialize HHS class
+        Initialize ILS class
 
         Parameters
         ----------
@@ -73,50 +79,110 @@ class ILS(Metaheuristic):
         self.red_rate = red_rate
         self.precision = precision
 
-        self.upper = np.array([1 for _ in self.search_space.values])
-        self.lower = np.array([0 for _ in self.search_space.values])
+    def run(self, X0=None, Y0=None, H=None, n_process=1):
 
-        self.up_bounds = np.array(self.search_space.convert_to_continuous([[x[1] for x in self.search_space.values]], sub_values=True)[0])
-        self.lo_bounds = np.array(self.search_space.convert_to_continuous([[x[0] for x in self.search_space.values]], sub_values=True)[0])
+        """run(X0=None, Y0=None, H=None, n_process=1)
 
-        up_m_lo = self.up_bounds - self.lo_bounds
-        self.radius = up_m_lo / 2
+        Parameters
+        ----------
+        X0 : list[float], optional
+            Initial solution. If None, a Fractal must be given (H!=None)
+        Y0 : {int, float}, optional
+            Score of the initial solution
+            Determine the starting point of the chaotic map.
+        H : Fractal, optional
+            When used by FDA, a fractal corresponding to the current subspace is given
+        n_process : int, default=1
+            Determine the number of best solution found to return.
 
-    def run(self, X0, Y0, n_process=1):
+        Returns
+        -------
+        best_sol : list[float]
+            Returns a list of the <n_process> best found points to the continuous format
 
-        X0 = np.array(self.search_space.convert_to_continuous([X0], sub_values=True)[0])
+        best_scores : list[float]
+            Returns a list of the <n_process> best found scores associated to best_sol
 
-        scores = [0] * 3
-        solutions = [np.copy(X0), np.copy(X0), np.copy(X0)]
-        scores[0] = Y0
+        """
 
-        step = np.max(self.radius)
+        if H:
+            assert isinstance(H, Hypersphere), logger.error(f"ILS should use Hyperspheres, got {H.__class__.__name__}")
+
+        # logging
+        logger.info("Starting")
+
+        self.build_bar(self.f_calls)
+
+        scores = np.zeros(3, dtype=float)
+
+        if X0:
+            points = np.tile(X0, (3, 1))
+            points[points > 1] = 1
+            points[points < 0] = 0
+
+        elif H:
+            points = np.tile(H.center, (3, 1))
+            points[points > 1] = 1
+            points[points < 0] = 0
+        else:
+            raise ValueError("No starting point given to Simulated Annealing")
+
+        if Y0:
+            scores[0] = Y0
+        else:
+            scores[0] = self.loss_func(self.search_space.convert_to_continuous([points[0]], True, True))[0]
+
+        step = H.radius
 
         while step > self.precision and self.loss_func.calls < self.f_calls:
             i = 0
+            improvement = False
+            # logging
+            logger.info(f"ILS {step}>{self.precision}")
+
             while i < self.search_space.n_variables and self.loss_func.calls < self.f_calls:
 
-                walk = solutions[0][i] + step
-                db = np.min([self.upper[i], walk])
-                solutions[1][i] = db
-                scores[1] = self.loss_func(self.search_space.convert_to_continuous([solutions[1]], True, True))[0]
+                # logging
+                logger.info(f"Evaluating dimension {i}")
 
-                walk = solutions[0][i] - step
-                db = np.max([self.lower[i], walk])
-                solutions[2][i] = db
+                self.pending_pb(2)
 
-                scores[2] = self.loss_func(self.search_space.convert_to_continuous([solutions[2]], True, True))[0]
+                walk = points[0][i] + step
+                points[1][i] = walk
+                points[1][points[1] > 1] = 1
+                points[1][points[1] < 0] = 0
+
+                walk = points[0][i] - step
+                points[2][i] = walk
+                points[2][points[2] > 1] = 1
+                points[2][points[2] < 0] = 0
+
+                scores[1:] = self.loss_func(self.search_space.convert_to_continuous(points[1:], True, True))
 
                 min_index = np.argmin(scores)
-                solutions = [np.copy(solutions[min_index]), np.copy(solutions[min_index]), np.copy(solutions[min_index])]
+
+                if min_index != 0:
+                    points = np.tile(points[min_index], (3, 1))
+                    scores[0] = scores[min_index]
+                    improvement = True
+
+                self.update_main_pb(2, explor=False, best=self.loss_func.new_best)
+                self.meta_pb.update(2)
 
                 i += 1
 
-            step = self.red_rate * step
+            if not improvement:
+                step = self.red_rate * step
+
+        # logging
+        logger.info("Ending")
+        self.close_bar()
+
+        return points[0], scores[0]
 
     def show(self, filepath="", save=False):
 
-        """show(self, filename="")
+        """show(filename="")
 
         Plots solutions and scores evaluated during the optimization
 

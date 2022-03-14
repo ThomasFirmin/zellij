@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Chaos_map(object):
@@ -24,102 +25,93 @@ class Chaos_map(object):
     Chaotic_optimization : Chaos map is used here.
     """
 
-    def __init__(self, name, level, dimension, map_kwargs=None):
+    def __init__(self, vectors, params):
 
-        chaos_map_name = {"henon": _henon_map, "logistic": _logistic_map, "kent": _kent_map, "tent": _tent_map, "random": _random_map}
+        self.vectors = vectors
+        self.params = params
+        self.map = np.zeros([self.vectors, self.params])
 
-        self.level = level
-        self.dimension = dimension
-        self.map_kwargs = map_kwargs
+    def __add__(self, map):
+        assert self.params == map.params, f"Error, maps must have equals `params`, got {self.params} and {map.params}"
 
-        if type(name) == str:
+        new_map = Chaos_map(self.vectors + map.vectors, self.params)
 
-            try:
-                self.map = [chaos_map_name[name]]
-            except:
-                print(f"Invalid map name:{name}. Try:{chaos_map.keys()[1:-1]}")
-                exit()
-        else:
+        new_map.map = np.append(self.map, map.map)
+        np.random.shuffle(new_map.map)
 
-            for i in name:
-                self.map = []
-
-                try:
-                    self.map.append(chaos_map_name[i])
-                except:
-                    print(f"Invalid map name{i}. Try:{chaos_map.keys()[1:-1]}")
-                    exit()
-
-        if self.map_kwargs != None:
-            self.chaos_map = self.map[0](self.level, self.dimension)
-            for m in self.map[1:]:
-                res = m(self.level, self.dimension, **self.map_kwargs)
-                self.chaos_map = np.append(self.chaos_map, res, axis=0)
-        else:
-            self.chaos_map = self.map[0](self.level, self.dimension)
-            for m in self.map[1:]:
-                res = m(self.level, self.dimension)
-                self.chaos_map = np.append(self.chaos_map, res, axis=0)
-
-        if type(name) != str:
-            np.random.shuffle(self.chaos_map)
-
-        self.inverted_choas_map = 1 - self.chaos_map
+        return new_map
 
 
-def _henon_map(n_vectors, n_param, a=1.4020560, b=0.305620406):
+class Henon(Chaos_map):
+    def __init__(self, vectors, params, a=1.4020560, b=0.305620406):
 
-    # Initialization
-    x = np.zeros([n_vectors, n_param])
-    y = np.zeros([n_vectors, n_param])
+        super().__init__(vectors, params)
 
-    x[0, :] = np.random.random(n_param)
+        self.a = a
+        self.b = b
 
-    for i in range(1, n_vectors):
+        # Initialization
+        y = np.zeros([self.vectors, self.params])
+        x = np.random.random(self.params)
 
-        # x_{k+1} = a.(1-x_{k}^2) + b.y_{k}
-        x[i, :] = 1 - a * np.square(x[i - 1, :]) + y[i - 1, :]
+        for i in range(1, self.vectors):
 
-        # y_{k+1} = x_{k}
-        y[i, :] = b * x[i - 1, :]
+            # y_{k+1} = x_{k}
+            y[i, :] = b * x
 
-    # Min_{n_param}(y_{n_param,n_vectors})
-    alpha = np.amin(y, axis=0)
+            # x_{k+1} = a.(1-x_{k}^2) + b.y_{k}
+            x = 1 - a * x ** 2 + y[i - 1, :]
 
-    # Max_{n_param}(y_{n_param,n_vectors})
-    beta = np.amax(y, axis=0)
+        # Min_{params}(y_{params,vectors})
+        alpha = np.amin(y, axis=0)
 
-    return (y - alpha) / (beta - alpha)
+        # Max_{params}(y_{params,vectors})
+        beta = np.amax(y, axis=0)
 
-
-def _logistic_map(n_vectors, n_param, mu=3.57):
-    x = np.zeros([n_vectors, n_param])
-    x[0, :] = np.random.random(n_param)
-
-    for i in range(1, n_vectors):
-        x[i, :] = mu * x[i - 1, :] * (1 - x[i - 1, :])
-
-    return x
+        self.map = (y - alpha) / (beta - alpha)
 
 
-def _kent_map(n_vectors, n_param, beta=0.8):
-    x = np.zeros([n_vectors, n_param])
-    x[0, :] = np.random.random(n_param)
+class Logistic(Chaos_map):
+    def __init__(self, vectors, params, mu=3.57):
 
-    for i in range(1, n_vectors):
-        x[i, :] = np.where(x[i - 1, :] < beta, x[i - 1, :] / beta, (1 - x[i - 1, :]) / (1 - beta))
+        super().__init__(vectors, params)
 
-    return x
+        self.mu = mu
 
+        self.map[0, :] = np.random.random(params)
 
-def _tent_map(n_vectors, n_param, mu=0.8):
-    x = np.zeros([n_vectors, n_param])
-
-    for i in range(1, n_vectors):
-        x[i, :] = mu * (1 - 2 * np.absolute((x[i - 1, :] - 0.5)))
-
-    return x
+        for i in range(1, vectors):
+            self.map[i, :] = mu * self.map[i - 1, :] * (1 - self.map[i - 1, :])
 
 
-def _random_map(n_vectors, n_param):
-    return np.random.random((n_vectors, n_param))
+class Kent(Chaos_map):
+    def __init__(self, vectors, params, beta=0.8):
+        super().__init__(vectors, params)
+
+        self.beta = beta
+
+        self.map[0, :] = np.random.random(params)
+
+        for i in range(1, vectors):
+            self.map[i, :] = np.where(self.map[i - 1, :] < beta, self.map[i - 1, :] / beta, (1 - self.map[i - 1, :]) / (1 - beta))
+
+
+class Tent(Chaos_map):
+    def __init__(self, vectors, params, mu=0.8):
+
+        super().__init__(vectors, params)
+
+        self.mu = mu
+
+        for i in range(1, vectors):
+            self.map[i, :] = mu * (1 - 2 * np.absolute((self.map[i - 1, :] - 0.5)))
+
+
+class Random(Chaos_map):
+    def __init__(self, vectors, params):
+        super().__init__(vectors, params)
+
+        self.map = np.random.random((vectors, params))
+
+
+chaos_map_name = {"henon": Henon, "logistic": Logistic, "kent": Kent, "tent": Tent, "random": Random}

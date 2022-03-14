@@ -2,6 +2,7 @@ import numpy as np
 import abc
 import copy
 
+
 class Tree_search(object):
 
     """Tree_search
@@ -23,13 +24,10 @@ class Tree_search(object):
 
     Methods
     -------
-    __init__(self,open,max_depth)
-        Initialize Tree_search class
-
-    add(self,c)
+    add(c)
         Add a node c to the fractal tree
 
-    get_next(self)
+    get_next()
         Get the next node to evaluate
 
     See Also
@@ -61,8 +59,8 @@ class Tree_search(object):
         self.max_depth = max_depth
 
     @abc.abstractmethod
-    def add(self,c):
-        """__init__(self,open,max_depth)
+    def add(self, c):
+        """__init__(open,max_depth)
 
         Parameters
         ----------
@@ -74,7 +72,7 @@ class Tree_search(object):
 
     @abc.abstractmethod
     def get_next(self):
-        """__init__(self, open, max_depth)
+        """__init__(open, max_depth)
 
         Returns
         -------
@@ -86,6 +84,7 @@ class Tree_search(object):
             if -1 no more nodes to explore, else return a list of the next node to explore
         """
         pass
+
 
 class Breadth_first_search(Tree_search):
     """Breadth_first_search
@@ -110,13 +109,11 @@ class Breadth_first_search(Tree_search):
 
     Methods
     -------
-    __init__(self,open,max_depth)
-        Initialize Breadth_first_search class
 
-    add(self,c)
+    add(c)
         Add a node c to the fractal tree
 
-    get_next(self)
+    get_next()
         Get the next node to evaluate
 
     See Also
@@ -129,7 +126,7 @@ class Breadth_first_search(Tree_search):
 
     def __init__(self, open, max_depth, Q=1, reverse=False):
 
-        """__init__(self, open, max_depth, Q=1, reverse=False)
+        """__init__(open, max_depth, Q=1, reverse=False)
 
         Parameters
         ----------
@@ -147,7 +144,7 @@ class Breadth_first_search(Tree_search):
 
         """
 
-        super().__init__(open,max_depth)
+        super().__init__(open, max_depth)
 
         ##############
         # PARAMETERS #
@@ -162,28 +159,29 @@ class Breadth_first_search(Tree_search):
 
         self.next_frontier = []
 
-    def add(self,c):
+    def add(self, c):
         self.next_frontier.append(c)
 
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier+self.open,reverse=self.reverse,key= lambda x: x.level)[:]
+            self.open = sorted(self.next_frontier + self.open, reverse=self.reverse, key=lambda x: x.level)[:]
             self.next_frontier = []
 
         if len(self.open) > 0:
 
-            idx_min = np.min([len(self.open),self.Q])
+            idx_min = np.min([len(self.open), self.Q])
 
             self.close += self.open[0:idx_min]
 
             for _ in range(idx_min):
                 self.open.pop(0)
 
-            return True,self.close[-idx_min:]
+            return True, self.close[-idx_min:]
 
         else:
-            return False,-1
+            return False, -1
+
 
 class Depth_first_search(Tree_search):
     """Depth_first_search
@@ -201,16 +199,13 @@ class Depth_first_search(Tree_search):
         maximum depth of the fractal rooted tree.
 
     Q : int, default=1
-        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+        Q-Depth_first_search, at each get_next, tries to return Q nodes.
 
     reverse : boolean, default=False
         if False do a descending sort the open list, else do an ascending sort
 
     Methods
     -------
-    __init__(self,open,max_depth)
-        Initialize Breadth_first_search class
-
     add(self,c)
         Add a node c to the fractal tree
 
@@ -226,8 +221,8 @@ class Depth_first_search(Tree_search):
     Cyclic_best_first_search : Hybrid between DFS and BestFS
     """
 
-    def __init__(self,open,max_depth,Q=1,reverse=False):
-        """__init__(self, open, max_depth, Q=1, reverse=False)
+    def __init__(self, open, max_depth, Q=1, reverse=False):
+        """__init__(open, max_depth, Q=1, reverse=False)
 
         Parameters
         ----------
@@ -238,13 +233,13 @@ class Depth_first_search(Tree_search):
             maximum depth of the fractal rooted tree.
 
         Q : int, default=1
-            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+            Q-Depth_first_search, at each get_next, tries to return Q nodes.
 
         reverse : boolean, default=False
             if False do a descending sort the open list, else do an ascending sort
 
         """
-        super().__init__(open,max_depth)
+        super().__init__(open, max_depth)
 
         ##############
         # PARAMETERS #
@@ -259,39 +254,74 @@ class Depth_first_search(Tree_search):
 
         self.next_frontier = []
 
-    def add(self,c):
+    def add(self, c):
 
         self.next_frontier.append(c)
 
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier,reverse=self.reverse,key= lambda x: x.score)[:]+self.open
+            self.open = sorted(self.next_frontier, reverse=self.reverse, key=lambda x: x.score)[:] + self.open
             self.next_frontier = []
 
         if len(self.open) > 0:
 
-            idx_min = np.min([len(self.open),self.Q])
+            idx_min = np.min([len(self.open), self.Q])
 
             self.close += self.open[0:idx_min]
 
             for _ in range(idx_min):
                 self.open.pop(0)
 
-            return True,self.close[-idx_min:]
+            return True, self.close[-idx_min:]
 
         else:
-            return False,-1
+            return False, -1
+
 
 class Best_first_search(Tree_search):
 
-        """Best_first_search
+    """Best_first_search
 
-        Best First Search algorithm (BestFS), BestFS is better than BFS and DFS, because it tries to explore and exploit only the best current node in the tree.
+    Best First Search algorithm (BestFS), BestFS is better than BFS and DFS, because it tries to explore and exploit only the best current node in the tree.
 
-        Attributes
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Best_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Beam_search : Memory efficient tree search algorithm based on BestFS
+    Cyclic_best_first_search : Hybrid between DFS and BestFS
+    """
+
+    def __init__(self, open, max_depth, Q=1, reverse=False):
+        """__init__(self, open, max_depth, Q=1, reverse=False)
+
+        Parameters
         ----------
-
         open : list[Fractal]
             Initial Open list containing not explored nodes from the fractal rooted tree.
 
@@ -299,86 +329,50 @@ class Best_first_search(Tree_search):
             maximum depth of the fractal rooted tree.
 
         Q : int, default=1
-            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+            Q-Best_first_search, at each get_next, tries to return Q nodes.
 
         reverse : boolean, default=False
             if False do a descending sort the open list, else do an ascending sort
 
-        Methods
-        -------
-        __init__(self,open,max_depth)
-            Initialize Breadth_first_search class
-
-        add(self,c)
-            Add a node c to the fractal tree
-
-        get_next(self)
-            Get the next node to evaluate
-
-        See Also
-        --------
-        Fractal : Abstract class defining what a fractal is.
-        FDA : Fractal Decomposition Algorithm
-        Tree_search : Base class
-        Beam_search : Memory efficient tree search algorithm based on BestFS
-        Cyclic_best_first_search : Hybrid between DFS and BestFS
         """
+        super().__init__(open, max_depth)
 
-        def __init__(self,open,max_depth,Q=1,reverse=False):
-            """__init__(self, open, max_depth, Q=1, reverse=False)
+        ##############
+        # PARAMETERS #
+        ##############
 
-            Parameters
-            ----------
-            open : list[Fractal]
-                Initial Open list containing not explored nodes from the fractal rooted tree.
+        self.reverse = reverse
+        self.Q = Q
 
-            max_depth : int
-                maximum depth of the fractal rooted tree.
+        #############
+        # VARIABLES #
+        #############
 
-            Q : int, default=1
-                Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+        self.next_frontier = []
 
-            reverse : boolean, default=False
-                if False do a descending sort the open list, else do an ascending sort
+    def add(self, c):
 
-            """
-            super().__init__(open,max_depth)
+        self.next_frontier.append(c)
 
-            ##############
-            # PARAMETERS #
-            ##############
+    def get_next(self):
 
-            self.reverse = reverse
-            self.Q = Q
-
-            #############
-            # VARIABLES #
-            #############
-
+        if len(self.next_frontier) > 0:
+            self.open = sorted(self.open + sorted(self.next_frontier, reverse=self.reverse, key=lambda x: x.score)[:], reverse=self.reverse, key=lambda x: x.score)
             self.next_frontier = []
 
-        def add(self,c):
+        if len(self.open) > 0:
 
-            self.next_frontier.append(c)
+            idx_min = np.min([len(self.open), self.Q])
+            self.close += self.open[0:idx_min]
 
-        def get_next(self):
+            for _ in range(idx_min):
+                self.open.pop(0)
 
-            if len(self.next_frontier) > 0:
-                self.open = sorted(self.open+sorted(self.next_frontier,reverse=self.reverse,key= lambda x: x.score)[:],reverse=self.reverse,key= lambda x: x.score)
-                self.next_frontier = []
+            return True, self.close[-idx_min:]
 
-            if len(self.open) > 0:
+        else:
+            return False, -1
 
-                idx_min = np.min([len(self.open),self.Q])
-                self.close += self.open[0:idx_min]
-
-                for _ in range(idx_min):
-                    self.open.pop(0)
-
-                return True,self.close[-idx_min:]
-
-            else:
-                return False,-1
 
 class Beam_search(Tree_search):
 
@@ -397,20 +391,17 @@ class Beam_search(Tree_search):
         maximum depth of the fractal rooted tree.
 
     Q : int, default=1
-        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+        Q-Beam_search, at each get_next, tries to return Q nodes.
 
     reverse : boolean, default=False
         if False do a descending sort the open list, else do an ascending sort
 
     Methods
     -------
-    __init__(self,open,max_depth)
-        Initialize Breadth_first_search class
-
-    add(self,c)
+    add(c)
         Add a node c to the fractal tree
 
-    get_next(self)
+    get_next()
         Get the next node to evaluate
 
     beam_length : int, default=10
@@ -425,9 +416,9 @@ class Beam_search(Tree_search):
     Cyclic_best_first_search : Hybrid between DFS and BestFS, which can also perform pruning.
     """
 
-    def __init__(self,open,max_depth,Q=1,reverse=False, beam_length = 10):
+    def __init__(self, open, max_depth, Q=1, reverse=False, beam_length=10):
 
-        """__init__(self, open, max_depth, Q=1, reverse=False)
+        """__init__(open, max_depth, Q=1, reverse=False)
 
         Parameters
         ----------
@@ -438,7 +429,7 @@ class Beam_search(Tree_search):
             maximum depth of the fractal rooted tree.
 
         Q : int, default=1
-            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+            Q-Beam_search, at each get_next, tries to return Q nodes.
 
         reverse : boolean, default=False
             If False do a descending sort the open list, else do an ascending sort
@@ -448,7 +439,7 @@ class Beam_search(Tree_search):
 
         """
 
-        super().__init__(open,max_depth)
+        super().__init__(open, max_depth)
 
         ##############
         # PARAMETERS #
@@ -465,28 +456,31 @@ class Beam_search(Tree_search):
 
         self.next_frontier = []
 
-    def add(self,c):
+    def add(self, c):
 
         self.next_frontier.append(c)
 
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier+sorted(self.open,reverse=self.reverse,key= lambda x: x.score),reverse=self.reverse,key= lambda x: x.score)[:self.beam_length]
+            self.open = sorted(self.next_frontier + sorted(self.open, reverse=self.reverse, key=lambda x: x.score), reverse=self.reverse, key=lambda x: x.score)[
+                : self.beam_length
+            ]
             self.next_frontier = []
 
         if len(self.open) > 0:
 
-            idx_min = np.min([len(self.open),self.Q])
+            idx_min = np.min([len(self.open), self.Q])
             self.close += self.open[0:idx_min]
 
             for _ in range(idx_min):
                 self.open.pop(0)
 
-            return True,self.close[-idx_min:]
+            return True, self.close[-idx_min:]
 
         else:
-            return False,-1
+            return False, -1
+
 
 class Diverse_best_first_search(Tree_search):
 
@@ -506,7 +500,7 @@ class Diverse_best_first_search(Tree_search):
         maximum depth of the fractal rooted tree.
 
     Q : int, default=1
-        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+        Q-Diverse_best_first_search, at each get_next, tries to return Q nodes.
 
     reverse : boolean, default=False
         if False do a descending sort the open list, else do an ascending sort
@@ -516,16 +510,13 @@ class Diverse_best_first_search(Tree_search):
 
     T : float, default=0.5
         Influences the probability of a node to be selected according to its score compared to the best score from the open list.
-        
+
     Methods
     -------
-    __init__(self,open,max_depth)
-        Initialize Breadth_first_search class
-
-    add(self,c)
+    add(c)
         Add a node c to the fractal tree
 
-    get_next(self)
+    get_next()
         Get the next node to evaluate
 
     See Also
@@ -537,9 +528,9 @@ class Diverse_best_first_search(Tree_search):
     Epsilon_greedy_search : Based on BestFS, allows to randomly select a node.
     """
 
-    def __init__(self,open,max_depth,Q=1,reverse=False, P=0.1, T=0.5):
+    def __init__(self, open, max_depth, Q=1, reverse=False, P=0.1, T=0.5):
 
-        """__init__(self, open, max_depth, Q=1, reverse=False)
+        """__init__(open, max_depth, Q=1, reverse=False)
 
         Parameters
         ----------
@@ -550,7 +541,7 @@ class Diverse_best_first_search(Tree_search):
             maximum depth of the fractal rooted tree.
 
         Q : int, default=1
-            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+            Q-Diverse_best_first_search, at each get_next, tries to return Q nodes.
 
         reverse : boolean, default=False
             If False do a descending sort the open list, else do an ascending sort
@@ -562,7 +553,7 @@ class Diverse_best_first_search(Tree_search):
             Influences the probability of a node to be selected according to its score compared to the best score from the open list.
         """
 
-        super().__init__(open,max_depth)
+        super().__init__(open, max_depth)
 
         ##############
         # PARAMETERS #
@@ -582,7 +573,7 @@ class Diverse_best_first_search(Tree_search):
         for i in self.open:
             i.g_value = i.min_score
 
-    def add(self,c):
+    def add(self, c):
 
         c.g_value = c.min_score
         start = c.father
@@ -605,35 +596,34 @@ class Diverse_best_first_search(Tree_search):
 
             combination = []
 
-            hmin,hmax = np.min(h_values),np.max(h_values)
-            gmin,gmax = np.min(g_values),np.max(g_values)
+            hmin, hmax = np.min(h_values), np.max(h_values)
+            gmin, gmax = np.min(g_values), np.max(g_values)
 
             if np.random.random() < self.P:
                 G = np.random.choice(g_values)
             else:
                 G = gmax
 
-            for h,g in zip(h_values,g_values):
+            for h, g in zip(h_values, g_values):
 
                 if g > G:
                     p.append(0)
                 else:
-                    p.append(self.T**(h-hmin))
+                    p.append(self.T ** (h - hmin))
 
                 p_total += p[-1]
 
-            idx = np.random.choice(len(self.open),p=p/p_total)
+            idx = np.random.choice(len(self.open), p=p / p_total)
 
             return idx
 
         else:
             return 0
 
-
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier+sorted(self.open,reverse=self.reverse,key= lambda x: x.score),reverse=self.reverse,key= lambda x: x.score)
+            self.open = sorted(self.next_frontier + sorted(self.open, reverse=self.reverse, key=lambda x: x.score), reverse=self.reverse, key=lambda x: x.score)
             self.next_frontier = []
 
         if len(self.open) > 0:
@@ -642,10 +632,11 @@ class Diverse_best_first_search(Tree_search):
             self.close += [self.open[idx]]
             self.open.pop(idx)
 
-            return True,[self.close[-1]]
+            return True, [self.close[-1]]
 
         else:
-            return False,-1
+            return False, -1
+
 
 class Cyclic_best_first_search(Tree_search):
 
@@ -665,20 +656,17 @@ class Cyclic_best_first_search(Tree_search):
         maximum depth of the fractal rooted tree.
 
     Q : int, default=1
-        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+        Q-Cyclic_best_first_search, at each get_next, tries to return Q nodes.
 
     reverse : boolean, default=False
         if False do a descending sort the open list, else do an ascending sort
 
     Methods
     -------
-    __init__(self,open,max_depth)
-        Initialize Breadth_first_search class
-
-    add(self,c)
+    add(c)
         Add a node c to the fractal tree
 
-    get_next(self)
+    get_next()
         Get the next node to evaluate
 
     See Also
@@ -690,9 +678,9 @@ class Cyclic_best_first_search(Tree_search):
     Depth_first_search : Tree search Depth based startegy
     """
 
-    def __init__(self,open,max_depth,Q=1,reverse=False):
+    def __init__(self, open, max_depth, Q=1, reverse=False):
 
-        """__init__(self, open, max_depth, Q=1, reverse=False)
+        """__init__(open, max_depth, Q=1, reverse=False)
 
         Parameters
         ----------
@@ -703,14 +691,14 @@ class Cyclic_best_first_search(Tree_search):
             maximum depth of the fractal rooted tree.
 
         Q : int, default=1
-            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+            Q-Cyclic_best_first_search, at each get_next, tries to return Q nodes.
 
         reverse : boolean, default=False
             If False do a descending sort the open list, else do an ascending sort
 
         """
 
-        super().__init__(open,max_depth)
+        super().__init__(open, max_depth)
 
         ##############
         # PARAMETERS #
@@ -725,16 +713,16 @@ class Cyclic_best_first_search(Tree_search):
 
         self.next_frontier = []
 
-        self.L = [False]*(self.max_depth+1)
+        self.L = [False] * (self.max_depth + 1)
         self.L[0] = True
         self.i = 0
-        self.contour = [[] for i in range(self.max_depth+1)]
+        self.contour = [[] for i in range(self.max_depth + 1)]
         self.contour[0] = open
 
         self.best_scores = float("inf")
         self.first_complete = False
 
-    def add(self,c):
+    def add(self, c):
 
         # Verify if a node must be pruned or not.
         # A node can be pruned only if at least one exploitation has been made
@@ -765,7 +753,7 @@ class Cyclic_best_first_search(Tree_search):
             modified_levels = np.unique(modified_levels)
             for l in modified_levels:
 
-                self.contour[l] = sorted(self.contour[l],reverse=self.reverse,key= lambda x: x.score)
+                self.contour[l] = sorted(self.contour[l], reverse=self.reverse, key=lambda x: x.score)
 
             self.next_frontier = []
 
@@ -794,7 +782,7 @@ class Cyclic_best_first_search(Tree_search):
             if search and not found:
                 self.i = i
 
-            idx_min = np.min([len(self.contour[self.i]),self.Q])
+            idx_min = np.min([len(self.contour[self.i]), self.Q])
 
             self.close += self.contour[self.i][0:idx_min]
 
@@ -804,10 +792,11 @@ class Cyclic_best_first_search(Tree_search):
             if len(self.contour[self.i]) == 0:
                 self.L[self.i] = False
 
-            return True,self.close[-idx_min:]
+            return True, self.close[-idx_min:]
 
         else:
-            return False,-1
+            return False, -1
+
 
 class Epsilon_greedy_search(Tree_search):
 
@@ -825,7 +814,7 @@ class Epsilon_greedy_search(Tree_search):
         maximum depth of the fractal rooted tree.
 
     Q : int, default=1
-        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+        Q-Epsilon_greedy_search, at each get_next, tries to return Q nodes.
 
     reverse : boolean, default=False
         if False do a descending sort the open list, else do an ascending sort
@@ -835,13 +824,10 @@ class Epsilon_greedy_search(Tree_search):
 
     Methods
     -------
-    __init__(self,open,max_depth)
-        Initialize Breadth_first_search class
-
-    add(self,c)
+    add(c)
         Add a node c to the fractal tree
 
-    get_next(self)
+    get_next()
         Get the next node to evaluate
 
     See Also
@@ -853,76 +839,203 @@ class Epsilon_greedy_search(Tree_search):
     Diverse_best_first_search : Tree search strategy based on an adaptative probability to select random nodes.
     """
 
-        def __init__(self, open, max_depth, reverse=False, epsilon=0.1):
+    def __init__(self, open, max_depth, reverse=False, epsilon=0.1):
 
-            """__init__(self, open, max_depth, Q=1, reverse=False)
+        """__init__(open, max_depth, Q=1, reverse=False)
 
-            Parameters
-            ----------
-            open : list[Fractal]
-                Initial Open list containing not explored nodes from the fractal rooted tree.
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
 
-            max_depth : int
-                maximum depth of the fractal rooted tree.
+        max_depth : int
+            maximum depth of the fractal rooted tree.
 
-            Q : int, default=1
-                Q-Breadth_first_search, at each get_next, tries to return Q nodes.
+        Q : int, default=1
+            Q-Epsilon_greedy_search, at each get_next, tries to return Q nodes.
 
-            reverse : boolean, default=False
-                If False do a descending sort the open list, else do an ascending sort
+        reverse : boolean, default=False
+            If False do a descending sort the open list, else do an ascending sort
 
-            epsilon : float, default=0.1
-                Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration EGS does.
+        epsilon : float, default=0.1
+            Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration EGS does.
 
-            """
+        """
 
-            super().__init__(open,max_depth)
+        super().__init__(open, max_depth)
 
-            ##############
-            # PARAMETERS #
-            ##############
+        ##############
+        # PARAMETERS #
+        ##############
 
-            self.reverse = reverse
-            self.epsilon = epsilon
+        self.reverse = reverse
+        self.epsilon = epsilon
 
-            #############
-            # VARIABLES #
-            #############
+        #############
+        # VARIABLES #
+        #############
 
+        self.next_frontier = []
+
+    def add(self, c):
+
+        self.next_frontier.append(c)
+
+    def get_next(self):
+
+        if len(self.next_frontier) > 0:
+            self.open = sorted(self.open + sorted(self.next_frontier, reverse=self.reverse, key=lambda x: x.score)[:], reverse=self.reverse, key=lambda x: x.score)
             self.next_frontier = []
 
-        def add(self,c):
+        if len(self.open) > 0:
 
-            self.next_frontier.append(c)
+            if np.random.random() > self.epsilon:
 
-        def get_next(self):
+                self.close += [self.open[0]]
+                self.open.pop(0)
 
-            if len(self.next_frontier) > 0:
-                self.open = sorted(self.open+sorted(self.next_frontier,reverse=self.reverse,key= lambda x: x.score)[:],reverse=self.reverse,key= lambda x: x.score)
-                self.next_frontier = []
+            else:
 
-            if len(self.open) > 0:
-
-                if np.random.random() > self.epsilon:
-
+                if len(self.open) > 1:
+                    idx = np.random.randint(1, len(self.open))
+                    self.close += [self.open[idx]]
+                    self.open.pop(idx)
+                else:
                     self.close += [self.open[0]]
                     self.open.pop(0)
 
-                else:
+            return True, [self.close[-1]]
 
-                    if len(self.open) > 1:
-                        idx = np.random.randint(1,len(self.open))
-                        self.close += [self.open[idx]]
-                        self.open.pop(idx)
-                    else:
-                        self.close += [self.open[0]]
-                        self.open.pop(0)
+        else:
+            return False, -1
 
 
-                return True,[self.close[-1]]
+class Potentially_Optimal_Rectangle(Tree_search):
 
+    """Potentially_Optimal_Rectangle
+
+    Potentially Optimal Rectangle algorithm (POR), is a the selection strategy comming from DIRECT.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Best_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Beam_search : Memory efficient tree search algorithm based on BestFS
+    Cyclic_best_first_search : Hybrid between DFS and BestFS
+    """
+
+    def __init__(self, open, max_depth, error=1e-4):
+        """__init__(self, open, max_depth, Q=1, reverse=False, error=1e-4)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Best_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        error : float, default=1e-4
+            Small value which determines when an evaluation should be considered as good as the best solution found so far.
+
+        """
+        super().__init__(open, max_depth)
+
+        ##############
+        # PARAMETERS #
+        ##############
+
+        self.error = error
+
+        #############
+        # VARIABLES #
+        #############
+
+        self.next_frontier = []
+
+        self.best_score = float("inf")
+
+        self.build = np.vectorize(lambda x: (x.min_score, np.linalg.norm(x.center - x.lo_bounds)))
+
+    def add(self, c):
+
+        self.next_frontier.append(c)
+
+        if c.min_score < self.best_score:
+            self.best_score = c.min_score
+
+    def get_next(self):
+
+        if len(self.next_frontier) > 0:
+            idx = self.optimal()
+
+            for i, j in enumerate(idx):
+                self.open.append(self.next_frontier.pop(j - i))
+
+        if len(self.open) > 0:
+
+            idx_min = len(self.open)
+
+            for _ in range(idx_min):
+                self.close.append(self.open.pop(0))
+
+            return True, self.close[-idx_min:]
+
+        else:
+            return False, -1
+
+    def optimal(self):
+
+        res = []
+
+        a, d = self.build(self.next_frontier)
+
+        p1 = a.reshape((len(a), 1)) - a
+        p2 = d.reshape((len(d), 1)) - d
+        K = p1 / p2
+
+        K2 = (a - self.best_score + self.error * np.abs(self.best_score)) / d
+
+        for i in range(len(a)):
+            U = K[i][p2[i] < 0]
+            if len(U) == 0:
+                res.append(i)
             else:
-                return False,-1
+                minU = np.nanmin(U)
+                if minU > 0:
+                    L = K[i][p2[i] >= 0]
+                    maxL = np.maximum(np.nanmax(L), K2[i])
+                    if maxL > 0 and maxL <= minU:
+                        res.append(i)
 
-tree_search_algorithm = {"BFS": Breadth_first_search,"DFS": Depth_first_search, "BS": Beam_search, "BestFS":Best_first_search,\
-"CBFS":Cyclic_best_first_search,"DBFS":Diverse_best_first_search,"EGS":Epsilon_greedy_search}
+        return res

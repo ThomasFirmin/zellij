@@ -1,18 +1,19 @@
 from zellij.core.metaheuristic import Metaheuristic
+from zellij.core.loss_func import FDA_loss_func
+
 import numpy as np
 import copy
 
-from zellij.core.fractal import Fractal
-from zellij.strategies.utils.tree_search import Tree_search
-from zellij.core.loss_func import FDA_loss_func
-from zellij.strategies.utils.heuristics import heuristic_list
+import logging
+
+logger = logging.getLogger("zellij.FDA")
 
 
 class FDA(Metaheuristic):
 
     """FDA
 
-    Fractal Decomposition Algorithm (FDA) is composed of 4 part:
+    Fractal Decomposition Algorithm (FDA) is composed of 5 part:
         –  Fractal decomposition : FDA uses hyper-spheres or hyper-cubes to decompose the search-space into smaller sub-spaces in a fractal way.
         –  Tree search algorithm : Fractals form a tree, so FDA is also a tree search problem. It can use Best First Search, Beam Search or others algorithms from the A* family.
         –  Exploration : To explore a fractal, FDA requires an exploration algorithm, for example GA,or in our case CGS.
@@ -24,8 +25,11 @@ class FDA(Metaheuristic):
     Attributes
     ----------
 
-    heuristic : Heuristic
-        Determine using all points evaluated inside a fractal, how to score this fractal.
+    heuristic : callable
+        Determine using using current state of the algorithm, how to score the current fractal. Used informations are given to the function at the following order:
+        - The current fractal
+        - The best solution found so far (converted to continuous)
+        - The best score found so far (computed with the loss function)
 
     exploration : Metaheuristic
         At each node of a fractal FDA applies an exploration algorithm to determine if this fractal is promising or not.
@@ -42,9 +46,6 @@ class FDA(Metaheuristic):
 
     lo_bounds : list
         List of float containing the lower bounds of the search space converted to continuous
-
-    fractal_name : str
-        Name of the type of fractal to use (hypersphere, hypercube...)
 
     fractal : Fractal
         Fractal object used to build the fractal tree
@@ -72,37 +73,24 @@ class FDA(Metaheuristic):
     Methods
     -------
 
-    run(self,shift=1, n_process=1)
-        Runs CGS
+    evaluate(hypervolumes)
+        Evaluate a list of fractals using exploration and/or exploitation
+
+    run(n_process=1)
+        Runs FDA
 
     See Also
     --------
     Metaheuristic : Parent class defining what a Metaheuristic is
     LossFunc : Describes what a loss function is in Zellij
-    Searchspace : Describes what a loss function is in Zellij
+    Searchspace : Describes what a search space is in Zellij
     Tree_search : Tree search algorithm to explore and exploit the fractal tree.
     Fractal : Base class which defines what a fractal is.
     """
 
-    def __init__(
-        self,
-        loss_func,
-        search_space,
-        f_calls,
-        exploration,
-        exploitation,
-        fractal,
-        tree_search,
-        heuristic="best",
-        level=5,
-        volume_kwargs={},
-        explor_kwargs={},
-        exploi_kwargs={},
-        ts_kwargs={},
-        verbose=True,
-    ):
+    def __init__(self, loss_func, search_space, f_calls, exploration, exploitation, fractal, tree_search, heuristic, level=5, verbose=True, **kwargs):
 
-        """__init__(self,loss_func, search_space, f_calls, exploration, exploitation, fractal="hypersphere", heuristic="best", level=5, tree_search="BS", volume_kwargs={}, explor_kwargs={}, exploi_kwargs={}, ts_kwargs={}, verbose=True)
+        """__init__(loss_func, search_space, f_calls, exploration, exploitation, fractal, tree_search, heuristic, level=5, verbose=True, **kwargs)
 
         Initialize FDA class
 
@@ -117,47 +105,52 @@ class FDA(Metaheuristic):
         f_calls : int
             Maximum number of loss_func calls
 
-
-        level : int, default=5
-            Depth of the fractal tree
-
-        fractal : Fractal
-            Fractal object used to build the fractal tree
-
-        tree_search : Tree_search
-            Tree_search object to use to explore and exploit the fractal tree.
-
-        heuristic : Heuristic
-            Determine using all points evaluated inside a fractal, how to score this fractal.
-
-        exploration : Metaheuristic
+        exploration : {Metaheuristic, list[Metaheuristic]}
             At each node of a fractal FDA applies an exploration algorithm to determine if this fractal is promising or not.
+            If a list of metaheuristic is given, at each level FDA will use the metaheuristic at the index equel to the current level.
+            If len(exploration) < level, the last metaheuristic will be used for following levels.
 
         exploitation : Metaheuristic
             At a leaf of the rooted fractal tree, FDA applies an exploitation algorithm, which ignores subspace bounds (not SearchSpace bounds),
             to refine the best solution found inside this fractal.
 
-        explor_kwargs : list[dict]
-            List of keyword arguments to pass to the exploration strategy at each level of the tree.
-            If len(explor_kwargs) < level, then that last element of the list will be used for the next levels.
+        level : int, default=5
+            Fractal tree depth.
 
-        explor_kwargs : dict
-            Keyword arguments to pass to the exploitation strategy.
+        tree_search : Tree_search
+            BFS : Breadth first search
+            DFS : Depth first search
+            BS : Beam_search
+            BestFS : Best first search
+            CBFS : Cyclic best first search
+            DBFS : Diverse best first search
+            EGS : Epsilon greedy search
+
+        fractal : Fractal
+            Fractal used to build the fractal tree
+
+        heuristic : callable
+            Determine using using current state of the algorithm, how to score the current fractal. Used informations are given to the function at the following order:
+            - The current fractal
+            - The best solution found so far (converted to continuous)
+            - The best score found so far (computed with the loss function)
 
         verbose : boolean, default=True
             Algorithm verbosity
 
+        **kwargs : dict
+            Keyword arguments for fractals and tree search algorithm.
+
         """
 
-        assert level >= 1, "Fractal level must be >= 1"
-
         ##############
-        # PARAMETERS DEPRECATED MUST IMPLEMENT Metaheuristic #
+        # PARAMETERS #
         ##############
 
-        super().__init__(loss_func, search_space, f_calls)
+        super().__init__(loss_func, search_space, f_calls, verbose)
 
-        self.heuristic = heuristic_list[heuristic]
+        self.heuristic = heuristic
+        self.level = level
 
         # Exploration and exploitation function
         if type(exploration) != list:
@@ -165,56 +158,56 @@ class FDA(Metaheuristic):
         else:
             self.exploration = exploration
 
-        self.exploitation = exploitation
-
-        ## KWARGS
-        if type(exploration) != list:
-            self.explor_kwargs = [explor_kwargs]
+        if exploitation:
+            self.exploitation = exploitation
+            self.exploi_calls = self.exploitation.f_calls
         else:
-            self.explor_kwargs = explor_kwargs
-
-        self.exploi_kwargs = exploi_kwargs
-
-        self.level = level
+            self.exploitation = False
 
         #############
         # VARIABLES #
         #############
 
+        # Save f_calls from metaheuristic, to adapt them during FDA.
+        self.explor_calls = [i.f_calls for i in self.exploration]
+
         # Working variables
         self.up_bounds = np.array([1.0 for _ in self.search_space.values])
         self.lo_bounds = np.array([0.0 for _ in self.search_space.values])
 
-        self.fractal_name = fractal  # A voir
-        self.fractal = fractal_list[fractal]  # A voir
+        self.fractal = fractal
+        self.tree_search = tree_search
+
+        self.volume_kwargs = {key: kwargs[key] for key in kwargs if key in self.fractal.__init__.__code__.co_varnames}
+        self.ts_kwargs = {key: kwargs[key] for key in kwargs if key in self.tree_search.__init__.__code__.co_varnames}
 
         # Initialize first fractal
-        self.root = self.fractal("God", self.lo_bounds, self.up_bounds, 0, 0, **volume_kwargs)
+        self.root = self.fractal(self.lo_bounds, self.up_bounds, **self.volume_kwargs)
 
         # Initialize tree search
-        self.tree_search = tree_search_algorithm[tree_search]([self.root], self.level, **ts_kwargs)  # A voir
-
-        # Initialize scoring and criterion variables
-        self.best_score = float("inf")  # A voir
-        self.best_ind = None  # A voir
+        self.tree_search = self.tree_search([self.root], self.level, **self.ts_kwargs)
 
         # Number of explored hypersphere
         self.n_h = 0
 
         self.executed = False  # A voir
-        self.total_h = int(((self.search_space.n_variables * 2) ** (self.level + 1) - 1) / ((self.search_space.n_variables * 2) - 1)) - 1
+
+        # Best solution converted to continuous
+        self.best_ind_c = []
+
+        self.n_process = 1
 
     # Evaluate a list of hypervolumes
     def evaluate(self, hypervolumes):
 
-        """evaluate(self,hypervolumes)
+        """evaluate(hypervolumes)
 
-        Perform exploration or exploitation of a list of hypervolumes.
+        Evaluate a list of fractals using exploration and/or exploitation.
 
         Parameters
         ----------
         hypervolumes : list[Fractal]
-            list of hypervolume to evaluate with exploration and/or exploitation
+            list of hypervolumes to evaluate with exploration and/or exploitation
 
         """
 
@@ -235,120 +228,102 @@ class FDA(Metaheuristic):
                 j += 1
 
                 # Link the loss function to the actual hypervolume (children)
-                modified_loss_func = FDA_loss_func(child, self.loss_func)  # A voir, add_attribute ?
+                modified_loss_func = FDA_loss_func(self.loss_func, child, self.search_space)
 
                 # Count the number of explored hypervolume
                 self.n_h += 1
 
-                # Exploitation
-                if child.level == self.level:
+                # Exploration
+                if child.level != self.level:
 
-                    # Select exploration metaheuristic
                     explor_idx = np.min([child.level, len(self.exploration)]) - 1
-                    explor_idx_kwargs = np.min([child.level, len(self.explor_kwargs)]) - 1
+                    calls_left = np.min([self.explor_calls[explor_idx], self.f_calls - self.loss_func.calls])
 
-                    # Compute bounds of child hypervolume
-                    lo = self.search_space.convert_to_continuous([child.lo_bounds], True)[0]
-                    up = self.search_space.convert_to_continuous([child.up_bounds], True)[0]
+                    if calls_left > 0:
 
-                    # Create a search space for the metaheuristic
-                    sp = self.search_space.subspace(lo, up)
+                        # Compute bounds of child hypervolume
+                        lo = self.search_space.convert_to_continuous([child.lo_bounds], True, True)[0]
+                        up = self.search_space.convert_to_continuous([child.up_bounds], True, True)[0]
 
-                    print(
-                        "  --O  |  Exploitation " + self.fractal_name + " n°",
-                        child.id,
-                        " child of ",
-                        child.father.id,
-                        " at level ",
-                        child.level,
-                        "\nNumber of explored " + self.fractal_name + ": ",
-                        self.n_h,
-                        "/",
-                        self.total_h,
-                    )
+                        # Create a search space for the metaheuristic
+                        sp = self.search_space.subspace(lo, up)
+                        self.exploration[explor_idx].search_space = sp
+                        self.exploration[explor_idx].loss_func = modified_loss_func
 
-                    # Run exploration, scores and evaluated solutions are saved using FDA_loss_func class
-                    exploration = self.exploration[explor_idx](modified_loss_func.evaluate, sp, **self.explor_kwargs[explor_idx_kwargs])
-                    exploration.run()
+                        self.exploration[explor_idx].f_calls = calls_left + self.loss_func.calls
+
+                        logger.info(f"Exploration {self.fractal.__name__} n° {child.id} child of {child.father.id} at level {child.level}")
+                        logger.info(f"Explored {self.fractal.__name__}: {self.n_h}")
+
+                        # Progress bar
+                        prec_calls = self.loss_func.calls
+
+                        # Run exploration, scores and evaluated solutions are saved using FDA_loss_func class
+                        self.exploration[explor_idx].run(H=child, n_process=self.n_process)
+
+                        # Save best found solution
+                        if self.loss_func.new_best:
+                            logger.info(f"Best solution found :{self.loss_func.best_score}")
+                            self.best_ind_c = self.search_space.convert_to_continuous([self.loss_func.best_sol])[0]
+
+                        child.score = self.heuristic(child, self.best_ind_c, self.loss_func.best_score)
+
+                        logger.debug(f"Child {child.father.id}.{child.id}.{child.level} score: {child.score}")
+
+                        # Add child to tree search
+                        self.tree_search.add(child)
+
+                        # Progress bar
+                        self.pending_pb(self.loss_func.calls - prec_calls)
+                        self.update_main_pb(self.loss_func.calls - prec_calls, explor=True, best=self.loss_func.new_best)
+                        self.meta_pb.update(self.loss_func.calls - prec_calls)
+
+                # Exploitation
+                elif self.exploitation:
 
                     # Run exploitation, scores and evaluated solutions are saved using FDA_loss_func class
-                    exploitation = self.exploitation(modified_loss_func.evaluate, sp, **self.exploi_kwargs)
-                    exploitation.run(child.best_sol, child.min_score)
+                    self.exploitation.loss_func = modified_loss_func
+                    calls_left = np.min([self.exploi_calls, self.f_calls - self.loss_func.calls])
 
-                    # Save best found solution
-                    if child.min_score < self.best_score:
+                    if calls_left > 0:
 
-                        print("Best solution found :", child.min_score, "<", self.best_score, "For exploration")
-                        self.best_ind = child.best_sol
-                        self.best_ind_c = self.search_space.convert_to_continuous([self.best_ind], True)[0]
-                        self.best_score = child.min_score
+                        self.exploitation.f_calls = calls_left + self.loss_func.calls
 
-                    child.best_sol_c = self.search_space.convert_to_continuous([child.best_sol], True)[0]
-                    child.score = self.heuristic(child, self.best_ind_c, self.best_score)
+                        logger.info(f" -> Exploitation {self.fractal.__name__} n° {child.id} child of {child.father.id} at level {child.level}")
+                        logger.info(f"Explored {self.fractal.__name__}: {self.n_h}")
 
-                    print(f"\t\t=>Score:{child.score}")
+                        # Progress bar
+                        prec_calls = self.loss_func.calls
 
-                # Exploration
-                else:
+                        # Run exploitation, scores and evaluated solutions are saved using FDA_loss_func class
+                        self.exploitation.run(H=child, n_process=self.n_process)
 
-                    explor_idx = np.min([child.level, len(self.exploration)]) - 1
-                    explor_idx_kwargs = np.min([child.level, len(self.explor_kwargs)]) - 1
+                        if self.loss_func.new_best:
+                            logger.info(f"Best solution found :{self.loss_func.best_score}")
+                            self.best_ind_c = self.search_space.convert_to_continuous([self.loss_func.best_sol])[0]
 
-                    # Compute bounds of child hypervolume
-                    lo = self.search_space.convert_to_continuous([child.lo_bounds], True, True)[0]
-                    up = self.search_space.convert_to_continuous([child.up_bounds], True, True)[0]
+                        logger.debug(f"Child {child.father.id}.{child.id}.{child.level} score: EXPLOITaTION")
 
-                    # Create a search space for the metaheuristic
-                    sp = self.search_space.subspace(lo, up)
-
-                    print(
-                        "  O_O  |  Exploration " + self.fractal_name + " n°",
-                        child.id,
-                        " child of ",
-                        child.father.id,
-                        " at level ",
-                        child.level,
-                        "\nNumber of explored " + self.fractal_name + ": ",
-                        self.n_h,
-                        "/",
-                        self.total_h,
-                    )
-
-                    # Run exploration, scores and evaluated solutions are saved using FDA_loss_func class
-                    exploration = self.exploration[explor_idx](modified_loss_func.evaluate, sp, **self.explor_kwargs[explor_idx_kwargs])
-                    exploration.run()
-
-                    # Save best found solution
-                    if child.min_score < self.best_score:
-
-                        print("Best solution found :", child.min_score, "<", self.best_score, "For exploration")
-                        self.best_ind = child.best_sol
-                        self.best_ind_c = self.search_space.convert_to_continuous([self.best_ind])[0]
-                        self.best_score = child.min_score
-
-                    child.best_sol_c = self.search_space.convert_to_continuous([child.best_sol])[0]
-                    child.score = self.heuristic(child, self.best_ind_c, self.best_score)
-
-                    print(f"\t\t=>Score:{child.score}")
-
-                # Add child to tree search
-                self.tree_search.add(child)
+                        # Progress bar
+                        self.pending_pb(self.loss_func.calls - prec_calls)
+                        self.update_main_pb(self.loss_func.calls - prec_calls, explor=False, best=self.loss_func.new_best)
+                        self.meta_pb.update(self.loss_func.calls - prec_calls)
 
             i += 1
 
-    def run(self, save=False):  # A voir, modifier avec n_process
+    def run(self, H=None, n_process=1):
 
-        """run(self, n_process = 1,save=False)
+        """run(H=None, n_process=1)
 
-        Runs FDA. Must be modified...
+        Runs FDA.
 
         Parameters
         ----------
+        H : Fractal, default=None
+            When used by FDA, a fractal corresponding to the current subspace is given
+
         n_process : int, default=1
             Determine the number of best solution found to return.
-
-        save : boolean, default=False
-            Deprecated must be removed.
 
         Returns
         -------
@@ -360,19 +335,32 @@ class FDA(Metaheuristic):
 
         """
 
+        if H != None:
+            logger.warning(f"Do not give any fractal to FDA.run")
+
+        self.build_bar(self.f_calls)
+
+        for exp in self.exploration:
+            exp.manager = self.manager
+
+        logger.info("Starting")
+
+        if self.exploitation:
+            self.exploitation.manager = self.manager
+
+        self.n_process = n_process
+
         self.n_h = 0
 
         stop = True
 
         # Select initial hypervolume (root) from the search tree
         stop, hypervolumes = self.tree_search.get_next()
-        print("Starting")
 
         while stop and self.loss_func.calls < self.f_calls:
 
             for H in hypervolumes:
-                if H.level < self.level:
-                    H.create_children()
+                H.create_children()
 
             self.evaluate(hypervolumes)
 
@@ -380,23 +368,24 @@ class FDA(Metaheuristic):
 
         self.executed = True
 
-        print("_________________________________________________________________")
-        print("Loss function calls: ", self.loss_func.calls)
-        print(
-            "Number of explored " + self.fractal_name + ": ",
-            self.n_h,
-            "/",
-            int(((self.search_space.n_variables * 2) ** (self.level + 1) - 1) / ((self.search_space.n_variables * 2) - 1)) - 1,
-        )
-        print(self.best_score)
-        print(self.best_ind)
-        print("_________________________________________________________________")
+        logger.info(f"Loss function calls: {self.loss_func.calls}")
+        logger.info(f"Explored {self.fractal.__name__}: {self.n_h}")
+        logger.info(f"Best score: {self.loss_func.best_score}")
+        logger.info(f"Best solution: {self.loss_func.best_sol}")
 
-        return self.root
+        best_idx = np.argpartition(self.loss_func.all_scores, n_process)
+        best = [self.loss_func.all_solutions[i] for i in best_idx[:n_process]]
+        min = [self.loss_func.all_scores[i] for i in best_idx[:n_process]]
 
-    def show(self, function=False, circles=False):
+        self.close_bar()
 
-        """show(self, filename=None)
+        logger.info("Ending")
+
+        return best, min
+
+    def show(self, filepath="", save=False):
+
+        """show(filename=None)
 
         Plots solutions and scores evaluated during the optimization
 
@@ -407,50 +396,4 @@ class FDA(Metaheuristic):
 
         """
 
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D
-        import mpl_toolkits.mplot3d.art3d as art3d
-        from matplotlib.lines import Line2D
-        import pandas as pd
-
-        H = self.root
-        H.current_children = -1
-
-        stop = True
-
-        p = []
-        s = []
-
-        v = []
-        s2 = []
-        c = []
-        r = []
-        while stop:
-
-            p += H.solutions
-            s += H.all_scores
-            v += [H.lo_bounds.tolist()]
-            v += [H.up_bounds.tolist()]
-            # v += [H.center.tolist()]
-            s2 += [1000 / (np.exp(H.level))] * 2
-            c += [H.level] * 2
-            # r += [H.radius[0]]
-
-            inter = H.getNextchildren()
-
-            while inter == -1:
-
-                H = H.father
-
-                if type(H) != str:
-                    inter = H.getNextchildren()
-                else:
-                    inter = 2
-
-            if type(inter) == int:
-                stop = False
-            else:
-                H = inter
-                H.current_children = -1
-
-        self.search_space.show(pd.DataFrame(p, columns=self.search_space.label), s)
+        super().show(filepath, save)

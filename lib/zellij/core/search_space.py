@@ -4,6 +4,10 @@ import matplotlib as mpl
 import pandas as pd
 import os
 
+import logging
+
+logger = logging.getLogger("zellij.space")
+
 # To modify
 def parallel_coordinates(frame, class_column, cols=None, ax=None, color=None, use_columns=False, xticks=None, colormap=None, **kwds):
 
@@ -582,7 +586,7 @@ class Searchspace:
 
         """
 
-        # If Searchspace is a subspace and want to convert inside it, use sub bounds to convert
+        # Uses bounds from the original space if this object is a subspace.
         if sub_values and self.sub_values != None:
             val = self.sub_values
 
@@ -613,7 +617,7 @@ class Searchspace:
                         converted.append(val[att][int(point[att] * n_values)])
 
                     elif self.types[att] == "K":
-                        converted.append(val[att])
+                        converted.append(self.values[att])
 
                 res.append(converted[:])
 
@@ -760,8 +764,6 @@ class Searchspace:
 
     def show(self, X, Y, save=False, path=""):
 
-        if not isinstance(X, pd.DataFrame):
-            X = pd.DataFrame(X, columns=self.labels)
         """show(self,X,Y)
 
         Show solutions X associated to their values Y, according to the Searchspace
@@ -776,13 +778,21 @@ class Searchspace:
 
         """
 
+        if not isinstance(X, pd.DataFrame):
+            X = pd.DataFrame(X, columns=self.labels)
+
+        argmin = np.argmin(Y)
+        logger.info("Best individual")
+        logger.info(X.iloc[argmin, :])
+        logger.info(np.array(Y)[argmin])
+
         f, plots = plt.subplots(self.n_variables, self.n_variables, figsize=(19.2, 14.4))
         f.suptitle("All evaluated solutions", fontsize=11)
 
         if len(X) < 100:
-            s = 1
+            s = 40
         else:
-            s = 2500 / len(X)
+            s = 10000 / len(X)
 
         if self.types[0] == "C":
             X.iloc[:, 0].value_counts().plot(kind="bar", ax=plots[0, 0])
@@ -794,6 +804,10 @@ class Searchspace:
             plots[0, 0].set_yticks([])
             plots[0, 0].xaxis.tick_top()
             plots[0, 0].tick_params(axis="x", labelsize=7)
+
+        def onpick(event):
+            ind = event.ind
+            print("Selected point:", X.iloc[ind, :], Y[ind])
 
         for i in range(self.n_variables):
 
@@ -850,8 +864,12 @@ class Searchspace:
                     try:
                         plots[j, i].tricontourf(X.iloc[:, i], X.iloc[:, j], Y, 10, cmap="Greys_r")
                     except:
-                        print("Triangularisation failed")
-                    plots[j, i].scatter(X.iloc[:, i], X.iloc[:, j], c=Y, s=s, alpha=0.4, cmap="plasma_r")
+                        logger.warning("Triangularisation failed")
+                    plots[j, i].scatter(X.iloc[:, i], X.iloc[:, j], c=Y, s=s, alpha=0.4, cmap="coolwarm_r", picker=True)
+                    plots[j, i].set_xlim((self.values[i][0], self.values[i][1]))
+                    plots[j, i].set_ylim((self.values[j][0], self.values[j][1]))
+
+                    plots[j, i].scatter(X.iloc[argmin, i], X.iloc[argmin, j], c="cyan", marker=(5, 2), alpha=0.8, s=150)
 
                 if i == 0:
                     plots[j, i].set_ylabel(self.labels[j])
@@ -870,12 +888,8 @@ class Searchspace:
             plt.savefig(save_path, bbox_inches="tight")
             plt.close()
         else:
+            f.canvas.mpl_connect("pick_event", onpick)
             plt.show()
-
-        argmin = np.argmin(Y)
-        print("Best individual")
-        print(X.iloc[argmin, :])
-        print(np.array(Y)[argmin])
 
         # for i in range(self.n_variables):
         #     if self.types[i] == "C":
