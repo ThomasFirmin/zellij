@@ -650,8 +650,8 @@ class Section(Fractal):
         return "ID: " + str(self.id) + " son of " + id + " at level " + str(self.level) + "\n" + "BOUNDS: " + str(self.lo_bounds) + "|" + str(self.up_bounds) + "\n"
 
 
-class DynamicVoronoi(Fractal):
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
+class Voronoi(Fractal):
+    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", n_seeds=None):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
 
@@ -692,199 +692,34 @@ class DynamicVoronoi(Fractal):
         super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
 
         self.dim = len(self.up_bounds)
-        self.n_dim = 2 * self.dim
-        self.spokes = spokes
+        if n_seeds is None:
+            self.n_seeds = 2 * self.dim
+        else:
+            self.n_seeds = n_seeds
 
         self.next_seeds = []
 
         if isinstance(seed, str) and seed == "random":
-            self.n_seeds = n_seeds
-
             self.all_seeds = []
-
             self.next_seeds = list(np.random.random((self.n_seeds, self.dim)) * (np.array(self.up_bounds) - np.array(self.lo_bounds)) + np.array(self.lo_bounds))
-
-            self.hyperplanes = []
-
             self.seed = "root"
+            self.hyperplanes = []
 
         else:
-            self.n_seeds = n_seeds
             self.all_seeds = self.father.all_seeds
-
             self.hyperplanes = []
-            self.sampled_bounds = []
-
             self.seed = seed
-
-        ######### WORKING
+            self.center = self.seed
 
         self.xlist = np.zeros(2 * self.dim)
 
+    @abc.abstractmethod
     def create_children(self):
+        pass
 
-        update_neighbors = False
-
-        for i in self.next_seeds:
-            child = DynamicVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, len(self.all_seeds), seed=i, spokes=self.spokes, n_seeds=self.n_seeds)
-            self.children.append(child)
-            self.all_seeds.append(child)
-
-        if not isinstance(self.father, str):
-
-            # Current cell will be it's own children
-            selfchild = DynamicVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, self.id, seed=self.seed, spokes=self.spokes, n_seeds=self.n_seeds)
-            self.children.append(selfchild)
-
-            # Replace previous cell by new cell
-            self.all_seeds[self.id] = selfchild
-
-        for child in self.children:
-            for cell in self.all_seeds:
-                cell.sampled_bounds = []
-                cell.next_seeds = []
-                if child.id != cell.id:
-                    h = Hyperplane(child, cell)
-                    child.hyperplanes.append(h)
-
-                    if cell not in self.children:
-                        cell.hyperplanes.append(h)
-
-        for i, c in enumerate(self.all_seeds):
-            logger.info(f"Building children n°{i}/{len(self.children)}")
-            c.update()
-
+    @abc.abstractmethod
     def update(self):
-        s = self.seed
-        i = self.id
-
-        max_dist = -float("inf")
-        max_dist_p = None
-
-        # Fixed points (2 for each dimension)
-        for d in range(self.n_dim):
-
-            l = self.dimSpoke(s, d % self.dim)
-
-            inter = np.empty((0, self.dim))
-
-            upma = self.up_bounds - l.A
-            loma = self.lo_bounds - l.A
-
-            cell_idx = []
-
-            for j, h in enumerate(self.hyperplanes):
-
-                on, pfar = h.intersection(l)
-
-                if on:
-                    # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
-
-                        pfar_clipped = self.clipBorder(l, upma, loma)
-                        inter = np.append(inter, [pfar_clipped], axis=0)
-
-                        cell_idx.append(-1)
-
-                    else:
-                        inter = np.append(inter, [pfar], axis=0)
-
-                        cell_idx.append(j)
-
-            if len(inter) == 0:
-
-                pfar_clipped = self.clipBorder(l, upma, loma)
-                self.sampled_bounds.append(np.copy(pfar_clipped))
-
-                dist = np.linalg.norm(pfar_clipped - l.A)
-                if dist > max_dist:
-                    max_dist_p = pfar_clipped
-                    max_dist = dist
-            else:
-                dist = np.linalg.norm(inter - l.A, axis=1)
-                minidx = np.argmin(dist)
-
-                a = np.copy(inter[minidx])
-
-                if cell_idx[minidx] != -1:
-
-                    if self.hyperplanes[cell_idx[minidx]].cellX != self:
-                        self.hyperplanes[cell_idx[minidx]].cellX.sampled_bounds.append(a)
-
-                    else:
-                        self.hyperplanes[cell_idx[minidx]].cellY.sampled_bounds.append(a)
-
-                self.sampled_bounds.append(a)
-
-                if dist[minidx] > max_dist:
-                    max_dist_p = inter[minidx]
-                    max_dist = dist[minidx]
-
-        # Random points
-        for d in range(self.spokes):
-
-            l = self.randomSpoke(self.seed)
-
-            inter = np.empty((0, self.dim))
-
-            upma = self.up_bounds - l.A
-            loma = self.lo_bounds - l.A
-
-            cell_idx = []
-
-            for j, h in enumerate(self.hyperplanes):
-
-                on, pfar = h.intersection(l)
-
-                if on:
-                    # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
-
-                        pfar_clipped = self.clipBorder(l, upma, loma)
-                        inter = np.append(inter, [pfar_clipped], axis=0)
-
-                        cell_idx.append(-1)
-
-                    else:
-                        inter = np.append(inter, [pfar], axis=0)
-
-                        cell_idx.append(j)
-
-            if len(inter) == 0:
-
-                pfar_clipped = self.clipBorder(l, upma, loma)
-                self.sampled_bounds.append(np.copy(pfar_clipped))
-
-                dist = np.linalg.norm(pfar_clipped - l.A)
-                if dist > max_dist:
-                    max_dist_p = pfar_clipped
-                    max_dist = dist
-            else:
-                dist = np.linalg.norm(inter - l.A, axis=1)
-                minidx = np.argmin(dist)
-
-                a = np.copy(inter[minidx])
-
-                if cell_idx[minidx] != -1:
-
-                    if self.hyperplanes[cell_idx[minidx]].cellX != self:
-                        self.hyperplanes[cell_idx[minidx]].cellX.sampled_bounds.append(a)
-
-                    else:
-                        self.hyperplanes[cell_idx[minidx]].cellY.sampled_bounds.append(a)
-
-                self.sampled_bounds.append(a)
-
-                if dist[minidx] > max_dist:
-                    max_dist_p = inter[minidx]
-                    max_dist = dist[minidx]
-
-        dist = np.linalg.norm(np.array(self.sampled_bounds) - max_dist_p, axis=1)
-        maxid = np.argmax(dist)
-        farthest = self.sampled_bounds[maxid]
-
-        self.next_seeds.append(self.shiftBorder(self.seed, max_dist_p))
-        self.next_seeds.append(self.shiftBorder(self.seed, farthest))
+        pass
 
     def randomSpoke(self, s):
         p = randomMuller(1, self.dim)[0]
@@ -900,19 +735,25 @@ class DynamicVoronoi(Fractal):
 
     def shiftBorder(self, s, p):
         l = HalfLine(s, p)
-        return l.point(2 / 3)
+        return l.point(np.random.random())
 
     def clipBorder(self, line, upma, loma):
 
         self.xlist[: self.dim] = loma / line.v
         self.xlist[self.dim :] = upma / line.v
 
-        x = np.where(self.xlist > 0, self.xlist, np.inf).min()
+        x = np.nanmin(np.where(self.xlist > 0, self.xlist, np.inf))
+        res = line.point(x)
 
-        return line.point(x)
+        mask = res > self.up_bounds
+        res[mask] = self.up_bounds[mask]
+        mask = res < self.lo_bounds
+        res[mask] = self.lo_bounds[mask]
+
+        return res
 
 
-class FixedVoronoi(Fractal):
+class DynamicVoronoi(Voronoi):
     def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
@@ -951,38 +792,212 @@ class FixedVoronoi(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
+
+        self.n_dim = 2 * self.dim
+        self.spokes = spokes
+
+        self.sampled_bounds = []
+
+    def create_children(self):
+
+        update_neighbors = False
+
+        if not isinstance(self.father, str):
+            # Current cell will be it's own children
+            selfchild = DynamicVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, self.id, seed=self.seed, spokes=self.spokes, n_seeds=self.n_seeds)
+            self.children.append(selfchild)
+            # Replace previous cell by new cell
+            self.all_seeds[self.id] = selfchild
+
+        for i in self.next_seeds:
+            child = DynamicVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, len(self.all_seeds), seed=i, spokes=self.spokes, n_seeds=self.n_seeds)
+            self.children.append(child)
+            self.all_seeds.append(child)
+
+        for child in self.children:
+            for cell in self.all_seeds:
+                cell.sampled_bounds = []
+                cell.next_seeds = []
+                if child.id != cell.id:
+                    try:
+                        h = Hyperplane(self.children[i], self.children[j])
+                        self.children[i].hyperplanes.append(h)
+                        self.children[j].hyperplanes.append(h)
+                    except AssertionError as e:
+                        logger.warning(f"Hyperplane building aborted: {e}")
+
+        for i, c in enumerate(self.all_seeds):
+            logger.info(f"Building children n°{i}/{len(self.children)}")
+            if len(c.hyperplanes) > 0:
+                c.update()
+            else:
+                self.children.pop(i)
+
+    def update(self):
+        upma = self.up_bounds - self.seed
+        loma = self.lo_bounds - self.seed
+
+        cell_idx = [False] * len(self.hyperplanes)
+
+        # Fixed points (2 for each dimension)
+        for d in range(self.n_dim):
+
+            l = self.dimSpoke(self.seed, d % self.dim)
+
+            inter = np.empty((0, self.dim))
+
+            for j, h in enumerate(self.hyperplanes):
+
+                on, pfar = h.intersection(l)
+
+                if on:
+                    # Clip line to bounds
+                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+
+                        pfar_clipped = self.clipBorder(l, upma, loma)
+                        inter = np.append(inter, [pfar_clipped], axis=0)
+
+                        cell_idx[j] = False
+
+                    else:
+                        inter = np.append(inter, [pfar], axis=0)
+
+                        cell_idx[j] = True
+                else:
+                    cell_idx[j] = False
+
+            if len(inter) == 0:
+
+                pfar_clipped = self.clipBorder(l, upma, loma)
+                self.sampled_bounds.append(np.copy(pfar_clipped))
+
+            else:
+                dist = np.linalg.norm(inter - l.A, axis=1)
+                minidx = np.argmin(dist)
+
+                a = np.copy(inter[minidx])
+
+                if cell_idx[minidx]:
+                    self.sampled_hyperplanes.add(minidx)
+
+                    if self.hyperplanes[minidx].cellX != self:
+                        self.hyperplanes[minidx].cellX.sampled_bounds.append(a)
+
+                    else:
+                        self.hyperplanes[minidx].cellY.sampled_bounds.append(a)
+
+                self.sampled_bounds.append(a)
+
+        # Random points
+        for d in range(self.spokes):
+
+            l = self.randomSpoke(self.seed)
+
+            inter = np.empty((0, self.dim))
+
+            for j, h in enumerate(self.hyperplanes):
+
+                on, pfar = h.intersection(l)
+
+                if on:
+                    # Clip line to bounds
+                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+
+                        pfar_clipped = self.clipBorder(l, upma, loma)
+                        inter = np.append(inter, [pfar_clipped], axis=0)
+
+                        cell_idx[j] = False
+
+                    else:
+                        inter = np.append(inter, [pfar], axis=0)
+
+                        cell_idx[j] = True
+                else:
+                    cell_idx[j] = False
+
+            if len(inter) == 0:
+
+                pfar_clipped = self.clipBorder(l, upma, loma)
+                self.sampled_bounds.append(np.copy(pfar_clipped))
+
+            else:
+                dist = np.linalg.norm(inter - l.A, axis=1)
+                minidx = np.argmin(dist)
+
+                a = np.copy(inter[minidx])
+
+                if cell_idx[minidx]:
+                    self.sampled_hyperplanes.add(minidx)
+
+                    if self.hyperplanes[minidx].cellX != self:
+                        self.hyperplanes[minidx].cellX.sampled_bounds.append(a)
+
+                    else:
+                        self.hyperplanes[minidx].cellY.sampled_bounds.append(a)
+
+                self.sampled_bounds.append(a)
+
+        dist = np.linalg.norm(np.array(self.sampled_bounds) - self.seed, axis=1)
+
+        dist = np.nan_to_num(dist)
+        sum = np.sum(dist)
+
+        if sum != 0:
+            p = dist / sum
+            choosen = np.random.choice(list(range(len(self.sampled_bounds))), np.minimum(np.count_nonzero(p), self.n_seeds), replace=False, p=p)
+
+            for c in choosen:
+                self.next_seeds.append(self.shiftBorder(self.seed, self.sampled_bounds[c]))
+
+
+class FixedVoronoi(Voronoi):
+    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
+
+        """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
+
+        Parameters
+        ----------
+        lo_bounds : list[float]
+            Contains the lower bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
+
+        up_bounds : list[float]
+            Contains the upper bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
+
+        father : Fractal, default='root'
+            Reference to the parent of the current fractal.
+
+        level : int, default=0
+            Current level of the fractal in the partition tree. See Tree_search.
+
+        id : int, default=0
+            Identifier of a fractal. Combined to the id of itf parents, the id is unique.
+
+        children : list[Fractal], default=[]
+            References to all children of the current fractal. If no child is given, children will be built by the method create_children during the tree building.
+
+        score : {float, int}, default=None
+            Heuristic value associated to the fractal after an exploration.  If no score is given, it will be built after the execution of an exploration strategy inside the fractal.
+
+        seed : {random, [[float]]}
+            If 'random' Voronoi centroid will be initialized randomly. Else: if a list of points is given, the DynamicVoronoi will use them.
+
+        spokes : int, default=2
+            Number of randoms spokes to draw during hyperplane sampling (SpokeDart)
+
+        n_seeds : int, default=2
+            Number of centroids at each decomposition.
+
+        """
+
+        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
 
         self.dim = len(self.up_bounds)
         self.n_dim = 2 * self.dim
         self.spokes = spokes
 
-        self.next_seeds = []
-
-        if isinstance(seed, str) and seed == "random":
-            self.n_seeds = n_seeds
-
-            self.all_seeds = []
-
-            self.next_seeds = list(np.random.random((self.n_seeds, self.dim)) * (np.array(self.up_bounds) - np.array(self.lo_bounds)) + np.array(self.lo_bounds))
-
-            self.seed = "root"
-
-            self.hyperplanes = []
-
-        else:
-            self.n_seeds = n_seeds
-            self.all_seeds = self.father.all_seeds
-
-            self.hyperplanes = []
-
-            self.sampled_bounds = []
-            self.sampled_hyperplanes = set()
-            self.seed = seed
-            self.center = self.seed
-        ######### WORKING
-
-        self.xlist = np.zeros(2 * self.dim)
+        self.sampled_bounds = []
+        self.sampled_hyperplanes = set()
 
     def create_children(self):
 
@@ -1136,39 +1151,8 @@ class FixedVoronoi(Fractal):
             for c in choosen:
                 self.next_seeds.append(self.shiftBorder(self.seed, self.sampled_bounds[c]))
 
-    def randomSpoke(self, s):
-        p = randomMuller(1, self.dim)[0]
-        pfar = p + s
 
-        return HalfLine(s, pfar)
-
-    def dimSpoke(self, s, dim, r=1):
-        p = np.zeros(self.dim)
-        p[dim] = r
-        pfar = p + s
-        return HalfLine(s, pfar)
-
-    def shiftBorder(self, s, p):
-        l = HalfLine(s, p)
-        return l.point(np.random.random())
-
-    def clipBorder(self, line, upma, loma):
-
-        self.xlist[: self.dim] = loma / line.v
-        self.xlist[self.dim :] = upma / line.v
-
-        x = np.nanmin(np.where(self.xlist > 0, self.xlist, np.inf))
-        res = line.point(x)
-
-        mask = res > self.up_bounds
-        res[mask] = self.up_bounds[mask]
-        mask = res < self.lo_bounds
-        res[mask] = self.lo_bounds[mask]
-
-        return res
-
-
-class LightFixedVoronoi(Fractal):
+class LightFixedVoronoi(Voronoi):
     def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
@@ -1207,35 +1191,13 @@ class LightFixedVoronoi(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
 
         self.dim = len(self.up_bounds)
         self.n_dim = 2 * self.dim
         self.spokes = spokes
 
-        self.next_seeds = []
-
-        if isinstance(seed, str) and seed == "random":
-            self.n_seeds = n_seeds
-
-            self.next_seeds = list(np.random.random((self.n_seeds, self.dim)) * (np.array(self.up_bounds) - np.array(self.lo_bounds)) + np.array(self.lo_bounds))
-
-            self.seed = "root"
-
-            self.hyperplanes = []
-
-        else:
-            self.n_seeds = n_seeds
-
-            self.hyperplanes = []
-
-            self.sampled_bounds = []
-            self.seed = seed
-            self.center = self.seed
-
-        ######### WORKING
-
-        self.xlist = np.zeros(2 * self.dim)
+        self.sampled_bounds = []
 
     def create_children(self):
 
@@ -1372,39 +1334,8 @@ class LightFixedVoronoi(Fractal):
             for c in choosen:
                 self.next_seeds.append(self.shiftBorder(self.seed, self.sampled_bounds[c]))
 
-    def randomSpoke(self, s):
-        p = randomMuller(1, self.dim)[0]
-        pfar = p + s
 
-        return HalfLine(s, pfar)
-
-    def dimSpoke(self, s, dim, r=1):
-        p = np.zeros(self.dim)
-        p[dim] = r
-        pfar = p + s
-        return HalfLine(s, pfar)
-
-    def shiftBorder(self, s, p):
-        l = HalfLine(s, p)
-        return l.point(np.random.random())
-
-    def clipBorder(self, line, upma, loma):
-
-        self.xlist[: self.dim] = loma / line.v
-        self.xlist[self.dim :] = upma / line.v
-
-        x = np.nanmin(np.where(self.xlist > 0, self.xlist, np.inf))
-        res = line.point(x)
-
-        mask = res > self.up_bounds
-        res[mask] = self.up_bounds[mask]
-        mask = res < self.lo_bounds
-        res[mask] = self.lo_bounds[mask]
-
-        return res
-
-
-class BoxedVoronoi(Fractal):
+class BoxedVoronoi(Voronoi):
     def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
@@ -1443,28 +1374,11 @@ class BoxedVoronoi(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
 
         self.dim = len(self.up_bounds)
         self.n_dim = 2 * self.dim
         self.spokes = spokes
-
-        if isinstance(seed, str) and seed == "random":
-            self.n_seeds = n_seeds
-            self.next_seeds = []
-            self.seed = "root"
-            self.hyperplanes = []
-
-        else:
-            self.n_seeds = n_seeds
-            self.next_seeds = seed
-            self.seed = seed
-            self.hyperplanes = []
-            self.center = self.seed
-
-        ######### WORKING
-
-        self.xlist = np.zeros(2 * self.dim)
 
     def create_children(self):
 
@@ -1578,34 +1492,3 @@ class BoxedVoronoi(Fractal):
         self.lo_bounds = np.nanmin(sampled_bounds, axis=0)
         self.up_bounds = np.nanmax(sampled_bounds, axis=0)
         del self.hyperplanes
-
-    def randomSpoke(self, s):
-        p = randomMuller(1, self.dim)[0]
-        pfar = p + s
-
-        return HalfLine(s, pfar)
-
-    def dimSpoke(self, s, dim, r=1):
-        p = np.zeros(self.dim)
-        p[dim] = r
-        pfar = p + s
-        return HalfLine(s, pfar)
-
-    def shiftBorder(self, s, p):
-        l = HalfLine(s, p)
-        return l.point(np.random.random())
-
-    def clipBorder(self, line, upma, loma):
-
-        self.xlist[: self.dim] = loma / line.v
-        self.xlist[self.dim :] = upma / line.v
-
-        x = np.nanmin(np.where(self.xlist > 0, self.xlist, np.inf))
-        res = line.point(x)
-
-        mask = res > self.up_bounds
-        res[mask] = self.up_bounds[mask]
-        mask = res < self.lo_bounds
-        res[mask] = self.lo_bounds[mask]
-
-        return res
