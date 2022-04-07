@@ -1,237 +1,221 @@
-# Chaotic Optimization
+# Zellij
 
 ## Description
 
-This Python package includes 2 efficients meta-heuristics for large scale global optimization and high dimensional continuous search spaces. Both algorithms include parametrable exploration and exploitation strategies.
-
-* **Chaotic Optimization Algorithm**
-  * Uses a chaotic dynamic to efficiently find local optima
-* **Fractal Decomposition Algorithm**
-  * Decomposes the search space using various fractals (hypersphere, hypercube...) to select and exploit promising areas.
-
-## Install
-
-### Requirements
-
-**chaotic-optimization** requires Numpy for fast computation and Matplotlib for plotting results.
-
-### Latest version
-Download chaotic-optimization folder and include it into your Python project. You can then import FDA or chaotic-optimization according to your needs.
-
-
-## Chaotic Optimization Algorithm
-
-### Description
-
-Chaotic Optimization Algorithm includes 3 strategies which use a chaotic dynamic, symmetrization and leveling at various scale.
-* **Chaotic Global Search (CGS)**: Explore the search space using a chaotic map. Chaos is used to violently agitate the points distribution over search space.
-* **Chaotic Local Search (CLS)**: It is an exploitation-based algorithm. It explores the neighborhood from an initial solution. It uses a chaos map to gently wiggle points. By moving iteratively from best solution to another and by using a zoom, **CLS** allows to search over different promising search space.
-* **Chaotic Fine Search (CFS)**: It is an exploitation-based algorithm to intensify the exploitation of the best solution found by the **CLS**. **CFS** uses an adaptative zoom to intensify the search in the neighborhood of a the best solution.
-
-All three strategies are used in the Tornado algorithm. But in they can also be used independently.
-
-### Parameters
-
-
-Parameters | Tornado | CGS | CLS | CFS | Type | Description | Default
------------- | ------------- | ------------- | ------------- | ------------- | ------------- | ------------- | -------------
-`loss_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `function` | Function that takes a vector of float (points) and return a loss value (float) | :x:
-`lo_bounds` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `list(float)` | Lower bounds of each dimension of the search space | :x:
-`up_bounds` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `list(float)` | Upper bounds of each dimension of the search space | :x:
-`N_symetric_p` | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | `int` | Determine the number of points for the rotating polygon. (4 square, 5 pentagon...) | `8`
-`chaos_map_func` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `string or list(string)` | Define the chaotic map to use. If a list of maps is given, it shuffles the different maps. `henon_map, kent_map, logistic_map, tent_map` | `"henon_map"`
-`f_call` | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | `int` | Determine the number of loss function calls. | `1000`
-`M_global` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the global number of iteration | `200`
-`M_local` | :heavy_check_mark: | :x: | :x: | :x: | `int` | Determine the number of exploitation iteration | `50`
-`N_level_cgs` | :heavy_check_mark: | :heavy_check_mark: | :x: | :x: | `int` | Determine the number of chaos level for CGS | `50`
-`N_level_cls` | :heavy_check_mark: | :x: | :heavy_check_mark: | :x: | `int` | Determine the number of chaos level for CLS | `5`
-`N_level_cfs` | :heavy_check_mark: | :x: | :x: | :heavy_check_mark: | `int` | Determine the number of chaos level for CFS | `5`
-`red_rate` | :heavy_check_mark: | :x: | :heavy_check_mark: | :heavy_check_mark: | `float` | Determine the zoom rate for CLS and CFS | `0.5`
-`gds` | :heavy_check_mark: | :x: | :x: | :x: | `Boolean` | Use an adaptative gradient descent search after CLS and CFS | `False`
-`windowed_cgs`| :heavy_check_mark: | :heavy_check_mark: | :x: | :x: | `float` | If > 0, the CGS uses a decreasing centered zoom over the search space | `0`
-`penalize` (not yet implemented) | :heavy_check_mark: | :x: | :x: | :x: | `Boolean` | Penalize loss function and area of the search space to avoid overlapping points | `0`
-`return_history`| :heavy_check_mark: | :x: | :x: | :x: | `Boolean` | If True return the history: `[function calls, penalized points, points, values, colors, size, best point]`  | `True`
-
-### Code example
-
-```python
-
-import numpy as np
-import tornado
-
-def himmelblau(y):
-    return np.sum(y**4 -16*y**2 + 5*y) * (1/len(y))
-  
-dim=200
-M_global = 500
-M_local = 50
-N_cgs = 10
-N_cls = 5
-N_cfs = 5
-N_p = 8
-
-lo_bounds = np.array([-5 for i in range(dim)])
-up_bounds = np.array([5 for i in range(dim)])
-
-tornado = tornado.Tornado(himmelblau, lo_bounds, up_bounds, chaos_map_func = "kent_map", M_global = M_global, M_local = M_local, N_level_cgs = N_cgs, N_level_cls = N_cls, N_level_cfs = N_cfs, N_symetric_p = N_p, return_history = False)
- 
-best_point = tornado.run()
-
-```
-### Figures
-
-![Chaotic optimization with himmelblau](https://github.com/ThomasFirmin/chaotic-optimisation/blob/main/figures/tornado.png?raw=true)
+Zellij is an open source Python package for the optimization of expensive black box functions in a high dimensional space. It is based on a fractal decomposition of the search space, and includes diverse exploration and exploitation metaheuristics such as an evolutionary algorithm, a simulated annealing, or chaotic optimization. Moreover Zellij includes tools to model and manipulate \'hypercubic\' non-constrained search space.
 
 ## Fractal Decomposition Algorithm
 
-### Description
+This algorithm is based on a branch and bound strategy to decompose the search space, into subspaces. The algorithm merges various well-known optimization problems:
+* **Decomposition problem:**
+  * To decompose the search space, selecting the right hypervolume is essential. (hypercube, hypersphere, dividing rectangles...)
+* **Exploration problem:**
+  * To decompose a fractal, a subspace, the algorithm must determine a heuristic value to each of them. To do so an exploration phase is applied to quickly determine if a fractal is promising or not.
+* **Exploitation problem:** 
+  * When the algorithm reach the last fractal level, the algorithm applies an intensification phase to exploit the best found solution found into the final fractal.
+* **Tree search problem:**
+  * By decomposing fractals into subspaces and so on, the algorithm builds a rooted tree. To efficiently explore this graph, tree search algorithm such as Best First Search or Beam Search are used.
+* **Rating problem:**
+  * Once a fractal has been explored, the algorithm must asign an heuristic value to determine if decomposing this fractal is worth it or not. Zellij can use best value, median, mean, distance to the best found solution...
 
-Fractal Decomposition Algorithm is method which decomposes the search space using various fractals (hypersphere, hypercube...) to select and exploit promising areas. It uses an exploitation, exploration and a search tree algorithms. Each fractal is scored according to the quality of the solution found by the exploitation phase, the best one, the father, is selected and decomposed, and so on. At the final level, best fractals are exploited. Father and children fractals builda tree, to search into this tree the algorithm usesa tree search algorithm (Best First Search, Beam Search,...)
+![Fractal decomposition](https://github.com/ThomasFirmin/zellij/blob/main/sources/fda.PNG?raw=true)
+ 
+## Chaotic Optimization
 
-### 3 algorithms
+The algorithm is composed of 3 parts:
+* Chaotic Global Search (CGS):
+  * CGS is used for the exploitation phase
+* Chaotic Local Search (CLS):
+  * CLS uses chaos and a progressive zoom to perform an exploitation on the best found solution found by the CGS
+* Chaotic Fine Search (CFS):
+  * CFS is used as an intensification procedure. It allows to refine the best solution found by the CLS.
 
-* Exploration: exploration is used to explore the fractal and score it.
-* Exploitation: exploitation is used at the final level on the best fractals
-* Tree search algorithm: used to efficiently search over the tree composed of fractals
+During the exploitation phase chaos allows to quickly and violently move over the search space, unlike the exploitation phase where chaos is used to waggle points around an initial solution.
 
-### Parameters
+## Install
+
+Download **Zellij 0.0.1** folder and include it to your Python project.
+
+## Code example
+
+```python
+
+from zellij.fda import FDA
+from zellij.strategies.chaos_algorithm import CGS
+from zellij.strategies.ils import ILS
+
+from zellij.utils.search_space import Searchspace
+from zellij.utils.loss_func import loss_func
+from zellij.utils.benchmark import himmelblau
+
+# Determine the search space
+label = ["a","b"]
+type = ["R","R"]
+values = [[-5,5],[-5,5]]
+neighborhood = [0.5,0.5]
+sp = Searchspace(label, type, values, neighborhood)
+
+# Wrap the function to iterate on it, manage its kwargs...
+model = loss_func(himmelblau)
+
+# Determine kwargs for the exploration strategy
+CGS_kwargs = {"f_calls":100,"level":25,"chaos_map":"henon","create":True}
+
+# Determine kwargs for the exploitation strategy
+ILS_kwargs = {"f_calls":1000,"red_rate":0.80,"precision":1e-5}
+
+# Determine tree search kwargs
+tree_search = {"beam_length":10}
+
+# Determine hypervolume kwargs
+vk = {}
+
+# Construct the fractal decomposition algorithm
+sa = FDA(model.evaluate, sp, 20000,CGS,ILS,tree_search="BestFS", heuristic="belief",level=6,volume_kwargs=vk,explor_kwargs=CGS_kwargs,exploi_kwargs=ILS_kwargs,ts_kwargs=tree_search,fractal="hypersphere")
+
+# Run
+sa.run()
+
+# Show the results
+sa.show()
+
+```
+
+## Parameters
+
+### Fractal Decomposition
 
 Parameters | Type | Description | Default
 ------------ | ------------- | ------------- | -------------
-`loss_func` |  `function` | Function that takes a vector of float (points) and return a loss value (float) | :x:
-`lo_bounds` | `list(float)` | Lower bounds of each dimension of the search space | :x:
-`up_bounds` | `list(float)` | Upper bounds of each dimension of the search space | :x:
-`f_call` | `int` | Determine the number of loss function calls. | `1000`
-`fractal` | `string` | Determine the hypervolume to use as fractal. `hypercube,hypersphere` | `hypersphere`
-`exploration` | `function` | Determine the exploration algorithm to use. See >insert< for more info | `LHS`
-`exploitation` | `function` | Determine the exploitation algorithm to use. See >insert< for more info | `ILS`
-`level` | `int` | Determine the level of the fractal decomposition (tree depth) | `5`
-`tree_search` | `string` | Determine the search tree algorithm. `BFS,DFS,BS,BestFS` See >insert< for more info| `DFS`
-`inflation` | `float` | Determine the inflation rate of the hypervolume.| `1.75`
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`exploration` | `Metaheuristic` or `list(Metaheuristic)` | Object that contains the exploration strategy and a `run` method, a list of metaheuristics can be passed. If so, at each level the metaheuristic at the current level index is used, if `len(exploration)<level` the last one is used for the next level until the exploration phase.| :x:
+`exploitation` | `Metaheuristic` | Object that contains the exploitation strategy and a `run` method | :x:
+`fractal` | `string` | Determine the hypervolume to use for the decomposition:`hypercube`,`hypersphere`,`direct` | `"hypersphere"`
+`heuristic` | `string` | Determine the method to rate a fractal after an exploration: `best`,`median`,`mean`,`std`,`dttcb`,`belief` | `"best"`
+`level` | `int` | Determine the depth of the search space, the fractal depth | `5`
+`volume_kwargs` | `dict` | Key word arguments for the selected hypervolume | `{}`
+`explor_kwargs` | `dict` or `list(dict)`| Key word arguments for the exploration | `{}`
+`exploi_kwargs` | `dict`| Key word arguments for the exploitation | `{}`
+`ts_kwargs` | `dict`| Key word arguments for the tree search algorithm | `{}`
+`verbose` | `boolean` | If `True` displays information during the execution | `True`
 
-### Code example
+----------------------
 
-```python
+### Chaotic Optimization
 
-import numpy as np
-from fda import *
-from fda_func import *
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`chaos_map` | `string` | Determine the chaos dynamic to use: `henon`,`kent`,`logistic`,`tent` | `"henon"`
+`exploration_ratio` | `float` | Determine the ratio between exploration and exploitation | `0.80`
+`level` | `tuple` | A tuple of size 3 determining the number of chaotic levels for CGS, CLS and CFS | `(32,8,2)`
+`polygon` | `int` | Determine the number of vertex used for the rotating polygon for CLS and CFS | `4`
+`red_rate` | 0<`float`<1 | Zoom rate for the CLS and CLS | `0.50`
+`verbose` | `boolean` | If `True` displays information during the execution | `True`
 
-def himmelblau(y):
-    return np.sum(y**4 -16*y**2 + 5*y) * (1/len(y))
+----
 
-f = FDA(lo_bounds,up_bounds,himmelblau, loss_call=10000, level=4,inflation=1,exploration=CGS,exploitation=CLS,tree_search="BestFS")
-hypersphere = f.run()
-    
-```
+#### CGS
 
-### Figures
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`level` | `int` | Number of chaotic levels | :x:
+`chaos_map` | `string` | Determine the chaos dynamic to use: `henon`,`kent`,`logistic`,`tent` | :x:
 
-![Fractal decomposition](https://github.com/ThomasFirmin/chaotic-optimisation/blob/main/figures/fda.PNG?raw=true)
+----
 
-### Build your own exploration, exploitation and tree search algorithm
+#### CLS
 
-#### Exploration and exploitation procedures
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`level` | `tuple` | Number of chaotic levels | :x:
+`polygon` | `int` | Determine the number of vertex used for the rotating polygon | :x:
+`red_rate` | 0<`float`<1 | Zoom rate | :x:
+`chaos_map` | `string` | Determine the chaos dynamic to use: `henon`,`kent`,`logistic`,`tent` | :x:
 
-Exploration and exploitation algorithms must take as parameters an hypervolume `H` and a loss function `loss_func`. It must also compute the loss function and update the hypervolume with the computed points and score using `add_point(score,point, color="black")` method. `color` is only used for ploting. The function must return the number of loss calls.
+----
 
-##### Code example
+#### CFS
 
-```python
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`chaos_map` | `string` | Determine the chaos dynamic to use: `henon`,`kent`,`logistic`,`tent` | :x:
+`exploration_ratio` | `float` | Determine the ratio between exploration and exploitation | :x:
+`level` | `tuple` | Number of chaotic levels | :x:
+`polygon` | `int` | Determine the number of vertex used for the rotating polygon | :x:
+`red_rate` | 0<`float`<1 | Zoom rate | :x:
 
-import numpy as np
-from fractal import Fractal
+----------------------
 
-# Lazy Hypervolume Search
-def LHS(H,loss_func):
-    loss_call = 0
+### Genetic Algorithm
 
-    for i in range(H.dim):
-        inf = np.copy(H.center)
-        sup = np.copy(H.center)
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`pop_size` | `int` | Population size | `10`
+`generation` | `int` | Number of generation | `1000`
+`verbose` | `boolean` | If `True` displays information during the execution | `True`
 
-        inf[i] = np.max([H.center[i]-H.radius[i]/np.sqrt(H.dim),H.lo_bounds[i]])
-        sup[i] = np.min([H.center[i]+H.radius[i]/np.sqrt(H.dim),H.up_bounds[i]])
+----------------------
 
-        score1 = loss_func(inf)
-        score2 = loss_func(sup)
+### Simulated Annealing
 
-        loss_call += 2
-        H.add_point(score1, inf,"blue")
-        H.add_point(score2, sup,"blue")
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`max_iter` | `int` | Number of iteration after each temperature decrease | :x:
+`T_0` | `float` | Initial temperature | :x:
+`T_end` | `float` | Final temperature | :x:
+`n_peaks` | `int` | Number of violent temperature increase when `T_end` is reached | `1`
+`red_rate` | `float` | reduction rate of the temperature | `0.80`
+`verbose` | `boolean` | If `True` displays information during the execution | `True`
 
-    return loss_call
-    
-```
+----------------------
 
-#### Tree search algorithm (NOT FINISHED, EXPERIMENTAL)
+### Hypersphere Heuristic Search (FDA)
 
-A tree search algorithm uses:
-* Open list: contains all unexplored nodes
-* Closed list: contains all explored nodes
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
 
-#### Code example
+----------------------
 
-```python
+### Intensive Local Search (FDA)
 
-import numpy as np
-from tree_search import Tree_search
+Parameters | Type | Description | Default
+------------ | ------------- | ------------- | -------------
+`loss_func` | `function` | Function that takes a vector of solutions and return an heuristic value | :x:
+`search_space` | `Search_space` | Contains lower and upper bounds of the search space and other methods to draw random points or neighbors | :x:
+`f_calls` | `int` | Stopping criterion: number of calls to the loss function | :x:
+`red_rate` | `float` | Step reduction between two iterations | `0.50`
+`precision` | `float` | Stopping criterion, when `red_rate` < `precision` | `1e-5`
 
-class Breadth_first_search(Tree_search):
+### Build your own exploration, exploitation and tree search algorithms
 
-    def __init__(self,open,n_fractal):
-
-        super().__init__(open)
-
-        self.n_fractal = n_fractal
-
-        self.actual_level = self.open[0].level
-
-        self.level_size = self.n_fractal**(self.actual_level+1)
-        self.next_frontier = []
-
-        self.beam_length = 1
-
-    def add(self,c):
-
-        self.next_frontier.append(c)
-
-        if len(self.next_frontier) == self.level_size:
-
-            self.actual_level = c.level
-
-            self.level_size = self.n_fractal**(self.actual_level+1)
-
-            self.open = sorted(self.next_frontier,reverse=self.reverse,key= lambda x: x.score)[:]
-
-            self.next_frontier = []
-
-    def get_next(self):
-
-        if len(self.open) > 0:
-
-            if len(self.open) < self.beam_length:
-                idx = len(self.open)
-            else:
-                idx = self.beam_length
-
-            self.how_many = idx
-            self.close += self.open[:idx]
-
-            for _ in range(idx):
-                self.open.pop(0)
-
-            return True,self.close[-idx:]
-
-        else:
-            return False,-1
-
-```
-
-## Related works
-* Tornado
-* Fractal Decomposition Algorithm
 ## Citing
+
+```xml
+@article{}
+```
 
 ## Sources
 
