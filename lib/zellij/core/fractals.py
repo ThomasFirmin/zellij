@@ -739,16 +739,11 @@ class Voronoi(Fractal):
 
     def clipBorder(self, line, upma, loma):
 
-        self.xlist[: self.dim] = loma / line.v
-        self.xlist[self.dim :] = upma / line.v
+        self.xlist[: self.dim] = loma / (line.v * (1 + 1e-10))
+        self.xlist[self.dim :] = upma / (line.v * (1 + 1e-10))
 
         x = np.nanmin(np.where(self.xlist > 0, self.xlist, np.inf))
         res = line.point(x)
-
-        mask = res > self.up_bounds
-        res[mask] = self.up_bounds[mask]
-        mask = res < self.lo_bounds
-        res[mask] = self.lo_bounds[mask]
 
         return res
 
@@ -954,7 +949,7 @@ class DynamicVoronoi(Voronoi):
 class FixedVoronoi(Voronoi):
     def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
 
-        """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
+        """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5)
 
         Parameters
         ----------
@@ -997,7 +992,6 @@ class FixedVoronoi(Voronoi):
         self.spokes = spokes
 
         self.sampled_bounds = []
-        self.sampled_hyperplanes = set()
 
     def create_children(self):
 
@@ -1080,7 +1074,6 @@ class FixedVoronoi(Voronoi):
                 a = np.copy(inter[minidx])
 
                 if cell_idx[minidx]:
-                    self.sampled_hyperplanes.add(minidx)
 
                     if self.hyperplanes[minidx].cellX != self:
                         self.hyperplanes[minidx].cellX.sampled_bounds.append(a)
@@ -1129,7 +1122,6 @@ class FixedVoronoi(Voronoi):
                 a = np.copy(inter[minidx])
 
                 if cell_idx[minidx]:
-                    self.sampled_hyperplanes.add(minidx)
 
                     if self.hyperplanes[minidx].cellX != self:
                         self.hyperplanes[minidx].cellX.sampled_bounds.append(a)

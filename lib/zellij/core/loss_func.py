@@ -5,6 +5,10 @@ from abc import abstractmethod
 import enlighten
 import zellij.utils.progress_bar as pb
 
+import logging
+
+logger = logging.getLogger("zellij.loss")
+
 try:
     from mpi4py import MPI
 except ImportError as err:
@@ -13,10 +17,6 @@ except ImportError as err:
     You can use: pip install zellij[Parallel]"
     )
     raise err
-
-import logging
-
-logger = logging.getLogger("zellij.loss")
 
 
 class LossFunc(object):
@@ -101,7 +101,7 @@ class LossFunc(object):
         if isinstance(self.save, str):
             self.folder_name = self.save
         else:
-            self.folder_name = f"{self.model.__name__}_zlj_save"
+            self.folder_name = f"{self.model.__class__.__name__}_zlj_save"
 
         self.outputs_path = ""
         self.model_path = ""
@@ -181,7 +181,9 @@ class LossFunc(object):
                 nfolder = f"{self.folder_name}_{i}"
                 os.mkdir(nfolder)
                 created = False
-                logger.warning(f"WARNING: Folder {self.folder_name} already exists, results will be saved at {nfolder}")
+                logger.warning(
+                    f"WARNING: Folder {self.folder_name} already exists, results will be saved at {nfolder}"
+                )
                 self.folder_name = nfolder
             except FileExistsError as error:
                 i += 1
@@ -207,14 +209,20 @@ class LossFunc(object):
 
         # Determine header
         if len(self.labels) != len(x):
-            logger.warning("WARNING: Labels are of incorrect size, it will be replaced in the save file header")
+            logger.warning(
+                "WARNING: Labels are of incorrect size, it will be replaced in the save file header"
+            )
             for i in range(len(x)):
                 self.labels.append(f"attribute{i}")
 
         with open(self.loss_file, "w") as f:
-            f.write(",".join(str(e) for e in self.labels) + ",loss" + suffix + "\n")
+            f.write(
+                ",".join(str(e) for e in self.labels) + ",loss" + suffix + "\n"
+            )
 
-        logger.info(f"INFO: Results will be saved at: {os.path.abspath(self.folder_name)}")
+        logger.info(
+            f"INFO: Results will be saved at: {os.path.abspath(self.folder_name)}"
+        )
 
         self.file_created = True
 
@@ -264,7 +272,12 @@ class LossFunc(object):
 
         if self.verbose:
             self.lf_pb.update(1)
-            self.best_pb.update("      Current score:{:.3f} | Best score:{:.3f}".format(y, self.best_score), color="white")
+            self.best_pb.update(
+                "      Current score:{:.3f} | Best score:{:.3f}".format(
+                    y, self.best_score
+                ),
+                color="white",
+            )
 
     def _build_return(self, r):
         """_build_return(self, r)
@@ -472,8 +485,10 @@ class MPILoss(LossFunc):
         # Master or worker process
         self.master = self.rank == 0
 
-        if master:
-            os.mkdir("tmp_wks")
+        if self.master:
+            if os.path.exists("tmp_wks"):
+                shutil.rmtree("tmp_wks")
+            os.makedirs("tmp_wks")
         else:
             self.worker()
 
@@ -525,7 +540,9 @@ class MPILoss(LossFunc):
 
             logger.debug(f"MASTER {self.rank} receiving | {nb_recv} < {len(X)}")
 
-            msg, others = self.comm.recv(source=MPI.ANY_SOURCE, tag=0, status=self.status)
+            msg, others = self.comm.recv(
+                source=MPI.ANY_SOURCE, tag=0, status=self.status
+            )
             source = self.status.Get_source()
 
             logger.debug(f"MASTER {self.rank} received from {source}")
@@ -537,7 +554,12 @@ class MPILoss(LossFunc):
                 self._save_model(msg, source)
 
                 # Save score and solution into a file
-                self._save_file(X[send_history[source]], res[send_history[source]], **others, **kwargs)
+                self._save_file(
+                    X[send_history[source]],
+                    res[send_history[source]],
+                    **others,
+                    **kwargs,
+                )
 
             # Save score and solution into the object
             self._save_best(X[send_history[source]], res[send_history[source]])
@@ -555,9 +577,13 @@ class MPILoss(LossFunc):
         # Receive last results from workers
         while nb_recv < len(X):
 
-            logger.debug(f"MASTER {self.rank} last receiving | {nb_recv} < {len(X)}")
+            logger.debug(
+                f"MASTER {self.rank} last receiving | {nb_recv} < {len(X)}"
+            )
 
-            msg, others = self.comm.recv(source=MPI.ANY_SOURCE, tag=0, status=self.status)
+            msg, others = self.comm.recv(
+                source=MPI.ANY_SOURCE, tag=0, status=self.status
+            )
             source = self.status.Get_source()
 
             logger.debug(f"MASTER {self.rank} received from {source}")
@@ -572,7 +598,12 @@ class MPILoss(LossFunc):
                 self._save_model(msg, source)
 
                 # Save score and solution into a file
-                self._save_file(X[send_history[source]], res[send_history[source]], **others, **kwargs)
+                self._save_file(
+                    X[send_history[source]],
+                    res[send_history[source]],
+                    **others,
+                    **kwargs,
+                )
 
             # Save score and solution into the object
             self._save_best(X[send_history[source]], res[send_history[source]])
@@ -611,12 +642,18 @@ class MPILoss(LossFunc):
                 # Verify if a model is returned or not
                 # Save the model using its save method
                 if trained_model and self.save:
-                    if hasattr(trained_model, "save") and callable(getattr(trained_model, "save")):
-                        worker_path = os.path.join("tmp_wks", f"worker{self.rank}")
+                    if hasattr(trained_model, "save") and callable(
+                        getattr(trained_model, "save")
+                    ):
+                        worker_path = os.path.join(
+                            "tmp_wks", f"worker{self.rank}"
+                        )
                         os.system(f"rm -rf {worker_path}")
                         trained_model.save(worker_path)
                     else:
-                        logger.error("Model/loss function does not have a method called `save`")
+                        logger.error(
+                            "Model/loss function does not have a method called `save`"
+                        )
                         exit()
 
                 # Send results
@@ -659,7 +696,9 @@ class MPILoss(LossFunc):
         # Save model into a file if it is better than the best found one
         if score < self.best_score:
 
-            master_path = ave_path = os.path.join(self.model_path, f"{self.model.__name__}_best")
+            master_path = ave_path = os.path.join(
+                self.model_path, f"{self.model.__class__.__name__}_best"
+            )
             worker_path = os.path.join("tmp_wks", f"worker{source}")
 
             if os.path.isdir(worker_path):
@@ -748,12 +787,18 @@ class SerialLoss(LossFunc):
     def _save_model(self, score, trained_model):
         # Save model into a file if it is better than the best found one
         if score < self.best_score:
-            save_path = os.path.join(self.model_path, f"{self.model.__name__}_best")
-            if hasattr(trained_model, "save") and callable(getattr(trained_model, "save")):
+            save_path = os.path.join(
+                self.model_path, f"{self.model.__class__.__name__}_best"
+            )
+            if hasattr(trained_model, "save") and callable(
+                getattr(trained_model, "save")
+            ):
                 os.system(f"rm -rf {save_path}")
                 trained_model.save(save_path)
             else:
-                logger.error("Model/loss function does not have a method called `save`")
+                logger.error(
+                    "Model/loss function does not have a method called `save`"
+                )
                 exit()
 
 

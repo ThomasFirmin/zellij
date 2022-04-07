@@ -1,16 +1,16 @@
 Metadata-Version: 2.1
 Name: zellij
-Version: 0.0.2
+Version: 0.0.1
 Summary: A generic framework for fractal-based optimization
-Home-page: UNKNOWN
+Home-page: 
 Author: Thomas Firmin
-Author-email: thomas.firmin@univ-lille.fr
+Author-email: thomas.firmin.etu@univ-lille.fr
 License: UNKNOWN
 Project-URL: Bug Tracker, 
 Keywords: fractal,continuous optimization,global optimization,black-box functions,decision space partitioning,exploration,exploitation,metaheuristics,tree search
 Platform: UNKNOWN
 Classifier: Programming Language :: Python :: 3
-Classifier: License :: OSI Approved :: CeCILL
+Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Requires-Python: >=3.6
 Description-Content-Type: text/markdown

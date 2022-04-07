@@ -138,12 +138,12 @@ class ILS(Metaheuristic):
             i = 0
             improvement = False
             # logging
-            logger.info(f"ILS {step}>{self.precision}")
+            logger.debug(f"ILS {step}>{self.precision}")
 
             while i < self.search_space.n_variables and self.loss_func.calls < self.f_calls:
 
                 # logging
-                logger.info(f"Evaluating dimension {i}")
+                logger.debug(f"Evaluating dimension {i}")
 
                 self.pending_pb(2)
 

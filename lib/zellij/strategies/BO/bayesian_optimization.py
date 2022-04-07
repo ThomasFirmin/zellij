@@ -55,7 +55,16 @@ class Bayesian_optimization(Metaheuristic):
 
     """
 
-    def __init__(self, loss_func, search_space, f_calls, iterations, acquisition, optimizer, verbose=False):
+    def __init__(
+        self,
+        loss_func,
+        search_space,
+        f_calls,
+        iterations,
+        acquisition,
+        optimizer,
+        verbose=False,
+    ):
 
         super().__init__(loss_func, search_space, f_calls, verbose)
 
@@ -65,7 +74,6 @@ class Bayesian_optimization(Metaheuristic):
 
         self.optimizer = optimizer
         self.acquisition = acquisition
-        self.kernel = kernel
 
         self.iterations = iterations
 
@@ -83,18 +91,34 @@ class Bayesian_optimization(Metaheuristic):
 
         if new:
             self.f = open("results_bo.txt", "w")
-            self.f.write(str(self.search_space.label)[1:-1].replace(" ", "").replace("'", "") + ",loss_value,aquisition,comments\n")
+            self.f.write(
+                str(self.search_space.label)[1:-1]
+                .replace(" ", "")
+                .replace("'", "")
+                + ",loss_value,aquisition,comments\n"
+            )
         else:
             self.f = open("results_bo.txt", "a")
 
         for i, j, k, c in zip(x, y, scores, comments):
-            self.f.write(str(i)[1:-1].replace(" ", "") + "," + str(j) + "," + str(k) + "," + str(c) + "\n")
+            self.f.write(
+                str(i)[1:-1].replace(" ", "")
+                + ","
+                + str(j)
+                + ","
+                + str(k)
+                + ","
+                + str(c)
+                + "\n"
+            )
         self.f.close()
 
     def run(self, n_process=1, save=False):
 
         # Initialize comm Size architectures
-        X = np.random.random((n_process, self.search_space.n_variables)).tolist()
+        X = np.random.random(
+            (n_process, self.search_space.n_variables)
+        ).tolist()
 
         # Compute architectures
         converted = self.search_space.convert_to_continuous(X, reverse=True)
@@ -141,7 +165,10 @@ class Bayesian_optimization(Metaheuristic):
         best = np.array(self.X)[ind_min].tolist()
 
         print(best)
-        return self.search_space.convert_to_continuous(best[0], reverse=True)[0], min
+        return (
+            self.search_space.convert_to_continuous(best[0], reverse=True)[0],
+            min,
+        )
 
     def show(self, filename=None):
 
@@ -162,4 +189,6 @@ class Bayesian_optimization(Metaheuristic):
         plt.show()
 
         if filename != None:
-            self.search_space.show(data.iloc[:, 0 : self.search_space.n_variables], scores)
+            self.search_space.show(
+                data.iloc[:, 0 : self.search_space.n_variables], scores
+            )

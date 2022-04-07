@@ -2,3 +2,6 @@ numpy
 deap
 matplotlib
 pandas
+seaborn
+enlighten
+GPy

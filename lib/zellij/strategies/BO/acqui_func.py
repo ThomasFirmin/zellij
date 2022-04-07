@@ -24,7 +24,9 @@ class Acquisition:
         self.surrogate = None
 
     def train_surrogate(self):
-        self.surrogate = GPy.models.GPRegression(np.array(self.X), np.array(self.Y))
+        self.surrogate = GPy.models.GPRegression(
+            np.array(self.X), np.array(self.Y)
+        )
         self.surrogate.optimize(optimizer="lbfgs")
 
     def add_points(self, X, Y):
@@ -85,7 +87,9 @@ def PI(ymin, mean, diagCov):
 def EI(ymin, mean, diagCov, psi=0.05):
     delta = ymin - mean + psi
     normalized = delta / np.sqrt(diagCov)
-    return delta * norm.cdf(normalized) + np.sqrt(diagCov) * norm.pdf(normalized)
+    return delta * norm.cdf(normalized) + np.sqrt(diagCov) * norm.pdf(
+        normalized
+    )
 
 
 def acqui_fun(acqui_name):
