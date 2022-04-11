@@ -8,7 +8,13 @@ lib/zellij.egg-info/SOURCES.txt
 lib/zellij.egg-info/dependency_links.txt
 lib/zellij.egg-info/requires.txt
 lib/zellij.egg-info/top_level.txt
+lib/zellij/core/__init__.py
+lib/zellij/core/fractals.py
+lib/zellij/core/loss_func.py
+lib/zellij/core/metaheuristic.py
+lib/zellij/core/search_space.py
 lib/zellij/strategies/__init__.py
+lib/zellij/strategies/bayesian_optimization.py
 lib/zellij/strategies/chaos_algorithm.py
 lib/zellij/strategies/fda.py
 lib/zellij/strategies/genetic_algorithm.py

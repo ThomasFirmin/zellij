@@ -41,6 +41,7 @@ setuptools.setup(
         "seaborn",
         "enlighten",
         "gpytorch",
+        "botorch",
     ],
     python_requires=">=3.6",
 )

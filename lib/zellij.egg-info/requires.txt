@@ -4,4 +4,4 @@ matplotlib
 pandas
 seaborn
 enlighten
-GPy
+gpytorch
