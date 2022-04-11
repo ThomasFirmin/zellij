@@ -40,7 +40,7 @@ setuptools.setup(
         "pandas",
         "seaborn",
         "enlighten",
-        "GPy",
+        "gpytorch",
     ],
     python_requires=">=3.6",
 )

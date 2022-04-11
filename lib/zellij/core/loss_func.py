@@ -71,7 +71,7 @@ class LossFunc(object):
         save : string
             Filename where to save the best found model and the historic of the loss function.
             Only one model is saved for memory issues. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
-             y is the results of the evaluation of x by f. model is optional, if you want to save the best found model (e.g. a neural network)\
+             y is the results of the evaluation of x by f. model is optional, if you want to save the best model found (e.g. a neural network)\
              you can return the model. However the model must have a "save" method (e.g. model.save(filename)).
 
         """
