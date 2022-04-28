@@ -6,7 +6,7 @@ To implements metaheuristics and other optimization methods, **Zellij** uses [DE
 and [BoTorch](https://botorch.org/) [[4]](#4) for *Bayesian Optimization*.
 **Zellij** is defined as an easy to use and modular framework, based on Python object oriented paradigm.
 
-## Installing Zellij
+## Install Zellij
 
 #### Original version
 ```
@@ -28,7 +28,7 @@ User will then be able to use the `MPI` option of the `Loss` decorator.
 ```
 Then the python script must be executed using `mpiexec`:
 ```python
-mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path/to/python/script>
+$ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path/to/python/script>
 ```
 
 Be carefull, before using this version, one must be familiar to MPI.
