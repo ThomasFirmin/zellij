@@ -75,36 +75,37 @@ ga.show()
 
 * Python >=3.6
 
-* numpy
-* DEAP
-* botorch
-* gpytorch
-* matplotlib
-* seaborn
-* pandas
+* [numpy](https://numpy.org/)
+* [DEAP](https://deap.readthedocs.io/en/master/)
+* [botorch](https://botorch.org/)
+* [gpytorch](https://gpytorch.ai/)
+* [matplotlib](https://matplotlib.org/)
+* [seaborn](https://seaborn.pydata.org/)
+* [pandas](https://pandas.pydata.org/)
 
 #### Distributed version
-* numpy
-* DEAP
-* botorch
-* gpytorch
-* matplotlib
-* seaborn
-* pandas
-* mpi4py
+* [numpy](https://numpy.org/)
+* [DEAP](https://deap.readthedocs.io/en/master/)
+* [botorch](https://botorch.org/)
+* [gpytorch](https://gpytorch.ai/)
+* [matplotlib](https://matplotlib.org/)
+* [seaborn](https://seaborn.pydata.org/)
+* [pandas](https://pandas.pydata.org/)
+* [mpi4py](https://mpi4py.readthedocs.io/en/stable/)
 
 ## Citing
 
-```xml
-@article{}
-```
+Incomming
 
 ## References
 <a id="1">[1]</a>
 Nakib, A., Ouchraa, S., Shvai, N., Souquet, L. & Talbi, E.-G. Deterministic metaheuristic based on fractal decomposition for large-scale optimization. Applied Soft Computing 61, 468–485 (2017).
+
 <a id="2">[2]</a>
 Demirhan, M., Özdamar, L., Helvacıoğlu, L. & Birbil, Ş. I. FRACTOP: A Geometric Partitioning Metaheuristic for Global Optimization. Journal of Global Optimization 14, 415–436 (1999).
+
 <a id="3">[3]</a>
 Félix-Antoine Fortin, François-Michel De Rainville, Marc-André Gardner, Marc Parizeau and Christian Gagné, "DEAP: Evolutionary Algorithms Made Easy", Journal of Machine Learning Research, vol. 13, pp. 2171-2175, jul 2012.
+
 <a id="4">[4]</a>
-M. Balandat, B. Karrer, D. R. Jiang, S. Daulton, B. Letham, A. G. Wilson, and E. Bakshy. BoTorch: A Framework for Efficient Monte-Carlo Bayesian Optimization. Advances in Neural Information Processing Systems 33, 2020
+M. Balandat, B. Karrer, D. R. Jiang, S. Daulton, B. Letham, A. G. Wilson, and E. Bakshy. BoTorch: A Framework for Efficient Monte-Carlo Bayesian Optimization. Advances in Neural Information Processing Systems 33, 2020.
