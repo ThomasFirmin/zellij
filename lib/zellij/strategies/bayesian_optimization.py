@@ -25,34 +25,7 @@ class Bayesian_optimization(Metaheuristic):
     loss function. Once done, the gaussian process is updated using results
     obtained by evaluating those encouraging solutions with the loss function.
 
-    Parameters
-    ----------
-    loss_func : Loss
-        Loss function to optimize. must be of type f(x)=y
-    search_space : Searchspace
-        Search space object containing bounds of the search space
-    f_calls : int
-        Maximum number of loss_func calls
-    verbose : bool
-        If False, there will be no print and no progress bar.
-    surrogate : botorch.models.model.Model
-        Gaussian Process Regressor object from 'botorch'.
-        Determines the surrogate model that Bayesian optimization will use to
-        interpolate the loss function
-    likelihood : gpytorch.mlls
-        gpytorch.mlls object it determines which MarginalLogLikelihood to use
-        when optimizing kernel's hyperparameters
-    acquisition : botorch.acquisition.acquisition.AcquisitionFunction
-        An acquisition function or infill criteria, determines how 'promising'
-        a point sampled from the surrogate is.
-    initial_size : int
-        Size of the initial set of solution to draw randomly.
-    sampler : botorch.sampling.samplers
-        Sampler used for a full Bayesian approach with Monte-Carlo sampling
-        applied to approximate the integrated acquisition function.
-
-    gpu: bool
-        Use GPU if available
+    It is based on `BoTorch <https://botorch.org/>`_ and `GPyTorch <https://gpytorch.ai/>`_.
 
     Attributes
     ----------
@@ -80,8 +53,47 @@ class Bayesian_optimization(Metaheuristic):
         Sampler used for a full Bayesian approach with Monte-Carlo sampling
         applied to approximate the integrated acquisition function.
 
-    gpu: bool
+    gpu: bool, default=True
         Use GPU if available
+
+    See Also
+    --------
+    :ref:`meta` : Parent class defining what a Metaheuristic is
+    :ref:`lf` : Describes what a loss function is in Zellij
+    :ref:`sp` : Describes what a loss function is in Zellij
+
+    Examples
+    --------
+    >>> from zellij.core.loss_func import Loss
+    >>> from zellij.core.search_space import Searchspace
+    >>> from zellij.utils.benchmark import himmelblau
+    >>> from zellij.strategies.bayesian_optimization import Bayesian_optimization
+    >>> import botorch
+    >>> import gpytorch
+    ...
+    >>> labels = ["a","b","c"]
+    >>> types = ["R","R","R"]
+    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
+    >>> sp = Searchspace(labels,types,values)
+    >>> lf = Loss()(himmelblau)
+    ...
+    >>> bo = Bayesian_optimization(lf, sp, 500,
+    ...       acquisition=botorch.acquisition.monte_carlo.qExpectedImprovement,
+    ...       q=5)
+    >>> bo.run()
+    >>> bo.show()
+
+
+    .. image:: ../_static/bo_sp_ex.png
+        :width: 924px
+        :align: center
+        :height: 487px
+        :alt: alternate text
+    .. image:: ../_static/bo_res_ex.png
+        :width: 924px
+        :align: center
+        :height: 487px
+        :alt: alternate text
 
     """
 
@@ -95,10 +107,40 @@ class Bayesian_optimization(Metaheuristic):
         likelihood=ExactMarginalLogLikelihood,
         acquisition=ExpectedImprovement,
         initial_size=10,
-        sampler=None,  # Sampler if q-ACQF
+        sampler=None,
         gpu=True,
         **kwargs,
     ):
+        """Short summary.
+
+        Parameters
+        ----------
+        loss_func : Loss
+            Loss function to optimize. must be of type f(x)=y
+        search_space : Searchspace
+            Search space object containing bounds of the search space
+        f_calls : int
+            Maximum number of loss_func calls
+        verbose : bool
+            If False, there will be no print and no progress bar.
+        surrogate : botorch.models.model.Model, default=SingleTaskGP
+            Gaussian Process Regressor object from 'botorch'.
+            Determines the surrogate model that Bayesian optimization will use to
+            interpolate the loss function
+        likelihood : gpytorch.mlls, default=ExactMarginalLogLikelihood
+            gpytorch.mlls object it determines which MarginalLogLikelihood to use
+            when optimizing kernel's hyperparameters
+        acquisition : botorch.acquisition.acquisition.AcquisitionFunction, default = ExpectedImprovement
+            An acquisition function or infill criteria, determines how 'promising'
+            a point sampled from the surrogate is.
+        initial_size : int, default=10
+            Size of the initial set of solution to draw randomly.
+        sampler : botorch.sampling.samplers, default=None
+            Sampler used for a full Bayesian approach with Monte-Carlo sampling
+            applied to approximate the integrated acquisition function.
+        gpu: bool, default=True
+            Use GPU if available
+        """
 
         super().__init__(loss_func, search_space, f_calls, verbose)
 
@@ -139,7 +181,7 @@ class Bayesian_optimization(Metaheuristic):
             )
         )
 
-    def generate_initial_data(self):
+    def _generate_initial_data(self):
         # generate training data
         train_x = torch.rand(
             self.initial_size,
@@ -157,7 +199,7 @@ class Bayesian_optimization(Metaheuristic):
 
         return train_x, train_obj, -self.loss_func.best_score
 
-    def initialize_model(self, train_x, train_obj, state_dict=None):
+    def _initialize_model(self, train_x, train_obj, state_dict=None):
 
         # define models for objective and constraint
         model = self.surrogate(
@@ -178,7 +220,9 @@ class Bayesian_optimization(Metaheuristic):
 
         return mll, model
 
-    def optimize_acqf_and_get_observation(self, acq_func, restarts=10, raw=512):
+    def _optimize_acqf_and_get_observation(
+        self, acq_func, restarts=10, raw=512
+    ):
         """Optimizes the acquisition function, and returns a new candidate and a noisy observation."""
 
         # optimize
@@ -212,7 +256,26 @@ class Bayesian_optimization(Metaheuristic):
 
         return new_x, new_obj
 
-    def run(self, n_process=1, save=False):
+    def run(self, n_process=1):
+
+        """run(n_process=1)
+
+        Runs SA
+
+        Parameters
+        ----------
+        n_process : int, default=1
+            Determine the number of best solution found to return.
+
+        Returns
+        -------
+        best_sol : list[float]
+            Returns a list of the <n_process> best found points to the continuous format
+
+        best_scores : list[float]
+            Returns a list of the <n_process> best found scores associated to best_sol
+
+        """
 
         # progress bar
         self.build_bar(self.iterations)
@@ -225,12 +288,12 @@ class Bayesian_optimization(Metaheuristic):
             train_x,
             train_obj,
             best_observed_value,
-        ) = self.generate_initial_data()
+        ) = self._generate_initial_data()
 
         # progress bar
         self.pending_pb(self.initial_size)
 
-        mll, model = self.initialize_model(train_x, train_obj)
+        mll, model = self._initialize_model(train_x, train_obj)
 
         # progress bar
         self.update_main_pb(
@@ -266,7 +329,7 @@ class Bayesian_optimization(Metaheuristic):
             (
                 new_x,
                 new_obj,
-            ) = self.optimize_acqf_and_get_observation(acqf)
+            ) = self._optimize_acqf_and_get_observation(acqf)
 
             # update training points
             train_x = torch.cat([train_x, new_x])
@@ -274,7 +337,7 @@ class Bayesian_optimization(Metaheuristic):
 
             # reinitialize the models so they are ready for fitting on next iteration
             # use the current state dict to speed up fitting
-            mll, model = self.initialize_model(
+            mll, model = self._initialize_model(
                 train_x,
                 train_obj,
                 model.state_dict(),
@@ -296,29 +359,36 @@ class Bayesian_optimization(Metaheuristic):
         # self.close_bar()
         return best, min
 
-    def show(self, filename=None):
+    def show(self, filepath=None, save=False):
 
-        if filename == None:
-            scores = np.array(self.loss_func.all_scores)
-        else:
-            data = pd.read_table(filename, sep=",", decimal=".")
-            scores = data["loss_value"].to_numpy()
+        """show(self, filename=None)
 
-        super().show()
+        Plots solutions and scores computed during the optimization
 
-        min = np.argmin(scores)
+        Parameters
+        ----------
+        filepath : str, default=""
+            If a filepath is given, the method will read files insidethe folder and will try to plot contents.
+
+        save : boolean, default=False
+            Save figures
+        """
+
+        data_all, all_scores = super().show(filepath, save)
+
+        min = np.argmin(all_scores)
         indexes = np.repeat(0, self.initial_size)
         indexes = np.append(
             indexes,
             np.repeat(
                 np.arange(1, self.iterations, dtype=int),
                 self.kwargs.get("q", 1),
-            )[: len(scores) - self.initial_size],
+            )[: len(all_scores) - self.initial_size],
         )
         plt.scatter(
             indexes,
-            scores,
-            c=scores,
+            all_scores,
+            c=all_scores,
             cmap="plasma_r",
         )
         plt.plot(
@@ -331,19 +401,15 @@ class Bayesian_optimization(Metaheuristic):
         plt.title("Scores evolution during bayesian optimization")
         plt.scatter(
             min // self.kwargs.get("q", 1),
-            scores[min],
+            all_scores[min],
             color="red",
             label="Best score",
         )
         plt.annotate(
-            str(scores[min]), (min // self.kwargs.get("q", 1), scores[min])
+            str(all_scores[min]),
+            (min // self.kwargs.get("q", 1), all_scores[min]),
         )
         plt.xlabel("iterations")
         plt.ylabel("Scores")
         plt.legend(loc=1)
         plt.show()
-
-        if filename != None:
-            self.search_space.show(
-                data.iloc[:, 0 : self.search_space.n_variables], scores
-            )

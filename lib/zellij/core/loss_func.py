@@ -23,35 +23,32 @@ class LossFunc(object):
 
     """LossFunc
 
-    LossFunc allows to wrap function of type f(x)=(y, model), so it can be used in Zellij by adding several features,\
-     such as calls count, saves, parallelization, historic... y is the results of the evaluation of x by f. model is optional,\
-      if you want to save the best found model (e.g. a neural network) you can return the model.
-    However the model must have a "save" method (e.g. model.save(filename)).
+    LossFunc allows to wrap function of type :math:`f(x)=y`. With :math:`x` a set of hyperparameters.
+    However, **Zellij** supports alternative pattern: :math:`f(x)=results,model` for example.
+    Where:
+
+    * :math:`results` can be a `list <https://docs.python.org/3/tutorial/datastructures.html#more-on-lists>`_ or a `dictionary <https://docs.python.org/3/tutorial/datastructures.html#dictionaries>`_. The first element of the list must be the loss value. If the return is a dictionary, the loss value must have the key *"score"*.
+    * :math:`model` is optionnal, it is an object with a *save()* method. (e.g. a neural network from Tensorflow)
+
+    You must wrap your function so it can be used in Zellij by adding several features,\
+     such as calls count, saves, parallelization, historic...
 
     Attributes
     ----------
     model : function
-        Function of type f(x)=y. x must be a solution. A solution can be a list of float, int... It can also be of mixed types, containing, strings, float, int...
+        Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x` must be a solution. A solution can be a list of float, int... It can also be of mixed types...
     best_score : float
-        Best found score among all loss function evaluations.
-    best_score : float
-        Best found score among all loss function evaluations.
+        Best score found so far.
     best_sol : list
-        Best found solution among all loss function evaluations.
+        Best solution found so far.
+    best_argmin : int
+        Index of the best solution found so far.
     all_scores : float
         Historic of all evaluated scores.
     all_solutions : float
         Historic of all evaluated solutions.
     calls : int
         Number of loss function calls
-
-    Methods
-    -------
-    _save_file(self,solution, score, filename, add, others=[])
-        Save informations into a file created by a Metaheuristic.
-
-    _save_best(self, solution, score)
-        Save best found solution and score into self.
 
     See Also
     --------
@@ -67,12 +64,11 @@ class LossFunc(object):
         Parameters
         ----------
         model : function
-            Function of type f(x)=y. x must be a solution. A solution can be a list of float, int... It can also be of mixed types, containing, strings, float, int...
+            Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x` must be a solution. A solution can be a list of float, int... It can also be of mixed types...
         save : string
             Filename where to save the best found model and the historic of the loss function.
-            Only one model is saved for memory issues. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
-             y is the results of the evaluation of x by f. model is optional, if you want to save the best model found (e.g. a neural network)\
-             you can return the model. However the model must have a "save" method (e.g. model.save(filename)).
+            Only one model is saved for memory issues. Be carefull, if you want to save a model,
+            the object that you loss function returns, must have a "save" method with a filename parameter. (e.g. model.save(filename)).
 
         """
         ##############
@@ -88,6 +84,7 @@ class LossFunc(object):
 
         self.best_score = float("inf")
         self.best_sol = None
+        self.best_argmin = None
 
         self.all_scores = []
         self.all_solutions = []
@@ -116,11 +113,29 @@ class LossFunc(object):
             self.manager = enlighten.get_manager(stream=None, enabled=False)
 
     def build_bar(self, total):
+        """build_bar(total)
+
+        build_bar is a method to build a progress bar.
+        It is a purely aesthetic feature to get info on the execution.
+        You can deactivate it, with `verbose=False`.
+
+        Parameters
+        ----------
+        total : int
+            Length of the progress bar.
+
+        """
+
         if self.verbose:
             self.lf_pb = pb.calls_counter_inside(self.manager, total)
             self.best_pb = pb.best_found(self.manager, self.best_score)
 
     def close_bar(self):
+        """close_bar()
+
+        Delete the progress bar.
+
+        """
         if self.verbose:
             self.lf_pb.close()
             self.best_pb.close()
@@ -129,9 +144,9 @@ class LossFunc(object):
     def _save_model(self, *args):
         """ _save_model(self)
 
-        Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
-         y is the results of the evaluation of x by f. model is optional, if you want to save the best found model (e.g. a neural network)\
-         you can return the model. However the model must have a "save" method (e.g. model.save(filename)).
+        Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form :math:`f(x) = (y, model)`\
+         `y` are the results of the evaluation of `x` by `f`. `model` is optional, if you want to save the best model found (e.g. a neural network)\
+         you can return the model. However the model must have a "save" method with a filename. (e.g. model.save(filename)).
 
         """
         pass
@@ -259,6 +274,18 @@ class LossFunc(object):
 
     # Save best found solution
     def _save_best(self, x, y):
+        """_save_best(x, y)
+
+        Save point x with score y, and verify if this point is the best found so far.
+
+        Parameters
+        ----------
+        x : list
+            Set of hyperparameters (a solution)
+        y : {float, int}
+            Loss value (score) associated to x.
+
+        """
 
         # historic
         self.all_solutions.append(list(x)[:])
@@ -268,6 +295,8 @@ class LossFunc(object):
         if y < self.best_score:
             self.best_score = y
             self.best_sol = list(x)[:]
+            self.best_argmin = len(self.all_scores)
+
             self.new_best = True
 
         if self.verbose:
@@ -286,8 +315,8 @@ class LossFunc(object):
 
         Parameters
         ----------
-        r : {tuple, float, int}
-            Return of of the loss function
+        r : {list, float, int}
+            Returns of the loss function
 
         Returns
         -------
@@ -316,13 +345,50 @@ class LossFunc(object):
         elif isinstance(results, dict):
             rd = results
             rd["score"] = r.values()[0]
-        elif isinstance(results, tuple):
+        elif isinstance(results, list):
             rd["score"] = results[0]
             for i, j in enumerate(results):
                 label = f"return{i}"
                 rd[label] = j
 
         return rd, model
+
+    def reset(self):
+        """reset()
+
+        Reset all attributes of `LossFunc` at their initial values.
+
+        """
+
+        self.best_score = float("inf")
+        self.best_sol = None
+        self.best_argmin = None
+
+        self.all_scores = []
+        self.all_solutions = []
+
+        self.calls = 0
+        # Must be private, à voir
+        self.new_best = False
+
+        self.labels = []
+
+        if isinstance(self.save, str):
+            self.folder_name = self.save
+        else:
+            self.folder_name = f"{self.model.__class__.__name__}_zlj_save"
+
+        self.outputs_path = ""
+        self.model_path = ""
+        self.plots_path = ""
+        self.loss_file = ""
+
+        self.file_created = False
+
+        if self.verbose:
+            self.manager = enlighten.get_manager()
+        else:
+            self.manager = enlighten.get_manager(stream=None, enabled=False)
 
 
 class FDA_loss_func:
@@ -804,25 +870,44 @@ class SerialLoss(LossFunc):
 
 # Wrap different loss functions
 def Loss(model=None, save=False, verbose=True, MPI=False):
-    """Loss(model, save_model='', MPI=False)
+    """Loss(model=None, save=False, verbose=True, MPI=False)
 
-    Wrap a function of type f(x)=y. See LossFunc for more info.
+    Wrap a function of type :math:`f(x)=y`. See `LossFunc` for more info.
 
     Parameters
     ----------
     model : function, default=None
         Function of type f(x)=y. x must be a solution. A solution can be a list of float, int... It can also be of mixed types, containing, strings, float, int...
 
-    save_model : string, default=''
+    save : string, optional
         Filename where to save the best found model. Only one model is saved for memory issues.
 
-    MPI : boolean, default=False
+    MPI : boolean, optional
         Wrap the function with MPILoss if True, with SerialLoss else.
 
     Returns
     -------
     wrapper : LossFunc
         Wrapped original function
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from zellij.core.loss_func import Loss
+    >>> @Loss(save=False, verbose=True)
+    ... def himmelblau(x):
+    ...   x_ar = np.array(x)
+    ...   return np.sum(x_ar**4 -16*x_ar**2 + 5*x_ar) * (1/len(x_ar))
+    >>> print(f"Best solution found: f({himmelblau.best_sol}) = {himmelblau.best_score}")
+    Best solution found: f(None) = inf
+    >>> print(f"Number of evaluations:{himmelblau.calls}")
+    Number of evaluations:0
+    >>> print(f"All evaluated solutions:{himmelblau.all_solutions}")
+    All evaluated solutions:[]
+    >>> print(f"All loss values:{himmelblau.all_scores}")
+    All loss values:[]
+
+
 
     """
     if model:

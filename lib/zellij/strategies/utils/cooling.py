@@ -15,7 +15,7 @@ class Cooling(object):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
@@ -31,9 +31,17 @@ class Cooling(object):
     cross : int
         Count the number of times Tend is crossed.
 
-    T0
-    Tend
-    peaks
+    T0 : float
+        Initial temperature of the cooling schedule.\
+         Higher temperature leads to higher acceptance of a worse solution. (more exploration)
+
+    Tend : float
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
+        <T0>. It allows to periodically easily escape from local optima.
+
+    peaks : int, default=1
+        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
+        <peaks> times.
 
     Methods
     -------
@@ -91,7 +99,9 @@ class Cooling(object):
         plt.plot(pts, ls="-", color="orange")
 
         if filepath:
-            save_path = os.path.join(self.loss_func.plots_path, f"cooling_sa.png")
+            save_path = os.path.join(
+                self.loss_func.plots_path, f"cooling_sa.png"
+            )
 
             plt.savefig(save_path, bbox_inches="tight")
             plt.close()
@@ -104,7 +114,8 @@ class MulExponential(Cooling):
     """MulExponential
 
     Exponential multiplicative monotonic cooling.
-    Tk = T0.alpha^k
+
+    :math:`T_k = T_0.\\alpha^k`
 
     Parameters
     ----------
@@ -115,7 +126,7 @@ class MulExponential(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
@@ -157,14 +168,18 @@ class MulExponential(Cooling):
         return self.Tcurrent if self.cross < self.peaks else False
 
     def iterations(self):
-        return int(np.ceil(np.log(self.Tend / self.T0) / np.log(self.alpha))) * self.peaks
+        return (
+            int(np.ceil(np.log(self.Tend / self.T0) / np.log(self.alpha)))
+            * self.peaks
+        )
 
 
 class MulLogarithmic(Cooling):
     """MulLogarithmic
 
     Logarithmic multiplicative monotonic cooling.
-    Tk = T0/(1+alpha.log(1+k))
+
+    :math:`T_k = \\frac{T_0}{1+\\alpha.log(1+k)}`
 
     Parameters
     ----------
@@ -175,16 +190,12 @@ class MulLogarithmic(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    alpha
 
     Methods
     -------
@@ -217,14 +228,18 @@ class MulLogarithmic(Cooling):
         return self.Tcurrent if self.cross < self.peaks else False
 
     def iterations(self):
-        return int(np.ceil(np.exp((self.T0 / self.Tend - 1 / self.alpha)) - 1)) * self.peaks
+        return (
+            int(np.ceil(np.exp((self.T0 / self.Tend - 1 / self.alpha)) - 1))
+            * self.peaks
+        )
 
 
 class MulLinear(Cooling):
     """MulLinear
 
     Linear multiplicative monotonic cooling.
-    Tk = T0/(1+alpha.k)
+
+    :math:`T_k = \\frac{T_0}{1+\\alpha.k}`
 
     Parameters
     ----------
@@ -235,16 +250,12 @@ class MulLinear(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    alpha
 
     Methods
     -------
@@ -284,7 +295,8 @@ class MulQuadratic(Cooling):
     """MulQuadratic
 
     Quadratic multiplicative monotonic cooling.
-    Tk = T0/(1+alpha.k^2)
+
+    :math:`T_k = \\frac{T_0}{1+\\alpha.k^2}`
 
     Parameters
     ----------
@@ -295,16 +307,12 @@ class MulQuadratic(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    alpha
 
     Methods
     -------
@@ -337,14 +345,18 @@ class MulQuadratic(Cooling):
         return self.Tcurrent if self.cross < self.peaks else False
 
     def iterations(self):
-        return int(np.ceil(np.sqrt(self.T0 / (self.Tend * self.alpha)))) * self.peaks
+        return (
+            int(np.ceil(np.sqrt(self.T0 / (self.Tend * self.alpha))))
+            * self.peaks
+        )
 
 
 class AddLinear(Cooling):
     """AddLinear
 
     Linear additive monotonic cooling.
-    Tk = Tend + (T0-Tend)((cycles-k))/cycles)
+
+    :math:`T_k = T_{end} + (T_0-T_{end})\\left(\\frac{cycles-k}{cycles}\\right)`
 
     Parameters
     ----------
@@ -356,16 +368,12 @@ class AddLinear(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    cycles
 
     Methods
     -------
@@ -387,7 +395,9 @@ class AddLinear(Cooling):
 
     def cool(self):
 
-        self.Tcurrent = self.Tend + (self.T0 - self.Tend) * ((self.cycles - self.k) / self.cycles)
+        self.Tcurrent = self.Tend + (self.T0 - self.Tend) * (
+            (self.cycles - self.k) / self.cycles
+        )
 
         if self.k == self.cycles:
             self.cross += 1
@@ -405,7 +415,8 @@ class AddQuadratic(Cooling):
     """AddQuadratic
 
     Quadratic additive monotonic cooling.
-    Tk = Tend + (T0-Tend)((cycles-k))/cycles)^2
+
+    :math:`T_k = T_{end} + (T_0-T_{end})\\left(\\frac{cycles-k}{cycles}\\right)^2`
 
     Parameters
     ----------
@@ -417,7 +428,7 @@ class AddQuadratic(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
@@ -448,7 +459,11 @@ class AddQuadratic(Cooling):
 
     def cool(self):
 
-        self.Tcurrent = self.Tend + (self.T0 - self.Tend) * ((self.cycles - self.k) / self.cycles) ** 2
+        self.Tcurrent = (
+            self.Tend
+            + (self.T0 - self.Tend)
+            * ((self.cycles - self.k) / self.cycles) ** 2
+        )
 
         if self.k == self.cycles:
             self.cross += 1
@@ -466,7 +481,8 @@ class AddExponential(Cooling):
     """AddExponential
 
     Exponential additive monotonic cooling.
-    Tk = Tend + (T0-Tend)(1/(1+exp(2*ln(T0-Tend)/n*(k-1/2*n))))
+
+    :math:`T_k = T_{end} + \\frac{T_0-T_{end}}{1+e^{\\frac{2ln(T_0-T_{end})}{cycles}}(k-0,5cycles)}`
 
     Parameters
     ----------
@@ -478,7 +494,7 @@ class AddExponential(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
@@ -509,7 +525,18 @@ class AddExponential(Cooling):
 
     def cool(self):
 
-        self.Tcurrent = self.Tend + (self.T0 - self.Tend) * (1 / (1 + np.exp(2 * np.log(self.T0 - self.Tend) / self.cycles * (self.k - 0.5 * self.cycles))))
+        self.Tcurrent = self.Tend + (self.T0 - self.Tend) * (
+            1
+            / (
+                1
+                + np.exp(
+                    2
+                    * np.log(self.T0 - self.Tend)
+                    / self.cycles
+                    * (self.k - 0.5 * self.cycles)
+                )
+            )
+        )
 
         if self.k == self.cycles:
             self.cross += 1
@@ -524,10 +551,11 @@ class AddExponential(Cooling):
 
 
 class AddTrigonometric(Cooling):
-    """AddExponential
+    """AddTrigonometric
 
     Trigonometric additive monotonic cooling.
-    Tk = Tend + 0,5.(T0-Tend)(1+cos(k.pi/cycles))
+
+    :math:`T_k = T_{end} + 0,5(T_0-T_{end})(1+cos(\\frac{k.\\pi}{cycles}))`
 
     Parameters
     ----------
@@ -539,7 +567,7 @@ class AddTrigonometric(Cooling):
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
+        Temperature threshold. When reached the temperature is violently increased proportionally to\
         `T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
@@ -570,7 +598,9 @@ class AddTrigonometric(Cooling):
 
     def cool(self):
 
-        self.Tcurrent = self.Tend + 0.5 * (self.T0 - self.Tend) * (1 + np.cos(self.k * np.pi / self.cycles))
+        self.Tcurrent = self.Tend + 0.5 * (self.T0 - self.Tend) * (
+            1 + np.cos(self.k * np.pi / self.cycles)
+        )
 
         if self.k == self.cycles:
             self.cross += 1

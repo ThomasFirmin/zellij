@@ -43,5 +43,6 @@ setuptools.setup(
         "gpytorch",
         "botorch",
     ],
+    extras_require={"mpi": ["mpi4py"]},
     python_requires=">=3.6",
 )

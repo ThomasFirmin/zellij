@@ -10,43 +10,39 @@ import logging
 logger = logging.getLogger("zellij.Meta")
 
 
-class Metaheuristic:
+class Metaheuristic(object):
 
     """Metaheuristic
 
-    Metaheuristic is a core object which define the structure of a metaheuristic in zellij.
+    Metaheuristic is a core object which defines the structure of a metaheuristic in Zellij.
+    It is an abtract class.
 
     Attributes
     ----------
 
     loss_func : LossFunc
-        Loss function to optimize. must be of type f(x)=y
+        Loss function to optimize. must be of type :math:`f(x)=y` or :math:`f(x)=results,model`
+        See :ref:`lf` for more information.
 
     search_space : Searchspace
-        Search space object containing bounds of the search space.
+        :ref:`sp` object containing bounds of all decision variables.
 
     f_calls : int
-        Maximum number of loss_func calls
+        Maximum number of calls to loss_func.
 
     save : boolean, optional
-        if True save results into a file
+        If True save results into a file
 
     H : Fractal, optional
-        If a Fractal is given, allows to use it.
+        If a :ref:`frac` is given, allows to use it.
 
     verbose : boolean, default=True
-        Algorithm verbosity
-
-    Methods
-    -------
-    create_file(self, *args)
-        Create a saving file.
-
+        Activate or deactivate the progress bar.
 
     See Also
     --------
-    LossFunc : Parent class for a loss function.
-    Searchspace : Define what a search space is in Zellij.
+    :ref:`lf` : Parent class for a loss function.
+    :ref:`sp` : Defines what a search space is in Zellij.
     """
 
     def __init__(self, loss_func, search_space, f_calls, verbose=True):
@@ -78,14 +74,33 @@ class Metaheuristic:
         self.main_pb = False
 
     def build_bar(self, total):
+        """build_bar(total)
+
+        build_bar is a method to build a progress bar.
+        It is a purely aesthetic feature to get info on the execution.
+        You can deactivate it, with `verbose=False`.
+
+        Parameters
+        ----------
+        total : int
+            Length of the progress bar.
+
+        """
 
         if self.verbose:
-            if (not hasattr(self.manager, "zellij_first_line")) or (hasattr(self.manager, "zellij_first_line") and not self.manager.zellij_first_line):
+            if (not hasattr(self.manager, "zellij_first_line")) or (
+                hasattr(self.manager, "zellij_first_line")
+                and not self.manager.zellij_first_line
+            ):
 
                 self.main_pb = True
                 self.manager.zellij_first_line = True
                 self.best_pb = pb.best_counter(self.manager)
-                self.calls_pb_explor, self.calls_pb_exploi, self.calls_pb_pending = pb.calls_counter(self.manager, self.f_calls)
+                (
+                    self.calls_pb_explor,
+                    self.calls_pb_exploi,
+                    self.calls_pb_pending,
+                ) = pb.calls_counter(self.manager, self.f_calls)
 
                 self.loss_func.manager = self.manager
 
@@ -96,9 +111,26 @@ class Metaheuristic:
                 self.calls_pb_exploi = False
                 self.calls_pb_pending = False
 
-        self.meta_pb = pb.metaheuristic_counter(self.manager, total, self.__class__.__name__)
+        self.meta_pb = pb.metaheuristic_counter(
+            self.manager, total, self.__class__.__name__
+        )
 
     def update_main_pb(self, nb, explor=True, best=False):
+        """update_main_pb(nb, explor=True, best=False)
+
+        Update the main progress bar with a certain number.
+
+        Parameters
+        ----------
+        nb : int
+            Length of the update. e.g. if the progress bar measure the number of iterations,
+            at each iteration `nb=1`.
+        explor : bool, default=True
+            If True the color associated to the update will be blue. Orange, otherwise.
+        best : bool default=False
+            If True the score of the current solution will be displayed.
+
+        """
         if self.main_pb and self.verbose:
             if best:
                 self.best_pb.update()
@@ -108,10 +140,26 @@ class Metaheuristic:
                 self.calls_pb_exploi.update_from(self.calls_pb_pending, nb)
 
     def pending_pb(self, nb):
+        """pending_pb(nb)
+
+        Update the progress bar with a pending property (white). This update will be replaced when using
+        `update_main_pb`.
+
+        Parameters
+        ----------
+        nb : type
+            Length of the pending objects.
+
+        """
         if self.main_pb and self.verbose:
             self.calls_pb_pending.update(nb)
 
     def close_bar(self):
+        """close_bar()
+
+        Delete the progress bar. (must be executed at the end of `run` method)
+
+        """
         if self.main_pb and self.verbose:
             self.best_pb.close()
             self.calls_pb_pending.close()
@@ -123,9 +171,26 @@ class Metaheuristic:
 
     @abstractmethod
     def run(self):
+        """run()
+
+        Abstract method, describe how to run a metaheuristic
+
+        """
         pass
 
     def show(self, filepath="", save=False):
+        """show(filepath="", save=False)
+
+        Basic plots for all metaheuristic. uses :ref:`sp` plotting.
+
+        Parameters
+        ----------
+        filepath : string, default=""
+            If a filepath to a file containing points is given, it will read those points and plot them.
+        save : bool, default=False
+            If true, it saves the plots.
+
+        """
 
         if filepath:
             all = os.path.join(filepath, "outputs", "all_evaluations.csv")
@@ -136,6 +201,8 @@ class Metaheuristic:
             all_data = self.loss_func.all_solutions
             all_scores = np.array(self.loss_func.all_scores)
 
-        self.search_space.show(all_data, all_scores, save, self.loss_func.plots_path)
+        self.search_space.show(
+            all_data, all_scores, save, self.loss_func.plots_path
+        )
 
         return all_data, all_scores

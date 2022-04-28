@@ -19,13 +19,23 @@ class Genetic_algorithm(Metaheuristic):
 
     Genetic_algorithm (GA) implements a steady state genetic algorithm. It can be used for exploration and exploitation.
     Indeed when the population has converged, GA can ,thanks to the mutation and crossover operators, perform an intensification phase arround best solutions.
-    It can work with a mixed search space, by adapting its operator. Used operators are: One-point crossover and Tournament selection of size 3.
+    It can work with a mixed search space, by adapting its operator.
 
-    Here the mutation operator is the neighborhood defined in the Searchspace object.
-    Available crossover operator are those compatible with a mixed individual (1-point, 2-points...). Same with the slection.
+    **Will be modified soon:**
+    Used operators are: One-point crossover and Tournament selection of size 3.
 
-    It uses DEAP.
-    See Metaheuristic for more info.
+    Here the mutation operator is the neighborhood defined in the :ref:`sp` object.
+    Available crossover operator are those compatible with a mixed individual (
+    `1-point <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.cxOnePoint>`_,
+    `2-points <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.cxTwoPoint>`_
+    ...).
+    Same with the slection (
+    `Roulette <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.selRoulette>`_,
+    `Tournament <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.selTournament>`_
+    ).
+
+    It uses `DEAP <https://deap.readthedocs.io/>`_.
+    See :ref:`meta` for more info.
 
     Attributes
     ----------
@@ -38,20 +48,51 @@ class Genetic_algorithm(Metaheuristic):
     generation : int
         Generation number of the GA.
 
-    Methods
-    -------
+    elitism : float, default=0.5
+        Percentage of the best parents to keep in the next population by replacing the worst children.
+        Default 50%.
 
-    run(self, n_process=1)
-        Runs Genetic_algorithm
+    filename : str, optional
+        If a file containing initial solutions. GA will initialize the population with it.
 
-    show(filename=None)
-        Plots results
 
     See Also
     --------
-    Metaheuristic : Parent class defining what a Metaheuristic is
-    LossFunc : Describes what a loss function is in Zellij
-    Searchspace : Describes what a loss function is in Zellij
+    :ref:`meta` : Parent class defining what a Metaheuristic is in Zellij.
+    :ref:`lf` : Describes what a loss function is in Zellij.
+    :ref:`sp` : Describes what a search space is in Zellij.
+
+    Examples
+    --------
+    >>> from zellij.core.loss_func import Loss
+    >>> from zellij.core.search_space import Searchspace
+    >>> from zellij.strategies.genetic_algorithm import Genetic_algorithm
+    >>> from zellij.utils.benchmark import himmelblau
+    >>> labels = ["a","b","c"]
+    >>> types = ["R","R","R"]
+    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
+    >>> sp = Searchspace(labels,types,values)
+    >>> lf = Loss()(himmelblau)
+    >>> ga = Genetic_algorithm(lf, sp, 1000, pop_size=25, generation=40,elitism=0.5)
+    >>> ga.run()
+    >>> ga.show()
+
+
+    .. image:: ../_static/ga_sp_ex.png
+        :width: 924px
+        :align: center
+        :height: 487px
+        :alt: alternate text
+    .. image:: ../_static/ga_res1_ex.png
+        :width: 924px
+        :align: center
+        :height: 487px
+        :alt: alternate text
+    .. image:: ../_static/ga_res2_ex.png
+        :width: 924px
+        :align: center
+        :height: 487px
+        :alt: alternate text
     """
 
     def __init__(
@@ -189,13 +230,13 @@ class Genetic_algorithm(Metaheuristic):
     # Run GA
     def run(self, H=None, n_process=1):
 
-        """run(self, n_process = 1,save=False)
+        """run(H=None, n_process=1)
 
         Runs GA
 
         Parameters
         ----------
-        H : Fractal, default=None
+        H : Fractal, optional
             When used by FDA, a fractal corresponding to the current subspace is given
 
         n_process : int, default=1

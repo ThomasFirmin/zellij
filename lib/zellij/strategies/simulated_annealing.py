@@ -19,57 +19,80 @@ class Simulated_annealing(Metaheuristic):
     an initial solution and iteratively moving to next one,\
      better than the previous one, or slightly worse to escape from local optima.
 
-    It uses a cooling schedule which partially drives the acceptance probability. This is the probability\
+    It uses a :ref:`cooling` which partially drives the acceptance probability. This is the probability\
     to accept a worse solution according to the temperature, the best solution found so far and the actual solution.
 
     Attributes
     ----------
 
+    loss_func : Loss
+        :ref:`lf` to optimize. must be of type f(x)=y
+
+    search_space : Searchspace
+        :ref:`sp` object containing bounds of the search space.
+
+    f_calls : int
+        Maximum number of :ref:`lf` calls
+
+    cooling : Cooling
+        :ref:`cooling` used to determine the probability of acceptance.
+
     max_iter : int
-        Maximum iterations of the inner loop. Determine how long the algorithm should sampled neighbors of a solution,\
+        Maximum iterations of the inner loop.
+        Determines how long the algorithm should sample neighbors of a solution,\
         before decreasing the temperature.
 
-    T_0 : float
-        Initial temperature of the cooling schedule.\
-         Higher temperature leads to higher acceptance of a worse solution. (more exploration)
+    save : boolean, optional
+        if True save results into a file
 
-    T_end : float
-        Temperature threshold. When reached the temperature is violently increased proportionately to\
-        T_0. It allows to periodically easily escape from local optima.
-
-    n_peaks : int
-        Maximum number of crossed threshold according to T_end. The temperature will be increased\
-        <n_peaks> times.
-
-    red_rate : float
-        Reduction rate of the initial temperature.
-        Each time the threshold is crossed, temperature is increased by <red_rate>*<T_0>.
-
-
-    Methods
-    -------
-
-    run(self, n_process=1)
-        Runs Genetic_algorithm
-
-    decrease_temperature(self, T)
-        Linear cooling schedule. Deprecated. Must be replaced by a cooling schedule object.
-
-    number_of_iterations(self)
-        Determine the number of iterations with the actual parameters.
-
-    show(filename=None)
-        Plots results
+    verbose : boolean, default=True
+        Algorithm verbosity
 
     See Also
     --------
-    Metaheuristic : Parent class defining what a Metaheuristic is
-    LossFunc : Describes what a loss function is in Zellij
-    Searchspace : Describes what a loss function is in Zellij
+    :ref:`meta` : Parent class defining what a Metaheuristic is
+    :ref:`lf` : Describes what a loss function is in Zellij
+    :ref:`sp` : Describes what a loss function is in Zellij
+
+
+    Examples
+    --------
+
+    >>> from zellij.core.loss_func import Loss
+    >>> from zellij.core.search_space import Searchspace
+    >>> from zellij.strategies.simulated_annealing import Simulated_annealing
+    >>> from zellij.strategies.utils.cooling import MulExponential
+    >>> from zellij.utils.benchmark import himmelblau
+    ...
+    >>> labels = ["a","b","c"]
+    >>> types = ["R","R","R"]
+    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
+    >>> sp = Searchspace(labels,types,values)
+    >>> lf = Loss()(himmelblau)
+    ...
+    >>> cooling = MulExponential(0.85,100,2,3)
+    >>> sa = Simulated_annealing(lf, sp, 100, cooling, 1)
+    ...
+    >>> point = sp.random_point()[0]
+    >>> sa.run(point, lf([point])[0])
+    >>> sa.show()
+
+    .. image:: ../_static/sa_sp_ex.png
+        :width: 924px
+        :align: center
+        :height: 487px
+        :alt: alternate text
+    .. image:: ../_static/sa_res_ex.png
+        :width: 924px
+        :align: center
+        :height: 487px
+        :alt: alternate text
     """
 
     # Initialize simulated annealing
-    def __init__(self, loss_func, search_space, f_calls, cooling, max_iter, verbose=True):
+    def __init__(
+        self, loss_func, search_space, f_calls, cooling, max_iter, verbose=True
+    ):
 
         """__init__(self,loss_func, search_space, f_calls, cooling, max_iter, verbose=True)
 
@@ -90,7 +113,8 @@ class Simulated_annealing(Metaheuristic):
             Cooling schedule used to determine the probability of acceptance.
 
         max_iter : int
-            Maximum iterations of the inner loop. Determine how long the algorithm should sampled neighbors of a solution,\
+            Maximum iterations of the inner loop.
+            Determines how long the algorithm should sample neighbors of a solution,\
             before decreasing the temperature.
 
         save : boolean, optional
@@ -122,6 +146,8 @@ class Simulated_annealing(Metaheuristic):
     def run(self, X0=None, Y0=None, H=None, n_process=1):
 
         """run(X0=None, Y0=None, H=None, n_process=1)
+
+        Runs SA
 
         Parameters
         ----------
@@ -158,7 +184,9 @@ class Simulated_annealing(Metaheuristic):
             self.Y0 = Y0
         else:
             logger.info("Simulated annealing evaluating initial solution")
-            self.Y0 = self.loss_func(self.search_space.convert_to_continuous([self.X0], True))[0]
+            self.Y0 = self.loss_func(
+                self.search_space.convert_to_continuous([self.X0], True)
+            )[0]
 
         self.n_best.append(X0)
         self.n_scores.append(Y0)
@@ -192,17 +220,26 @@ class Simulated_annealing(Metaheuristic):
         # Simulated annealing starting
         while T_actu and self.loss_func.calls < self.f_calls:
             iteration = 0
-            while iteration < self.max_iter and self.loss_func.calls < self.f_calls:
+            while (
+                iteration < self.max_iter
+                and self.loss_func.calls < self.f_calls
+            ):
 
                 neighbors = self.search_space.get_neighbor(X, size=n_process)
 
                 # Update progress bar
                 self.pending_pb(len(neighbors))
 
-                loss_values = self.loss_func(neighbors, temperature=self.record_temp[-1], probability=self.record_proba[-1])
+                loss_values = self.loss_func(
+                    neighbors,
+                    temperature=self.record_temp[-1],
+                    probability=self.record_proba[-1],
+                )
 
                 # Update progress bar
-                self.update_main_pb(len(neighbors), explor=False, best=self.loss_func.new_best)
+                self.update_main_pb(
+                    len(neighbors), explor=False, best=self.loss_func.new_best
+                )
 
                 index_min = np.argmin(loss_values)
                 Y = neighbors[index_min][:]
@@ -251,21 +288,44 @@ class Simulated_annealing(Metaheuristic):
                 iteration += 1
                 self.meta_pb.update()
 
-                logger.debug(f"ITERATION: {self.loss_func.calls}/{self.f_calls}")
+                logger.debug(
+                    f"ITERATION: {self.loss_func.calls}/{self.f_calls}"
+                )
 
                 self.record_temp.append(T_actu)
 
                 # Save file
                 if self.loss_func.save:
                     if not self.file_created:
-                        self.sa_save = os.path.join(self.loss_func.outputs_path, "sa_best.csv")
+                        self.sa_save = os.path.join(
+                            self.loss_func.outputs_path, "sa_best.csv"
+                        )
                         with open(self.sa_save, "w") as f:
-                            f.write(",".join(e for e in self.search_space.labels) + ",loss,temperature,probability\n")
-                            f.write(",".join(str(e) for e in self.X0) + "," + str(self.Y0) + "," + str(self.cooling.T0) + ",0\n")
+                            f.write(
+                                ",".join(e for e in self.search_space.labels)
+                                + ",loss,temperature,probability\n"
+                            )
+                            f.write(
+                                ",".join(str(e) for e in self.X0)
+                                + ","
+                                + str(self.Y0)
+                                + ","
+                                + str(self.cooling.T0)
+                                + ",0\n"
+                            )
                             self.file_created = True
 
                     with open(self.sa_save, "a") as f:
-                        f.write(",".join(str(e) for e in X) + "," + str(cout_X) + "," + str(self.record_temp[-1]) + "," + str(self.record_proba[-1]) + "\n")
+                        f.write(
+                            ",".join(str(e) for e in X)
+                            + ","
+                            + str(cout_X)
+                            + ","
+                            + str(self.record_temp[-1])
+                            + ","
+                            + str(self.record_proba[-1])
+                            + "\n"
+                        )
 
                 self.n_scores.append(cout_X)
                 self.n_best.append(X)
@@ -288,7 +348,7 @@ class Simulated_annealing(Metaheuristic):
 
         """show(self, filename=None)
 
-        Plots solutions and scores evaluated during the optimization
+        Plots solutions and scores computed during the optimization
 
         Parameters
         ----------
@@ -318,6 +378,7 @@ class Simulated_annealing(Metaheuristic):
             probability = np.array(self.record_proba)
 
         argmin = np.argmin(sa_scores)
+
         f, (l1, l2) = plt.subplots(2, 2, figsize=(19.2, 14.4))
 
         ax1, ax2 = l1
@@ -325,8 +386,20 @@ class Simulated_annealing(Metaheuristic):
 
         ax1.plot(list(range(len(sa_scores))), sa_scores, "-")
         argmin = np.argmin(sa_scores)
-        ax1.scatter(argmin, sa_scores[argmin], color="red", label="Best score: " + str(sa_scores[argmin]))
-        ax1.scatter(0, sa_scores[0], color="green", label="Initial score: " + str(sa_scores[0]))
+        all_argmin = np.argmin(all_scores)
+
+        ax1.scatter(
+            argmin,
+            sa_scores[argmin],
+            color="red",
+            label="Best score: " + str(sa_scores[argmin]),
+        )
+        ax1.scatter(
+            0,
+            sa_scores[0],
+            color="green",
+            label="Initial score: " + str(sa_scores[0]),
+        )
 
         ax1.set_title("Simulated annealing")
         ax1.set_xlabel("Iteration")
@@ -339,8 +412,18 @@ class Simulated_annealing(Metaheuristic):
             s = 2500 / len(all_scores)
 
         ax2.scatter(list(range(len(all_scores))), all_scores, s=s)
-        ax2.scatter(argmin, sa_scores[argmin], color="red", label="Best score: " + str(sa_scores[argmin]))
-        ax2.scatter(0, sa_scores[0], color="green", label="Initial score: " + str(sa_scores[0]))
+        ax2.scatter(
+            all_argmin,
+            all_scores[all_argmin],
+            color="red",
+            label="Best score: " + str(sa_scores[argmin]),
+        )
+        ax2.scatter(
+            0,
+            sa_scores[0],
+            color="green",
+            label="Initial score: " + str(sa_scores[0]),
+        )
 
         ax2.set_title("All evaluated solutions")
         ax2.set_xlabel("Solution ID")
@@ -349,7 +432,12 @@ class Simulated_annealing(Metaheuristic):
 
         ax3.plot(list(range(len(sa_scores))), temperature, "-")
         argmin = np.argmin(sa_scores)
-        ax3.scatter(argmin, temperature[argmin], color="red", label="Best score: " + str(temperature[argmin]))
+        ax3.scatter(
+            argmin,
+            temperature[argmin],
+            color="red",
+            label="Best score: " + str(temperature[argmin]),
+        )
 
         ax3.set_title("Temperature decrease")
         ax3.set_xlabel("Iteration")
@@ -363,7 +451,12 @@ class Simulated_annealing(Metaheuristic):
 
         ax4.scatter(list(range(len(sa_scores))), probability, s=s)
         argmin = np.argmin(sa_scores)
-        ax4.scatter(argmin, probability[argmin], color="red", label="Best score: " + str(probability[argmin]))
+        ax4.scatter(
+            argmin,
+            probability[argmin],
+            color="red",
+            label="Best score: " + str(probability[argmin]),
+        )
 
         ax4.set_title("Escaping probability")
         ax4.set_xlabel("Iteration")
@@ -371,7 +464,9 @@ class Simulated_annealing(Metaheuristic):
         ax4.legend(loc="upper right")
 
         if save:
-            save_path = os.path.join(self.loss_func.plots_path, f"sa_summary.png")
+            save_path = os.path.join(
+                self.loss_func.plots_path, f"sa_summary.png"
+            )
 
             plt.savefig(save_path, bbox_inches="tight")
             plt.close()
