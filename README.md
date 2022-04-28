@@ -16,7 +16,7 @@ $ pip install zellij
 #### Distributed Zellij
 
 This version requires MPI, such as [MPICH](https://www.mpich.org/) or [Open MPI](https://www.open-mpi.org/).
-It based on [mpi4py](https://mpi4py.readthedocs.io/en/stable/intro.html#what-is-mpi)
+It is based on [mpi4py](https://mpi4py.readthedocs.io/en/stable/intro.html#what-is-mpi)
 
 ```
 $ pip install zellij[mpi]
