@@ -66,7 +66,7 @@ Here, the neighborhood of each variable is defined by :math:`[a-0.5,a+0.5]` and 
   types = ["R","R"]
   values = [[-5, 5],[-5, 5]]
   neighborhood = [0.5,0.5]
-  sp = Searchspace(labels,types,values)
+  sp = Searchspace(labels,types,values,neighborhood)
   print(sp)
 
 Once your search space is defined, you can use some of its functionnalities. You can draw random points, random attributes...
