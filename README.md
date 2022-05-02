@@ -74,24 +74,24 @@ ga.show()
 #### Original version
 
 * Python >=3.6
-
-* [numpy](https://numpy.org/)
-* [DEAP](https://deap.readthedocs.io/en/master/)
-* [botorch](https://botorch.org/)
-* [gpytorch](https://gpytorch.ai/)
-* [matplotlib](https://matplotlib.org/)
-* [seaborn](https://seaborn.pydata.org/)
-* [pandas](https://pandas.pydata.org/)
+* [numpy](https://numpy.org/)=>1.21.4
+* [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
+* [botorch](https://botorch.org/)>=0.6.3.1
+* [gpytorch](https://gpytorch.ai/)>=1.6.0
+* [matplotlib](https://matplotlib.org/)>=3.5.0
+* [seaborn](https://seaborn.pydata.org/)>=0.11.2
+* [pandas](https://pandas.pydata.org/)>=1.3.4
 
 #### Distributed version
-* [numpy](https://numpy.org/)
-* [DEAP](https://deap.readthedocs.io/en/master/)
-* [botorch](https://botorch.org/)
-* [gpytorch](https://gpytorch.ai/)
-* [matplotlib](https://matplotlib.org/)
-* [seaborn](https://seaborn.pydata.org/)
-* [pandas](https://pandas.pydata.org/)
-* [mpi4py](https://mpi4py.readthedocs.io/en/stable/)
+* Python >=3.6
+* [numpy](https://numpy.org/)=>1.21.4
+* [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
+* [botorch](https://botorch.org/)>=0.6.3.1
+* [gpytorch](https://gpytorch.ai/)>=1.6.0
+* [matplotlib](https://matplotlib.org/)>=3.5.0
+* [seaborn](https://seaborn.pydata.org/)>=0.11.2
+* [pandas](https://pandas.pydata.org/)>=1.3.4
+* [mpi4py](https://mpi4py.readthedocs.io/en/stable/)>=3.1.2
 
 ## Citing
 
