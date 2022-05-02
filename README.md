@@ -73,7 +73,7 @@ ga.show()
 
 #### Original version
 
-* Python >=3.6
+* **Python** >=3.6
 * [numpy](https://numpy.org/)=>1.21.4
 * [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
 * [botorch](https://botorch.org/)>=0.6.3.1
@@ -83,7 +83,7 @@ ga.show()
 * [pandas](https://pandas.pydata.org/)>=1.3.4
 
 #### Distributed version
-* Python >=3.6
+* **Python** >=3.6
 * [numpy](https://numpy.org/)=>1.21.4
 * [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
 * [botorch](https://botorch.org/)>=0.6.3.1
