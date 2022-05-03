@@ -3,3 +3,4 @@ sphinx-copybutton
 sphinx-tabs
 sphinx-panels
 sphinx-rtd-theme
+../lib/zellij
