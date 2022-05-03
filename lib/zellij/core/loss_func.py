@@ -26,7 +26,6 @@ except ImportError as err:
         "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
     You can use: pip install zellij[Parallel]"
     )
-    raise err
 
 
 class LossFunc(object):
