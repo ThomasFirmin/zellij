@@ -1,0 +1,29 @@
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-03T16:46:17+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-05-03T16:47:28+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+# .readthedocs.yaml
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+# Required
+version: 2
+
+# Set the version of Python and other tools you might need
+build:
+  os: ubuntu-20.04
+  tools:
+    python: "3.9"
+
+# Build documentation in the docs/ directory with Sphinx
+sphinx:
+   configuration: docs/conf.py
+
+# If using Sphinx, optionally build your docs in additional formats such as PDF
+formats:
+   - pdf
