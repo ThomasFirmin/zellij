@@ -92,7 +92,7 @@ ga.show()
 * [seaborn](https://seaborn.pydata.org/)>=0.11.2
 * [pandas](https://pandas.pydata.org/)>=1.3.4
 
-#### Distributed version
+#### MPI version
 * **Python** >=3.6
 * [numpy](https://numpy.org/)=>1.21.4
 * [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
