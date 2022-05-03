@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <ThomasFirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   ThomasFirmin
+# @Last modified time: 2022-05-03T15:44:48+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 import numpy as np
 from abc import abstractmethod
 import matplotlib.pyplot as plt
@@ -37,7 +47,10 @@ def interSegmentCircle(A, B, C, R):
     if delta < 0:
         p1, p2 = (None, None)
     elif delta > 0:
-        p1, p2 = (A + ((-b + np.sqrt(delta)) / (2 * a)) * BmA, A + ((-b - np.sqrt(delta)) / (2 * a)) * BmA)
+        p1, p2 = (
+            A + ((-b + np.sqrt(delta)) / (2 * a)) * BmA,
+            A + ((-b - np.sqrt(delta)) / (2 * a)) * BmA,
+        )
 
         Ap1, p1B = np.linalg.norm(p1 - A), np.linalg.norm(B - p1)
         Ap2, p2B = np.linalg.norm(p2 - A), np.linalg.norm(B - p2)
@@ -101,7 +114,9 @@ def interLineHyperplane(A, B, X, Y):
             intersection = A + BmA * d
 
             # C = A + (B-A)*t, use parametric and symetric equation of a line: (c0-a0)/(b0-a0) = (c1-a1)/(b1-a1)... = t, be caraful when (bi -ai) = 0, t doesn't exists for dim i.
-            maxidx = np.argmax(BmA != 0)  # argmax stops at the first occurence of True. At least one value from BmA must be != 0, otherwise, A==B which is not possible.
+            maxidx = np.argmax(
+                BmA != 0
+            )  # argmax stops at the first occurence of True. At least one value from BmA must be != 0, otherwise, A==B which is not possible.
             t = (intersection[maxidx] - A[maxidx]) / BmA[maxidx]
 
             # not on the half line
@@ -131,7 +146,9 @@ class Hyperplane(object):
         self.X = X.seed
         self.Y = Y.seed
 
-        assert not np.all(self.X == self.Y), logger.error(f"Can't build a bisecting plane between two identical points, got {X.seed} and {Y.seed}")
+        assert not np.all(self.X == self.Y), logger.error(
+            f"Can't build a bisecting plane between two identical points, got {X.seed} and {Y.seed}"
+        )
 
         YmX = self.Y - self.X
 
@@ -205,7 +222,9 @@ class SpokeDart(object):
                     else:
                         sp = a
 
-                    if np.any(sp > np.array([1] * self.dim)) or np.any(sp < np.array([0] * self.dim)):
+                    if np.any(sp > np.array([1] * self.dim)) or np.any(
+                        sp < np.array([0] * self.dim)
+                    ):
                         reject += 1
                     else:
                         S = np.append(S, [sp[:]], axis=0)

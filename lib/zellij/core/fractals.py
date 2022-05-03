@@ -1,10 +1,24 @@
+# @Author: Thomas Firmin <ThomasFirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   ThomasFirmin
+# @Last modified time: 2022-05-03T15:44:11+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 import numpy as np
 import abc
 import copy
 
 import time
 
-from zellij.strategies.utils.spoke_dart import randomMuller, Hyperplane, HalfLine
+from zellij.strategies.utils.spoke_dart import (
+    randomMuller,
+    Hyperplane,
+    HalfLine,
+)
 
 import logging
 
@@ -73,7 +87,16 @@ class Fractal(object):
     Hypersphere : Inherited Fractal type
     """
 
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+    ):
 
         """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None)
 
@@ -179,7 +202,16 @@ class Hypercube(Fractal):
     Hypersphere : Another hypervolume, with different properties
     """
 
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+    ):
 
         """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None)
 
@@ -208,7 +240,9 @@ class Hypercube(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(
+            lo_bounds, up_bounds, father, level, id, children, score
+        )
 
         self.dim = len(self.up_bounds)
 
@@ -258,7 +292,18 @@ class Hypercube(Fractal):
         else:
             id = str(self.father.id)
 
-        return "ID: " + str(self.id) + " son of " + id + "\n" + "BOUNDS: " + str(self.lo_bounds) + "|" + str(self.up_bounds) + "\n"
+        return (
+            "ID: "
+            + str(self.id)
+            + " son of "
+            + id
+            + "\n"
+            + "BOUNDS: "
+            + str(self.lo_bounds)
+            + "|"
+            + str(self.up_bounds)
+            + "\n"
+        )
 
 
 class Hypersphere2(Fractal):
@@ -301,7 +346,17 @@ class Hypersphere2(Fractal):
     Hypercube : Another hypervolume, with different properties
     """
 
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, inflation=1.75, children=[], score=None):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        inflation=1.75,
+        children=[],
+        score=None,
+    ):
 
         """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, inflation=1.75, children=[], score=None)
 
@@ -331,7 +386,9 @@ class Hypersphere2(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(
+            lo_bounds, up_bounds, father, level, id, children, score
+        )
 
         self.dim = len(self.up_bounds)
 
@@ -388,7 +445,20 @@ class Hypersphere2(Fractal):
         else:
             id = str(self.father.id)
 
-        return "ID: " + str(self.id) + " son of " + id + " at level " + str(self.level) + "\n" + "BOUNDS: " + str(self.lo_bounds) + "|" + str(self.up_bounds) + "\n"
+        return (
+            "ID: "
+            + str(self.id)
+            + " son of "
+            + id
+            + " at level "
+            + str(self.level)
+            + "\n"
+            + "BOUNDS: "
+            + str(self.lo_bounds)
+            + "|"
+            + str(self.up_bounds)
+            + "\n"
+        )
 
 
 class Hypersphere(Fractal):
@@ -431,7 +501,19 @@ class Hypersphere(Fractal):
     Hypercube : Another hypervolume, with different properties
     """
 
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, radius=None, center=None, inflation=1.75, children=[], score=None):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        radius=None,
+        center=None,
+        inflation=1.75,
+        children=[],
+        score=None,
+    ):
 
         """__init__(father,lo_bounds,up_bounds,level,id,children=[],score=None)
 
@@ -464,7 +546,9 @@ class Hypersphere(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(
+            lo_bounds, up_bounds, father, level, id, children, score
+        )
 
         if isinstance(father, str):
             self.original_up = self.lo_bounds
@@ -514,7 +598,16 @@ class Hypersphere(Fractal):
             up[up < 0] = 0
             up[up > 1] = 1
 
-            h = Hypersphere(lo, up, self, level, n_h, center=np.copy(center), radius=r_p, inflation=self.inflation)
+            h = Hypersphere(
+                lo,
+                up,
+                self,
+                level,
+                n_h,
+                center=np.copy(center),
+                radius=r_p,
+                inflation=self.inflation,
+            )
 
             self.children.append(h)
             n_h += 1
@@ -533,7 +626,16 @@ class Hypersphere(Fractal):
             up[up < 0] = 0
             up[up > 1] = 1
 
-            h = Hypersphere(lo, up, self, level, n_h, center=np.copy(center), radius=r_p, inflation=self.inflation)
+            h = Hypersphere(
+                lo,
+                up,
+                self,
+                level,
+                n_h,
+                center=np.copy(center),
+                radius=r_p,
+                inflation=self.inflation,
+            )
 
             self.children.append(h)
             n_h += 1
@@ -544,7 +646,20 @@ class Hypersphere(Fractal):
         else:
             id = str(self.father.id)
 
-        return "ID: " + str(self.id) + " son of " + id + " at level " + str(self.level) + "\n" + "BOUNDS: " + str(self.lo_bounds) + "|" + str(self.up_bounds) + "\n"
+        return (
+            "ID: "
+            + str(self.id)
+            + " son of "
+            + id
+            + " at level "
+            + str(self.level)
+            + "\n"
+            + "BOUNDS: "
+            + str(self.lo_bounds)
+            + "|"
+            + str(self.up_bounds)
+            + "\n"
+        )
 
 
 class Section(Fractal):
@@ -575,7 +690,17 @@ class Section(Fractal):
     Hypercube : Another hypervolume, with different properties
     """
 
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, n=2):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+        n=2,
+    ):
 
         """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, n=2)
 
@@ -604,9 +729,13 @@ class Section(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(
+            lo_bounds, up_bounds, father, level, id, children, score
+        )
 
-        assert n > 1, logger.error(f"{n}-Section is not possible, n must be > 1")
+        assert n > 1, logger.error(
+            f"{n}-Section is not possible, n must be > 1"
+        )
 
         self.dim = len(self.up_bounds)
         self.section = n
@@ -647,11 +776,35 @@ class Section(Fractal):
         else:
             id = str(self.father.id)
 
-        return "ID: " + str(self.id) + " son of " + id + " at level " + str(self.level) + "\n" + "BOUNDS: " + str(self.lo_bounds) + "|" + str(self.up_bounds) + "\n"
+        return (
+            "ID: "
+            + str(self.id)
+            + " son of "
+            + id
+            + " at level "
+            + str(self.level)
+            + "\n"
+            + "BOUNDS: "
+            + str(self.lo_bounds)
+            + "|"
+            + str(self.up_bounds)
+            + "\n"
+        )
 
 
 class Voronoi(Fractal):
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", n_seeds=None):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+        seed="random",
+        n_seeds=None,
+    ):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
 
@@ -689,7 +842,9 @@ class Voronoi(Fractal):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score)
+        super().__init__(
+            lo_bounds, up_bounds, father, level, id, children, score
+        )
 
         self.dim = len(self.up_bounds)
         if n_seeds is None:
@@ -701,7 +856,11 @@ class Voronoi(Fractal):
 
         if isinstance(seed, str) and seed == "random":
             self.all_seeds = []
-            self.next_seeds = list(np.random.random((self.n_seeds, self.dim)) * (np.array(self.up_bounds) - np.array(self.lo_bounds)) + np.array(self.lo_bounds))
+            self.next_seeds = list(
+                np.random.random((self.n_seeds, self.dim))
+                * (np.array(self.up_bounds) - np.array(self.lo_bounds))
+                + np.array(self.lo_bounds)
+            )
             self.seed = "root"
             self.hyperplanes = []
 
@@ -749,7 +908,19 @@ class Voronoi(Fractal):
 
 
 class DynamicVoronoi(Voronoi):
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+        seed="random",
+        spokes=2,
+        n_seeds=5,
+    ):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
 
@@ -787,7 +958,17 @@ class DynamicVoronoi(Voronoi):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
+        super().__init__(
+            lo_bounds,
+            up_bounds,
+            father,
+            level,
+            id,
+            children,
+            score,
+            seed=seed,
+            n_seeds=n_seeds,
+        )
 
         self.n_dim = 2 * self.dim
         self.spokes = spokes
@@ -800,13 +981,31 @@ class DynamicVoronoi(Voronoi):
 
         if not isinstance(self.father, str):
             # Current cell will be it's own children
-            selfchild = DynamicVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, self.id, seed=self.seed, spokes=self.spokes, n_seeds=self.n_seeds)
+            selfchild = DynamicVoronoi(
+                self.lo_bounds,
+                self.up_bounds,
+                self,
+                self.level + 1,
+                self.id,
+                seed=self.seed,
+                spokes=self.spokes,
+                n_seeds=self.n_seeds,
+            )
             self.children.append(selfchild)
             # Replace previous cell by new cell
             self.all_seeds[self.id] = selfchild
 
         for i in self.next_seeds:
-            child = DynamicVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, len(self.all_seeds), seed=i, spokes=self.spokes, n_seeds=self.n_seeds)
+            child = DynamicVoronoi(
+                self.lo_bounds,
+                self.up_bounds,
+                self,
+                self.level + 1,
+                len(self.all_seeds),
+                seed=i,
+                spokes=self.spokes,
+                n_seeds=self.n_seeds,
+            )
             self.children.append(child)
             self.all_seeds.append(child)
 
@@ -848,7 +1047,9 @@ class DynamicVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)
@@ -897,7 +1098,9 @@ class DynamicVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)
@@ -940,14 +1143,33 @@ class DynamicVoronoi(Voronoi):
 
         if sum != 0:
             p = dist / sum
-            choosen = np.random.choice(list(range(len(self.sampled_bounds))), np.minimum(np.count_nonzero(p), self.n_seeds), replace=False, p=p)
+            choosen = np.random.choice(
+                list(range(len(self.sampled_bounds))),
+                np.minimum(np.count_nonzero(p), self.n_seeds),
+                replace=False,
+                p=p,
+            )
 
             for c in choosen:
-                self.next_seeds.append(self.shiftBorder(self.seed, self.sampled_bounds[c]))
+                self.next_seeds.append(
+                    self.shiftBorder(self.seed, self.sampled_bounds[c])
+                )
 
 
 class FixedVoronoi(Voronoi):
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+        seed="random",
+        spokes=2,
+        n_seeds=5,
+    ):
 
         """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5)
 
@@ -985,7 +1207,17 @@ class FixedVoronoi(Voronoi):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
+        super().__init__(
+            lo_bounds,
+            up_bounds,
+            father,
+            level,
+            id,
+            children,
+            score,
+            seed=seed,
+            n_seeds=n_seeds,
+        )
 
         self.dim = len(self.up_bounds)
         self.n_dim = 2 * self.dim
@@ -1007,7 +1239,16 @@ class FixedVoronoi(Voronoi):
         #     self.all_seeds.append(selfchild)
 
         for i in self.next_seeds:
-            child = FixedVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, len(self.all_seeds), seed=i, spokes=self.spokes, n_seeds=self.n_seeds)
+            child = FixedVoronoi(
+                self.lo_bounds,
+                self.up_bounds,
+                self,
+                self.level + 1,
+                len(self.all_seeds),
+                seed=i,
+                spokes=self.spokes,
+                n_seeds=self.n_seeds,
+            )
             child.hyperplanes = self.hyperplanes[:]
             self.children.append(child)
             self.all_seeds.append(child)
@@ -1048,7 +1289,9 @@ class FixedVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)
@@ -1096,7 +1339,9 @@ class FixedVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)
@@ -1138,14 +1383,33 @@ class FixedVoronoi(Voronoi):
 
         if sum != 0:
             p = dist / sum
-            choosen = np.random.choice(list(range(len(self.sampled_bounds))), np.minimum(np.count_nonzero(p), self.n_seeds), replace=False, p=p)
+            choosen = np.random.choice(
+                list(range(len(self.sampled_bounds))),
+                np.minimum(np.count_nonzero(p), self.n_seeds),
+                replace=False,
+                p=p,
+            )
 
             for c in choosen:
-                self.next_seeds.append(self.shiftBorder(self.seed, self.sampled_bounds[c]))
+                self.next_seeds.append(
+                    self.shiftBorder(self.seed, self.sampled_bounds[c])
+                )
 
 
 class LightFixedVoronoi(Voronoi):
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+        seed="random",
+        spokes=2,
+        n_seeds=5,
+    ):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
 
@@ -1183,7 +1447,17 @@ class LightFixedVoronoi(Voronoi):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
+        super().__init__(
+            lo_bounds,
+            up_bounds,
+            father,
+            level,
+            id,
+            children,
+            score,
+            seed=seed,
+            n_seeds=n_seeds,
+        )
 
         self.dim = len(self.up_bounds)
         self.n_dim = 2 * self.dim
@@ -1202,7 +1476,16 @@ class LightFixedVoronoi(Voronoi):
         #     self.children.append(selfchild)
 
         for i in self.next_seeds:
-            child = LightFixedVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, len(self.children), seed=i, spokes=self.spokes, n_seeds=self.n_seeds)
+            child = LightFixedVoronoi(
+                self.lo_bounds,
+                self.up_bounds,
+                self,
+                self.level + 1,
+                len(self.children),
+                seed=i,
+                spokes=self.spokes,
+                n_seeds=self.n_seeds,
+            )
             child.hyperplanes = self.hyperplanes[:]
 
             self.children.append(child)
@@ -1245,7 +1528,9 @@ class LightFixedVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)
@@ -1285,7 +1570,9 @@ class LightFixedVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)
@@ -1312,7 +1599,9 @@ class LightFixedVoronoi(Voronoi):
 
                 self.sampled_bounds.append(a)
 
-        self.hyperplanes = [self.hyperplanes[idx] for idx in sampled_hyperplanes]
+        self.hyperplanes = [
+            self.hyperplanes[idx] for idx in sampled_hyperplanes
+        ]
 
         dist = np.linalg.norm(np.array(self.sampled_bounds) - self.seed, axis=1)
 
@@ -1321,14 +1610,33 @@ class LightFixedVoronoi(Voronoi):
 
         if sum != 0:
             p = dist / sum
-            choosen = np.random.choice(list(range(len(self.sampled_bounds))), np.minimum(np.count_nonzero(p), self.n_seeds), replace=False, p=p)
+            choosen = np.random.choice(
+                list(range(len(self.sampled_bounds))),
+                np.minimum(np.count_nonzero(p), self.n_seeds),
+                replace=False,
+                p=p,
+            )
 
             for c in choosen:
-                self.next_seeds.append(self.shiftBorder(self.seed, self.sampled_bounds[c]))
+                self.next_seeds.append(
+                    self.shiftBorder(self.seed, self.sampled_bounds[c])
+                )
 
 
 class BoxedVoronoi(Voronoi):
-    def __init__(self, lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5):
+    def __init__(
+        self,
+        lo_bounds,
+        up_bounds,
+        father="root",
+        level=0,
+        id=0,
+        children=[],
+        score=None,
+        seed="random",
+        spokes=2,
+        n_seeds=5,
+    ):
 
         """lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, seed="random", spokes=2, n_seeds=5
 
@@ -1366,7 +1674,17 @@ class BoxedVoronoi(Voronoi):
 
         """
 
-        super().__init__(lo_bounds, up_bounds, father, level, id, children, score, seed=seed, n_seeds=n_seeds)
+        super().__init__(
+            lo_bounds,
+            up_bounds,
+            father,
+            level,
+            id,
+            children,
+            score,
+            seed=seed,
+            n_seeds=n_seeds,
+        )
 
         self.dim = len(self.up_bounds)
         self.n_dim = 2 * self.dim
@@ -1376,10 +1694,21 @@ class BoxedVoronoi(Voronoi):
 
         logger.info(f"Creating children of n°{self.id}")
 
-        self.next_seeds = np.random.uniform(self.lo_bounds, self.up_bounds, (self.n_seeds, self.dim))
+        self.next_seeds = np.random.uniform(
+            self.lo_bounds, self.up_bounds, (self.n_seeds, self.dim)
+        )
 
         for i in self.next_seeds:
-            child = BoxedVoronoi(self.lo_bounds, self.up_bounds, self, self.level + 1, len(self.children), seed=i, spokes=self.spokes, n_seeds=self.n_seeds)
+            child = BoxedVoronoi(
+                self.lo_bounds,
+                self.up_bounds,
+                self,
+                self.level + 1,
+                len(self.children),
+                seed=i,
+                spokes=self.spokes,
+                n_seeds=self.n_seeds,
+            )
             self.children.append(child)
 
         for i in range(len(self.children) - 1):
@@ -1420,7 +1749,9 @@ class BoxedVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)
@@ -1457,7 +1788,9 @@ class BoxedVoronoi(Voronoi):
 
                 if on:
                     # Clip line to bounds
-                    if np.any(pfar > self.up_bounds) or np.any(pfar < self.lo_bounds):
+                    if np.any(pfar > self.up_bounds) or np.any(
+                        pfar < self.lo_bounds
+                    ):
 
                         pfar_clipped = self.clipBorder(l, upma, loma)
                         inter = np.append(inter, [pfar_clipped], axis=0)

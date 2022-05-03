@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <ThomasFirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   ThomasFirmin
+# @Last modified time: 2022-05-03T15:44:46+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 import numpy as np
 
 
@@ -87,7 +97,10 @@ def dttcb(H, *args, **kwargs):
 
     best_ind = args[0]
 
-    return np.min(np.array(H.all_scores) / np.linalg.norm(np.array(H.solutions) - np.array(best_ind), axis=1))
+    return np.min(
+        np.array(H.all_scores)
+        / np.linalg.norm(np.array(H.solutions) - np.array(best_ind), axis=1)
+    )
 
 
 def belief(H, gamma=0.5, *args, **kwargs):
@@ -115,4 +128,7 @@ def belief(H, gamma=0.5, *args, **kwargs):
         H.father.score = 0
 
     ratio = np.array(H.all_scores) / best_sc
-    return -(gamma * H.father.score + (1 - gamma) * np.mean(ratio * np.exp(1 - ratio)))
+    return -(
+        gamma * H.father.score
+        + (1 - gamma) * np.mean(ratio * np.exp(1 - ratio))
+    )

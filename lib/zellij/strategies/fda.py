@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <ThomasFirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   ThomasFirmin
+# @Last modified time: 2022-05-03T15:45:08+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 from zellij.core.metaheuristic import Metaheuristic
 from zellij.core.loss_func import FDA_loss_func
 
@@ -88,7 +98,20 @@ class FDA(Metaheuristic):
     Fractal : Base class which defines what a fractal is.
     """
 
-    def __init__(self, loss_func, search_space, f_calls, exploration, exploitation, fractal, tree_search, heuristic, level=5, verbose=True, **kwargs):
+    def __init__(
+        self,
+        loss_func,
+        search_space,
+        f_calls,
+        exploration,
+        exploitation,
+        fractal,
+        tree_search,
+        heuristic,
+        level=5,
+        verbose=True,
+        **kwargs,
+    ):
 
         """__init__(loss_func, search_space, f_calls, exploration, exploitation, fractal, tree_search, heuristic, level=5, verbose=True, **kwargs)
 
@@ -178,14 +201,26 @@ class FDA(Metaheuristic):
         self.fractal = fractal
         self.tree_search = tree_search
 
-        self.volume_kwargs = {key: kwargs[key] for key in kwargs if key in self.fractal.__init__.__code__.co_varnames}
-        self.ts_kwargs = {key: kwargs[key] for key in kwargs if key in self.tree_search.__init__.__code__.co_varnames}
+        self.volume_kwargs = {
+            key: kwargs[key]
+            for key in kwargs
+            if key in self.fractal.__init__.__code__.co_varnames
+        }
+        self.ts_kwargs = {
+            key: kwargs[key]
+            for key in kwargs
+            if key in self.tree_search.__init__.__code__.co_varnames
+        }
 
         # Initialize first fractal
-        self.root = self.fractal(self.lo_bounds, self.up_bounds, **self.volume_kwargs)
+        self.root = self.fractal(
+            self.lo_bounds, self.up_bounds, **self.volume_kwargs
+        )
 
         # Initialize tree search
-        self.tree_search = self.tree_search([self.root], self.level, **self.ts_kwargs)
+        self.tree_search = self.tree_search(
+            [self.root], self.level, **self.ts_kwargs
+        )
 
         # Number of explored hypersphere
         self.n_h = 0
@@ -228,7 +263,9 @@ class FDA(Metaheuristic):
                 j += 1
 
                 # Link the loss function to the actual hypervolume (children)
-                modified_loss_func = FDA_loss_func(self.loss_func, child, self.search_space)
+                modified_loss_func = FDA_loss_func(
+                    self.loss_func, child, self.search_space
+                )
 
                 # Count the number of explored hypervolume
                 self.n_h += 1
@@ -236,46 +273,81 @@ class FDA(Metaheuristic):
                 # Exploration
                 if child.level != self.level:
 
-                    explor_idx = np.min([child.level, len(self.exploration)]) - 1
-                    calls_left = np.min([self.explor_calls[explor_idx], self.f_calls - self.loss_func.calls])
+                    explor_idx = (
+                        np.min([child.level, len(self.exploration)]) - 1
+                    )
+                    calls_left = np.min(
+                        [
+                            self.explor_calls[explor_idx],
+                            self.f_calls - self.loss_func.calls,
+                        ]
+                    )
 
                     if calls_left > 0:
 
                         # Compute bounds of child hypervolume
-                        lo = self.search_space.convert_to_continuous([child.lo_bounds], True, True)[0]
-                        up = self.search_space.convert_to_continuous([child.up_bounds], True, True)[0]
+                        lo = self.search_space.convert_to_continuous(
+                            [child.lo_bounds], True, True
+                        )[0]
+                        up = self.search_space.convert_to_continuous(
+                            [child.up_bounds], True, True
+                        )[0]
 
                         # Create a search space for the metaheuristic
                         sp = self.search_space.subspace(lo, up)
                         self.exploration[explor_idx].search_space = sp
-                        self.exploration[explor_idx].loss_func = modified_loss_func
+                        self.exploration[
+                            explor_idx
+                        ].loss_func = modified_loss_func
 
-                        self.exploration[explor_idx].f_calls = calls_left + self.loss_func.calls
+                        self.exploration[explor_idx].f_calls = (
+                            calls_left + self.loss_func.calls
+                        )
 
-                        logger.info(f"Exploration {self.fractal.__name__} n° {child.id} child of {child.father.id} at level {child.level}")
-                        logger.info(f"Explored {self.fractal.__name__}: {self.n_h}")
+                        logger.info(
+                            f"Exploration {self.fractal.__name__} n° {child.id} child of {child.father.id} at level {child.level}"
+                        )
+                        logger.info(
+                            f"Explored {self.fractal.__name__}: {self.n_h}"
+                        )
 
                         # Progress bar
                         prec_calls = self.loss_func.calls
 
                         # Run exploration, scores and evaluated solutions are saved using FDA_loss_func class
-                        self.exploration[explor_idx].run(H=child, n_process=self.n_process)
+                        self.exploration[explor_idx].run(
+                            H=child, n_process=self.n_process
+                        )
 
                         # Save best found solution
                         if self.loss_func.new_best:
-                            logger.info(f"Best solution found :{self.loss_func.best_score}")
-                            self.best_ind_c = self.search_space.convert_to_continuous([self.loss_func.best_sol])[0]
+                            logger.info(
+                                f"Best solution found :{self.loss_func.best_score}"
+                            )
+                            self.best_ind_c = (
+                                self.search_space.convert_to_continuous(
+                                    [self.loss_func.best_sol]
+                                )[0]
+                            )
 
-                        child.score = self.heuristic(child, self.best_ind_c, self.loss_func.best_score)
+                        child.score = self.heuristic(
+                            child, self.best_ind_c, self.loss_func.best_score
+                        )
 
-                        logger.debug(f"Child {child.father.id}.{child.id}.{child.level} score: {child.score}")
+                        logger.debug(
+                            f"Child {child.father.id}.{child.id}.{child.level} score: {child.score}"
+                        )
 
                         # Add child to tree search
                         self.tree_search.add(child)
 
                         # Progress bar
                         self.pending_pb(self.loss_func.calls - prec_calls)
-                        self.update_main_pb(self.loss_func.calls - prec_calls, explor=True, best=self.loss_func.new_best)
+                        self.update_main_pb(
+                            self.loss_func.calls - prec_calls,
+                            explor=True,
+                            best=self.loss_func.new_best,
+                        )
                         self.meta_pb.update(self.loss_func.calls - prec_calls)
 
                 # Exploitation
@@ -283,14 +355,22 @@ class FDA(Metaheuristic):
 
                     # Run exploitation, scores and evaluated solutions are saved using FDA_loss_func class
                     self.exploitation.loss_func = modified_loss_func
-                    calls_left = np.min([self.exploi_calls, self.f_calls - self.loss_func.calls])
+                    calls_left = np.min(
+                        [self.exploi_calls, self.f_calls - self.loss_func.calls]
+                    )
 
                     if calls_left > 0:
 
-                        self.exploitation.f_calls = calls_left + self.loss_func.calls
+                        self.exploitation.f_calls = (
+                            calls_left + self.loss_func.calls
+                        )
 
-                        logger.info(f" -> Exploitation {self.fractal.__name__} n° {child.id} child of {child.father.id} at level {child.level}")
-                        logger.info(f"Explored {self.fractal.__name__}: {self.n_h}")
+                        logger.info(
+                            f" -> Exploitation {self.fractal.__name__} n° {child.id} child of {child.father.id} at level {child.level}"
+                        )
+                        logger.info(
+                            f"Explored {self.fractal.__name__}: {self.n_h}"
+                        )
 
                         # Progress bar
                         prec_calls = self.loss_func.calls
@@ -299,14 +379,26 @@ class FDA(Metaheuristic):
                         self.exploitation.run(H=child, n_process=self.n_process)
 
                         if self.loss_func.new_best:
-                            logger.info(f"Best solution found :{self.loss_func.best_score}")
-                            self.best_ind_c = self.search_space.convert_to_continuous([self.loss_func.best_sol])[0]
+                            logger.info(
+                                f"Best solution found :{self.loss_func.best_score}"
+                            )
+                            self.best_ind_c = (
+                                self.search_space.convert_to_continuous(
+                                    [self.loss_func.best_sol]
+                                )[0]
+                            )
 
-                        logger.debug(f"Child {child.father.id}.{child.id}.{child.level} score: EXPLOITaTION")
+                        logger.debug(
+                            f"Child {child.father.id}.{child.id}.{child.level} score: EXPLOITaTION"
+                        )
 
                         # Progress bar
                         self.pending_pb(self.loss_func.calls - prec_calls)
-                        self.update_main_pb(self.loss_func.calls - prec_calls, explor=False, best=self.loss_func.new_best)
+                        self.update_main_pb(
+                            self.loss_func.calls - prec_calls,
+                            explor=False,
+                            best=self.loss_func.new_best,
+                        )
                         self.meta_pb.update(self.loss_func.calls - prec_calls)
 
             i += 1

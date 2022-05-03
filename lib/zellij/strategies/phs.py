@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <ThomasFirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   ThomasFirmin
+# @Last modified time: 2022-05-03T15:45:45+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 import numpy as np
 from zellij.core.metaheuristic import Metaheuristic
 from zellij.core.fractals import Hypersphere
@@ -87,7 +97,9 @@ class PHS(Metaheuristic):
         """
 
         if H:
-            assert isinstance(H, Hypersphere), logger.error(f"PHS should use Hyperspheres, got {H.__class__.__name__}")
+            assert isinstance(H, Hypersphere), logger.error(
+                f"PHS should use Hyperspheres, got {H.__class__.__name__}"
+            )
 
         current_idx = len(self.loss_func.all_solutions)
         points = np.zeros((3, self.search_space.n_variables), dtype=float)
@@ -107,7 +119,9 @@ class PHS(Metaheuristic):
 
         if self.loss_func.calls < self.f_calls:
 
-            radius_part = H.inflation * H.radius / np.sqrt(self.search_space.n_variables)
+            radius_part = (
+                H.inflation * H.radius / np.sqrt(self.search_space.n_variables)
+            )
 
             points[0] = H.center
             points[1] = H.center + radius_part
@@ -117,7 +131,9 @@ class PHS(Metaheuristic):
             points[points < 0] = 0
 
         logger.info(f"Evaluating points")
-        scores = self.loss_func(self.search_space.convert_to_continuous(points, True, True))
+        scores = self.loss_func(
+            self.search_space.convert_to_continuous(points, True, True)
+        )
 
         self.update_main_pb(3, explor=True, best=self.loss_func.new_best)
         self.meta_pb.update(3)

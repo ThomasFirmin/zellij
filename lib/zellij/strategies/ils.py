@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <ThomasFirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   ThomasFirmin
+# @Last modified time: 2022-05-03T15:45:43+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 import numpy as np
 from zellij.core.metaheuristic import Metaheuristic
 from zellij.core.fractals import Hypersphere
@@ -46,7 +56,15 @@ class ILS(Metaheuristic):
     Searchspace : Describes what a loss function is in Zellij
     """
 
-    def __init__(self, loss_func, search_space, f_calls, red_rate=0.5, precision=1e-5, verbose=True):
+    def __init__(
+        self,
+        loss_func,
+        search_space,
+        f_calls,
+        red_rate=0.5,
+        precision=1e-5,
+        verbose=True,
+    ):
 
         """__init__(loss_func, search_space, f_calls,save=False,verbose=True)
 
@@ -106,7 +124,9 @@ class ILS(Metaheuristic):
         """
 
         if H:
-            assert isinstance(H, Hypersphere), logger.error(f"ILS should use Hyperspheres, got {H.__class__.__name__}")
+            assert isinstance(H, Hypersphere), logger.error(
+                f"ILS should use Hyperspheres, got {H.__class__.__name__}"
+            )
 
         # logging
         logger.info("Starting")
@@ -130,7 +150,9 @@ class ILS(Metaheuristic):
         if Y0:
             scores[0] = Y0
         else:
-            scores[0] = self.loss_func(self.search_space.convert_to_continuous([points[0]], True, True))[0]
+            scores[0] = self.loss_func(
+                self.search_space.convert_to_continuous([points[0]], True, True)
+            )[0]
 
         step = H.radius
 
@@ -140,7 +162,10 @@ class ILS(Metaheuristic):
             # logging
             logger.debug(f"ILS {step}>{self.precision}")
 
-            while i < self.search_space.n_variables and self.loss_func.calls < self.f_calls:
+            while (
+                i < self.search_space.n_variables
+                and self.loss_func.calls < self.f_calls
+            ):
 
                 # logging
                 logger.debug(f"Evaluating dimension {i}")
@@ -157,7 +182,11 @@ class ILS(Metaheuristic):
                 points[2][points[2] > 1] = 1
                 points[2][points[2] < 0] = 0
 
-                scores[1:] = self.loss_func(self.search_space.convert_to_continuous(points[1:], True, True))
+                scores[1:] = self.loss_func(
+                    self.search_space.convert_to_continuous(
+                        points[1:], True, True
+                    )
+                )
 
                 min_index = np.argmin(scores)
 
@@ -166,7 +195,9 @@ class ILS(Metaheuristic):
                     scores[0] = scores[min_index]
                     improvement = True
 
-                self.update_main_pb(2, explor=False, best=self.loss_func.new_best)
+                self.update_main_pb(
+                    2, explor=False, best=self.loss_func.new_best
+                )
                 self.meta_pb.update(2)
 
                 i += 1

@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <ThomasFirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   ThomasFirmin
+# @Last modified time: 2022-05-03T15:44:53+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 import numpy as np
 import abc
 import copy
@@ -165,7 +175,11 @@ class Breadth_first_search(Tree_search):
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier + self.open, reverse=self.reverse, key=lambda x: x.level)[:]
+            self.open = sorted(
+                self.next_frontier + self.open,
+                reverse=self.reverse,
+                key=lambda x: x.level,
+            )[:]
             self.next_frontier = []
 
         if len(self.open) > 0:
@@ -261,7 +275,14 @@ class Depth_first_search(Tree_search):
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier, reverse=self.reverse, key=lambda x: x.score)[:] + self.open
+            self.open = (
+                sorted(
+                    self.next_frontier,
+                    reverse=self.reverse,
+                    key=lambda x: x.score,
+                )[:]
+                + self.open
+            )
             self.next_frontier = []
 
         if len(self.open) > 0:
@@ -357,7 +378,16 @@ class Best_first_search(Tree_search):
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.open + sorted(self.next_frontier, reverse=self.reverse, key=lambda x: x.score)[:], reverse=self.reverse, key=lambda x: x.score)
+            self.open = sorted(
+                self.open
+                + sorted(
+                    self.next_frontier,
+                    reverse=self.reverse,
+                    key=lambda x: x.score,
+                )[:],
+                reverse=self.reverse,
+                key=lambda x: x.score,
+            )
             self.next_frontier = []
 
         if len(self.open) > 0:
@@ -463,9 +493,14 @@ class Beam_search(Tree_search):
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier + sorted(self.open, reverse=self.reverse, key=lambda x: x.score), reverse=self.reverse, key=lambda x: x.score)[
-                : self.beam_length
-            ]
+            self.open = sorted(
+                self.next_frontier
+                + sorted(
+                    self.open, reverse=self.reverse, key=lambda x: x.score
+                ),
+                reverse=self.reverse,
+                key=lambda x: x.score,
+            )[: self.beam_length]
             self.next_frontier = []
 
         if len(self.open) > 0:
@@ -623,7 +658,14 @@ class Diverse_best_first_search(Tree_search):
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.next_frontier + sorted(self.open, reverse=self.reverse, key=lambda x: x.score), reverse=self.reverse, key=lambda x: x.score)
+            self.open = sorted(
+                self.next_frontier
+                + sorted(
+                    self.open, reverse=self.reverse, key=lambda x: x.score
+                ),
+                reverse=self.reverse,
+                key=lambda x: x.score,
+            )
             self.next_frontier = []
 
         if len(self.open) > 0:
@@ -753,7 +795,9 @@ class Cyclic_best_first_search(Tree_search):
             modified_levels = np.unique(modified_levels)
             for l in modified_levels:
 
-                self.contour[l] = sorted(self.contour[l], reverse=self.reverse, key=lambda x: x.score)
+                self.contour[l] = sorted(
+                    self.contour[l], reverse=self.reverse, key=lambda x: x.score
+                )
 
             self.next_frontier = []
 
@@ -884,7 +928,16 @@ class Epsilon_greedy_search(Tree_search):
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            self.open = sorted(self.open + sorted(self.next_frontier, reverse=self.reverse, key=lambda x: x.score)[:], reverse=self.reverse, key=lambda x: x.score)
+            self.open = sorted(
+                self.open
+                + sorted(
+                    self.next_frontier,
+                    reverse=self.reverse,
+                    key=lambda x: x.score,
+                )[:],
+                reverse=self.reverse,
+                key=lambda x: x.score,
+            )
             self.next_frontier = []
 
         if len(self.open) > 0:
@@ -985,7 +1038,9 @@ class Potentially_Optimal_Rectangle(Tree_search):
 
         self.best_score = float("inf")
 
-        self.build = np.vectorize(lambda x: (x.min_score, np.linalg.norm(x.center - x.lo_bounds)))
+        self.build = np.vectorize(
+            lambda x: (x.min_score, np.linalg.norm(x.center - x.lo_bounds))
+        )
 
     def add(self, c):
 
