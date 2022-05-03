@@ -68,7 +68,7 @@ class LossFunc(object):
 
     def __init__(self, model, save=False, verbose=True):
 
-        """__init__(self, model, save=False)
+        """__init__(model, save=False)
 
         Parameters
         ----------
@@ -151,7 +151,7 @@ class LossFunc(object):
 
     @abstractmethod
     def _save_model(self, *args):
-        """ _save_model(self)
+        """ _save_model()
 
         Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form :math:`f(x) = (y, model)`\
          `y` are the results of the evaluation of `x` by `f`. `model` is optional, if you want to save the best model found (e.g. a neural network)\
@@ -166,7 +166,7 @@ class LossFunc(object):
 
     def _create_file(self, x, *args):
 
-        """create_file(self, *args)
+        """create_file(x, *args)
 
         Create a save file:
 
@@ -252,7 +252,7 @@ class LossFunc(object):
 
     def _save_file(self, x, y, **kwargs):
 
-        """_save_file(self, model, save_model='')
+        """_save_file(x, y, **kwargs)
 
         Private method to save informations about an evaluation of the loss function.
 
@@ -318,7 +318,7 @@ class LossFunc(object):
             )
 
     def _build_return(self, r):
-        """_build_return(self, r)
+        """_build_return(r)
 
         This method builds a unique return according to the outputs of the loss function
 
@@ -512,16 +512,16 @@ class MPILoss(LossFunc):
 
     Methods
     -------
-    __call__(self, X, filename='', **kwargs)
+    __call__(X, filename='', **kwargs)
         Evaluate a list X of solutions with the original loss function.
 
-    worker(self)
+    worker()
         Initialize a worker.
 
-    stop(self)
+    stop()
         Stops all the workers and master.
 
-    _save_model(self, score, source)
+    _save_model(score, source)
         See LossFunc, save a model according to its score and the worker rank.
 
     See Also
@@ -533,7 +533,7 @@ class MPILoss(LossFunc):
 
     def __init__(self, model, save=False, verbose=True):
 
-        """__init__(self, model, save=False)
+        """__init__(model, save=False)
 
         Initialize MPI variables. For more info, see LossFunc.
 
@@ -568,7 +568,7 @@ class MPILoss(LossFunc):
 
     def __call__(self, X, label=[], **kwargs):
 
-        """__call__(self, model, save_model='')
+        """__call__(model, save_model='')
 
         Evaluate a list X of solutions with the original loss function.
 
@@ -690,7 +690,7 @@ class MPILoss(LossFunc):
 
     def worker(self):
 
-        """worker(self)
+        """worker()
 
         Initialize worker. Whilte it does not receive a stop message, a worker will wait for a solution to evaluate.
 
@@ -741,7 +741,7 @@ class MPILoss(LossFunc):
 
     def stop(self):
 
-        """stop(self)
+        """stop()
 
         Send a stop message to all workers.
 
@@ -754,7 +754,7 @@ class MPILoss(LossFunc):
 
     def _save_model(self, score, source):
 
-        """ _save_model(self)
+        """ _save_model()
 
         Private method to save a model. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
          y is the results of the evaluation of x by f. model is optional, if you want to save the best found model (e.g. a neural network)\
@@ -804,7 +804,7 @@ class SerialLoss(LossFunc):
 
     def __init__(self, model, save=False, verbose=True):
 
-        """__init__(self, model, save=False)
+        """__init__(model, save=False)
 
         Initialize SerialLoss.
 
@@ -814,7 +814,7 @@ class SerialLoss(LossFunc):
 
     def __call__(self, X, **kwargs):
 
-        """__call__(self, model, **kwargs)
+        """__call__(model, **kwargs)
 
         Evaluate a list X of solutions with the original loss function.
 

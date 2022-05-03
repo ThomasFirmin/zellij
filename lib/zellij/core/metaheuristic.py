@@ -29,7 +29,6 @@ class Metaheuristic(object):
 
     Attributes
     ----------
-
     loss_func : LossFunc
         Loss function to optimize. must be of type :math:`f(x)=y` or :math:`f(x)=results,model`
         See :ref:`lf` for more information.

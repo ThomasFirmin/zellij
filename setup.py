@@ -10,7 +10,6 @@ docs_extras = [
     "pylons_sphinx_latesturl",
     "repoze.sphinx.autointerface",
     "sphinxcontrib-autoprogram",
-    "numpydoc",
     "sphinx-copybutton",
     "sphinx-tabs",
     "sphinx-panels",

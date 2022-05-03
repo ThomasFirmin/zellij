@@ -18,20 +18,6 @@ class Cooling(object):
 
     Cooling is a base object which define what a cooling Schedule is.
 
-    Parameters
-    ----------
-    T0 : float
-        Initial temperature of the cooling schedule.\
-         Higher temperature leads to higher acceptance of a worse solution. (more exploration)
-
-    Tend : float
-        Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
-
-    peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
-
     Attributes
     ----------
 
@@ -127,7 +113,7 @@ class MulExponential(Cooling):
 
     :math:`T_k = T_0.\\alpha^k`
 
-    Parameters
+    Attributes
     ----------
     alpha : float
         Decrease factor. 0.8<=`alpha`<=0.9
@@ -142,10 +128,6 @@ class MulExponential(Cooling):
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    alpha
 
     Methods
     -------
@@ -428,7 +410,7 @@ class AddQuadratic(Cooling):
 
     :math:`T_k = T_{end} + (T_0-T_{end})\\left(\\frac{cycles-k}{cycles}\\right)^2`
 
-    Parameters
+    Attributes
     ----------
     cycles : int
         Number of cooling cycles.
@@ -444,10 +426,6 @@ class AddQuadratic(Cooling):
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    cycles
 
     Methods
     -------
@@ -494,7 +472,7 @@ class AddExponential(Cooling):
 
     :math:`T_k = T_{end} + \\frac{T_0-T_{end}}{1+e^{\\frac{2ln(T_0-T_{end})}{cycles}}(k-0,5cycles)}`
 
-    Parameters
+    Attributes
     ----------
     cycles : int
         Number of cooling cycles.
@@ -510,10 +488,6 @@ class AddExponential(Cooling):
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    cycles
 
     Methods
     -------
@@ -567,7 +541,7 @@ class AddTrigonometric(Cooling):
 
     :math:`T_k = T_{end} + 0,5(T_0-T_{end})(1+cos(\\frac{k.\\pi}{cycles}))`
 
-    Parameters
+    Attributes
     ----------
     cycles : int
         Number of cooling cycles.
@@ -583,10 +557,6 @@ class AddTrigonometric(Cooling):
     peaks : int, default=1
         Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
         `peaks` times.
-
-    Attributes
-    ----------
-    cycles
 
     Methods
     -------

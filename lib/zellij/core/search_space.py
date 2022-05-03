@@ -319,7 +319,7 @@ class Searchspace:
     # Create the neighborhood for each variables
     def _create_neighborhood(self, neighborhood):
 
-        """_create_neighborhood(self,neighborhood)
+        """_create_neighborhood(neighborhood)
 
         Create the neighborhood. See Searchspace.__init__
 
@@ -355,7 +355,7 @@ class Searchspace:
     # Return 1 or size=n random attribute from the search space, can exclude one attribute
     def random_attribute(self, size=1, replace=True, exclude=None):
 
-        """random_attribute(self,size=1,replace=True, exclude=None)
+        """random_attribute(size=1,replace=True, exclude=None)
 
         Draw random features from the search space. Features of type K, cannot be drawn (i.e. their probability are set to 0).
 
@@ -403,13 +403,12 @@ class Searchspace:
     # Return a or size=n random value from an attribute, can exclude one value
     def random_value(self, attribute, size=1, replace=True, exclude=None):
 
-        """random_value(self, attribute, size=1, replace = True, exclude=None)
+        """random_value(attribute, size=1, replace = True, exclude=None)
 
         Draw random values of an attribute from the search space, using uniform distribution. Features of type K return their constant value.
 
         Parameters
         ----------
-
         attribute : str
             Select dimension of label==<exclude> from which to draw a random value.
         size : int, default=1
@@ -483,7 +482,7 @@ class Searchspace:
 
     def _get_real_neighbor(self, x, i):
 
-        """_get_real_neighbor(self, x, i)
+        """_get_real_neighbor(x, i)
 
         Draw a neighbor of a Real attribute from the search space, using uniform distribution. According to its lower and upper bounds
 
@@ -514,7 +513,7 @@ class Searchspace:
 
     def _get_discrete_neighbor(self, x, i):
 
-        """_get_discrete_neighbor(self, x, i)
+        """_get_discrete_neighbor(x, i)
 
         Draw a neighbor of a Discrete attribute from the search space, using discrete uniform distribution. According to its lower and upper bounds
 
@@ -577,7 +576,7 @@ class Searchspace:
     # Return a neighbor of a given point in the search space, can select neighbor of a particular attribute
     def get_neighbor(self, point, size=1, attribute=None):
 
-        """get_neighbor(self, point, size=1, attribute=None)
+        """get_neighbor(point, size=1, attribute=None)
 
         Draw a neighbor of an initial solution, according to the search space bounds and dimensions types.
 
@@ -650,7 +649,7 @@ class Searchspace:
     # Return a random point of the search space
     def random_point(self, size=1):
 
-        """random_point(self, size=1)
+        """random_point(size=1)
 
         Return a random point from the search space
 
@@ -690,7 +689,7 @@ class Searchspace:
     # Convert a point to continuous, or convert a continuous point to a point from the search space
     def convert_to_continuous(self, points, reverse=False, sub_values=False):
 
-        """convert_to_continuous(self,points,reverse=False,sub_values=False)
+        """convert_to_continuous(points,reverse=False,sub_values=False)
 
         Convert given points from mixed to continuous, or, from continuous to mixed.
 
@@ -824,20 +823,20 @@ class Searchspace:
 
     def subspace(self, lo_bounds, up_bounds):
 
-        """convert_to_continuous(self,points,reverse=False,sub_values=False)
+        """convert_to_continuous(points,reverse=False,sub_values=False)
 
         Build a sub space according to the actual Searchspace using two vectors containing lower and upper bounds of the subspace.
         Transforms types to K if necessary.
         Builds an adaptated neighborhood to avoid large neighborhood compare to the subspace size.
         Categorical lower and upper bounds of the subspace are determined according to a slice of the vector containing values:
 
-            Original: ["dog", "cat", "rabbit", "horse"]
+            * Original: ["dog", "cat", "rabbit", "horse"]
 
-            lo_bounds = ["dog"]
+            * lo_bounds = ["dog"]
 
-            up_bounds = ["rabbit"]
+            * up_bounds = ["rabbit"]
 
-            Subspace: ["dog", "cat", "rabbit"]
+            * Subspace: ["dog", "cat", "rabbit"]
 
         Parameters
         ----------
@@ -929,7 +928,7 @@ class Searchspace:
 
     def show(self, X, Y, save=False, path=""):
 
-        """show(self,X,Y)
+        """show(X, Y, save=False, path="")
 
         Show solutions X associated to their values Y, according to the Searchspace
 
