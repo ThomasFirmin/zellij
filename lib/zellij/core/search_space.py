@@ -3,7 +3,7 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:20+02:00
+# @Last modified time: 2022-05-03T16:00:13+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -367,7 +367,7 @@ class Searchspace:
             Select randomly <size> features with replacement if True, without else.
             See numpy.random.choice
         exclude : str, default=None
-            Exclude dimension of label==<exclude> from the drawing.
+            Exclude dimension of label==<exclude>.
 
         Returns
         -------
@@ -418,7 +418,7 @@ class Searchspace:
             Select randomly <size> features with replacement if True, without else.
             See numpy.random.choice
         exclude : str, default=None
-            Exclude dimension of label==<exclude> from the drawing.
+            Exclude dimension of label==<exclude>.
 
         Returns
         -------
