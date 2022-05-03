@@ -3,6 +3,20 @@ import setuptools
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
+docs_extras = [
+    "Sphinx >= 3.0.0",  # Force RTD to use >= 3.0.0
+    "docutils",
+    "pylons-sphinx-themes >= 1.0.8",  # Ethical Ads
+    "pylons_sphinx_latesturl",
+    "repoze.sphinx.autointerface",
+    "sphinxcontrib-autoprogram",
+    "numpydoc",
+    "sphinx-copybutton",
+    "sphinx-tabs",
+    "sphinx-panels",
+    "sphinx-rtd-theme",
+]
+
 setuptools.setup(
     name="zellij",
     version="0.0.1",
@@ -43,6 +57,6 @@ setuptools.setup(
         "gpytorch",
         "botorch",
     ],
-    extras_require={"mpi": ["mpi4py"]},
+    extras_require={"mpi": ["mpi4py"], "docs": docs_extras},
     python_requires=">=3.6",
 )
