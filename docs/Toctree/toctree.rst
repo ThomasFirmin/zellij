@@ -3,17 +3,17 @@
   :maxdepth: 2
   :hidden:
 
-  ../Welcome/index
-  ../Quickstart/index
-  ../Organisation/index
+  ../Welcome/we_index
+  ../Quickstart/qu_index
+  ../Organisation/or_index
 
 .. toctree::
   :caption: Core package
   :maxdepth: 2
   :hidden:
 
-  ../Core/index
-  ../Build_meta/index
+  ../Core/co_index
+  ../Build_meta/bu_index
 
 
 
@@ -22,33 +22,33 @@
   :maxdepth: 2
   :hidden:
 
-  ../Strategies/index
-  ../Plotting/index
+  ../Strategies/st_index
+  ../Plotting/pl_index
 
 .. toctree::
   :caption: Advanced Guide
   :maxdepth: 2
   :hidden:
 
-  ../Advanced/index
+  ../Advanced/ad_index
 
 .. toctree::
   :caption: Fractal Decomposition
   :maxdepth: 2
   :hidden:
 
-  ../Fda/index
+  ../Fda/fd_index
 
 .. toctree::
   :caption: Examples
   :maxdepth: 2
   :hidden:
 
-  ../Examples/index
+  ../Examples/ex_index
 
 .. toctree::
   :caption: Developer's guide
   :maxdepth: 2
   :hidden:
 
-  ../Dev_guide/index
+  ../Dev_guide/de_index
