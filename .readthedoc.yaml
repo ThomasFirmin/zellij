@@ -39,5 +39,21 @@ python:
       path: another/package
   system_packages: true
 
+version: 2
+
 submodules:
-  include: all
+  include:
+    - Advanced
+    - Build_meta
+    - Core
+    - Dev_guide
+    - Examples
+    - Fda
+    - Fractals
+    - Organisation
+    - Plotting
+    - Quickstart
+    - Strategies
+    - Toctree
+    - Welcome
+  recursive: true

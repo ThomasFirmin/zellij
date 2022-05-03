@@ -60,18 +60,8 @@ Future features
 * Enhanced searchspaces and conversion to continuous methods.
 
 
-Indices and tables
+References
 ==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
-
-
-
-
-
 .. [1] Nakib, A., Ouchraa, S., Shvai, N., Souquet, L. & Talbi, E.-G. Deterministic metaheuristic based on fractal decomposition for large-scale optimization. Applied Soft Computing 61, 468–485 (2017).
 .. [2] Demirhan, M., Özdamar, L., Helvacıoğlu, L. & Birbil, Ş. I. FRACTOP: A Geometric Partitioning Metaheuristic for Global Optimization. Journal of Global Optimization 14, 415–436 (1999).
 .. [3] T.Firmin, Fractal decomposition: A divide and conquer approach for global optimization
