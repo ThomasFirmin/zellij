@@ -1,0 +1,5 @@
+numpydoc
+sphinx-copybutton
+sphinx-tabs
+sphinx-panels
+sphinx-rtd-theme

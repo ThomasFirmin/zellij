@@ -3,7 +3,7 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-05-03T16:47:28+02:00
+# @Last modified time: 2022-05-03T16:53:10+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -27,3 +27,14 @@ sphinx:
 # If using Sphinx, optionally build your docs in additional formats such as PDF
 formats:
    - pdf
+
+python:
+  install:
+    - requirements: docs/requirements.txt
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+    - method: setuptools
+      path: another/package
+  system_packages: true
