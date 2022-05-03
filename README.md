@@ -103,10 +103,6 @@ ga.show()
 * [pandas](https://pandas.pydata.org/)>=1.3.4
 * [mpi4py](https://mpi4py.readthedocs.io/en/stable/)>=3.1.2
 
-## Citing
-
-Incomming
-
 ## References
 <a id="1">[1]</a>
 Nakib, A., Ouchraa, S., Shvai, N., Souquet, L. & Talbi, E.-G. Deterministic metaheuristic based on fractal decomposition for large-scale optimization. Applied Soft Computing 61, 468–485 (2017).
