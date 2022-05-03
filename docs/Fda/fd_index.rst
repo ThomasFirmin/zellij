@@ -1,3 +1,5 @@
+.. _fda:
+
 ===============================
 Fractal Decomposition Algorithm
 ===============================
@@ -6,6 +8,8 @@ Fractal Decomposition Algorithm
    :members:
    :undoc-members:
    :show-inheritance:
+
+.. _frac:
 
 ********
 Fractals

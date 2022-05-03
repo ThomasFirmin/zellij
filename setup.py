@@ -14,6 +14,7 @@ docs_extras = [
     "sphinx-tabs",
     "sphinx-panels",
     "sphinx-rtd-theme",
+    "pillow>=6.2.0",
 ]
 
 setuptools.setup(
