@@ -38,3 +38,6 @@ python:
     - method: setuptools
       path: another/package
   system_packages: true
+
+submodules:
+  include: all
