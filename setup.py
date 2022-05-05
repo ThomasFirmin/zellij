@@ -49,12 +49,12 @@ setuptools.setup(
     packages=setuptools.find_packages("lib"),
     install_requires=[
         "numpy",
+        "torch",
         "deap",
         "matplotlib",
         "pandas",
         "seaborn",
         "enlighten",
-        "gpytorch",
         "botorch",
     ],
     extras_require={"mpi": ["mpi4py"], "docs": docs_extras},

@@ -22,7 +22,7 @@ logger = logging.getLogger("zellij.loss")
 try:
     from mpi4py import MPI
 except ImportError as err:
-    logger.error(
+    logger.info(
         "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
     You can use: pip install zellij[MPI]"
     )
@@ -555,6 +555,8 @@ class MPILoss(LossFunc):
                 "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
             You can use: pip install zellij[Parallel]"
             )
+
+            raise err
 
         # Master or worker process
         self.master = self.rank == 0
