@@ -41,6 +41,10 @@ setuptools.setup(
         "metaheuristics",
         "tree search",
     ],
+    url="https://github.com/ThomasFirmin/zellij",
+    project_urls={
+        "Bug Tracker": "https://github.com/ThomasFirmin/zellij/issues",
+    },
     package_dir={"": "lib"},
     packages=setuptools.find_packages("lib"),
     install_requires=[
