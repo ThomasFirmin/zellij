@@ -27,7 +27,7 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: CeCILL-C",
+        "License :: CeCILL-C Free Software License Agreement (CECILL-C)",
         "Operating System :: OS Independent",
     ],
     keywords=[
