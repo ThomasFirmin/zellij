@@ -21,13 +21,13 @@ setuptools.setup(
     name="zellij",
     version="0.0.2",
     author="Thomas Firmin",
-    author_email="thomas.firmin.etu@univ-lille.fr",
-    description="A generic framework for fractal-based optimization",
+    author_email="thomas.firmin@univ-lille.fr",
+    description="A software framework for HyperParameters Optimization",
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "License :: CeCILL-C",
         "Operating System :: OS Independent",
     ],
     keywords=[
