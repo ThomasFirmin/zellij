@@ -25,10 +25,6 @@ setuptools.setup(
     description="A generic framework for fractal-based optimization",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="",
-    project_urls={
-        "Bug Tracker": "",
-    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
