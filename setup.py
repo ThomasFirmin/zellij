@@ -19,7 +19,7 @@ docs_extras = [
 
 setuptools.setup(
     name="zellij",
-    version="0.0.1",
+    version="0.0.2",
     author="Thomas Firmin",
     author_email="thomas.firmin.etu@univ-lille.fr",
     description="A generic framework for fractal-based optimization",
