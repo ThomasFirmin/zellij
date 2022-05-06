@@ -54,7 +54,7 @@ labels = ["a","b"]
 types = ["R","R"]
 values = [[-5, 5],[-5, 5]]
 neighborhood = [0.5,0.5]
-sp = Searchspace(labels,types,values)
+sp = Searchspace(labels,types,values, neighborhood)
 ```
 
 #### Define your loss function
