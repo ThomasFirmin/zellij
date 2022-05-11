@@ -48,7 +48,7 @@ setuptools.setup(
     package_dir={"": "lib"},
     packages=setuptools.find_packages("lib"),
     install_requires=[
-        "numpy=>1.21.4",
+        "numpy>=1.21.4",
         "DEAP>=1.3.1",
         "botorch>=0.6.3.1",
         "gpytorch>=1.6.0",
