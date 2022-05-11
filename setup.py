@@ -19,7 +19,7 @@ docs_extras = [
 
 setuptools.setup(
     name="zellij",
-    version="0.0.3",
+    version="0.0.4",
     author="Thomas Firmin",
     author_email="thomas.firmin@univ-lille.fr",
     description="A software framework for HyperParameters Optimization",
