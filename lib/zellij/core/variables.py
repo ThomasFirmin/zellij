@@ -114,13 +114,17 @@ class CatVar(Variable):
 
     def random(self, size=1):
         if size == 1:
-            return random.choices(self.features, weights=self.weights, k=size)[
-                0
-            ]
+            res = random.choices(self.features, weights=self.weights, k=size)[0]
+            if isinstance(res, Variable):
+                res = res.random()
         else:
-            return random.choices(self.features, weights=self.weights, k=size)[
-                0
-            ]
+            res = random.choices(self.features, weights=self.weights, k=size)
+
+            for v in res:
+                if isinstance(res, Variable):
+                    v = v.random()
+
+        return res
 
     def isconstant(self):
         return len(self.features) == 1
