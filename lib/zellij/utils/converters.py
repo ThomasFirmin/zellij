@@ -5,6 +5,78 @@ import logging
 logger = logging.getLogger("zellij.neighborhoods")
 
 
+class ArrayConverter(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class BlockConverter(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class DBlockConverter(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class FloatMinmax(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class IntMinmax(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class CatMinmax(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class FloatBinning(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class IntBinning(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
+class CatBinning(Converter):
+    def convert(self, value):
+        pass
+
+    def reverse(self, value):
+        pass
+
+
 class Minmax(Converter):
     def __init__(self, search_space):
         super(Minmax, self).__init__(search_space)

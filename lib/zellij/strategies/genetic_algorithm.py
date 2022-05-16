@@ -198,7 +198,7 @@ class Genetic_algorithm(Metaheuristic):
             decimal=".",
             usecols=self.search_space.n_variables,
         )
-        contents = data.tail(taille_population)
+        contents = data.tail(pop_size)
 
         return pcls(ind_init(c) for index, c in contents.iterrows())
 

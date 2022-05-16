@@ -1,10 +1,65 @@
 from abc import ABC, abstractmethod
+from zellij.core.variables import Variable
+from zellij.core.search_space import SearchSpace
+
 import logging
 
 logger = logging.getLogger("zellij.Addons")
 
 
 class Addons(ABC):
+    def __init__(self, object):
+        self.target = object
+        self._add_addon(self.target, self)
+
+    @property
+    def target(self):
+        return self._target
+
+    @target.setter
+    def target(self, object):
+        self._target = object
+
+    # Add addon in addons :)
+    def _add_addon(self, object, addon):
+        key = f"{addon.__class__.__bases__[0].__name__}".lower()
+        if hasattr(self, key):
+            logger.warning(f"A {key} already is already implemented")
+            logger.warning(f"{key} will be overwritten")
+        setattr(addon, key, object)
+
+    def delete(self):
+        key = f"{self.__class__.__bases__[0].__name__}".lower()
+        if hasattr(self, key):
+            logger.info(f"{key} will be deleted")
+            delattr(self.target, key)
+        else:
+            logger.warning(f"{key} is not implemented this object")
+
+
+class VarAddons(Addons):
+    def __init__(self, variable):
+        super(VarAddons, self).__init__(variable)
+
+    @property
+    def target(self):
+        assert isinstance()
+        return self._search_space
+
+    @search_space.setter
+    def search_space(self, search_space):
+        self._search_space = search_space
+
+    def delete(self):
+        key = f"{self.__class__.__bases__[0].__name__}".lower()
+        if hasattr(self, key):
+            logger.info(f"{key} will be deleted")
+            delattr(self.search_space, key)
+        else:
+            logger.warning(f"{key} is not implemented this search space")
+
+
+class SearchSpaceAddons(Addons):
     def __init__(self, search_space):
         self.search_space = search_space
         self.search_space._add_addon(self)
