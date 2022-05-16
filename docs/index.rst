@@ -4,4 +4,4 @@
    contain the root `toctree` directive.
 
 .. include:: Toctree/toctree.rst
-.. include:: Welcome/we_index.rst
+.. include:: Welcome/index.rst

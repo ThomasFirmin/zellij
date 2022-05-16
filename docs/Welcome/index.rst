@@ -60,6 +60,11 @@ Future features
 * Enhanced searchspaces and conversion to continuous methods.
 
 
+Contributors
+============
+* Thomas Firmin: thomas.firmin@univ-lille.fr
+* El-Ghazali Talbi: el-ghazali.talbi@univ-lille.fr
+
 References
 ==================
 .. [1] Nakib, A., Ouchraa, S., Shvai, N., Souquet, L. & Talbi, E.-G. Deterministic metaheuristic based on fractal decomposition for large-scale optimization. Applied Soft Computing 61, 468–485 (2017).

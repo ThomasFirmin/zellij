@@ -730,7 +730,6 @@ class MPILoss(LossFunc):
                         logger.error(
                             "Model/loss function does not have a method called `save`"
                         )
-                        exit()
 
                 # Send results
                 logger.debug(f"WORKER {self.rank} sending {score}")

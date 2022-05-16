@@ -465,7 +465,7 @@ class Hypersphere(Fractal):
 
     """Hypersphere
 
-    The Hypersphere is a basic hypervolume to decompose the SearchSpace. It is one of the most computationally efficient, to decompose the SearchSpace.
+    The Hypersphere is a basic hypervolume to decompose the SearchSpace. It is one of the most computationally efficient.
     To decompose an hypersphere by equalsize hypersphere the complexity is equal to $2*d$, d is the dimension, moreover building an hypersphere is easy, it only needs a center and its radius.
     However the space coverage is poor, indeed the volume of an hypersphere tends to 0, when the dimension tends to infinity. To partially tackle this problem, an inflation rate allows bigger hypersphere,
     but this will create overlapping hypervolumes.

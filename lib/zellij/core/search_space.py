@@ -13,90 +13,21 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import pandas as pd
 import os
+from abc import ABC, abstractmethod
+
 
 import logging
 
 logger = logging.getLogger("zellij.space")
 
-# To modify
-def parallel_coordinates(
-    frame,
-    class_column,
-    cols=None,
-    ax=None,
-    color=None,
-    use_columns=False,
-    xticks=None,
-    colormap=None,
-    **kwds,
-):
 
-    n = len(frame)
-    class_col = frame[class_column]
-    class_min = np.amin(class_col)
-    class_max = np.amax(class_col)
-
-    if cols is None:
-        df = frame.drop(class_column, axis=1)
-    else:
-        df = frame[cols]
-
-    ncols = len(df.columns)
-
-    # determine values to use for xticks
-    if use_columns is True:
-        if not np.all(np.isreal(list(df.columns))):
-            raise ValueError("Columns must be numeric to be used as xticks")
-        x = df.columns
-    elif xticks is not None:
-        if not np.all(np.isreal(xticks)):
-            raise ValueError("xticks specified must be numeric")
-        elif len(xticks) != ncols:
-            raise ValueError("Length of xticks must match number of columns")
-        x = xticks
-    else:
-        x = range(ncols)
-
-    fig = plt.figure()
-    ax = plt.gca()
-
-    Colorm = plt.get_cmap(colormap)
-
-    for i in range(n):
-        y = df.iloc[i].values
-        kls = class_col.iat[i]
-        ax.plot(
-            x,
-            y,
-            color=Colorm((kls - class_min) / (class_max - class_min)),
-            alpha=1 - (kls - class_min) / (class_max - class_min),
-            **kwds,
-        )
-
-    for i in x:
-        ax.axvline(i, linewidth=1, color="black")
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(df.columns)
-    ax.set_xlim(x[0], x[-1])
-    ax.grid()
-
-    bounds = np.linspace(class_min, class_max, 10)
-    cax, _ = mpl.colorbar.make_axes(ax)
-    cb = mpl.colorbar.ColorbarBase(
-        cax,
-        cmap=Colorm,
-        spacing="proportional",
-        ticks=bounds,
-        boundaries=bounds,
-        format="%.2f",
-    )
-
-    return fig
+class Searchspace(ABC):
+    def __init__(self, values):
+        pass
 
 
 # TYPES: REAL: R, DISCRETE: D, CATEGORICAL: C, CONSTANT: K
-class Searchspace:
+class Mixed:
 
     """Searchspace
 
@@ -149,9 +80,6 @@ class Searchspace:
     random_value(self, attribute, size=1, replace = True, exclude=None)
         Draw random values of an attribute from the search space, using uniform distribution. Features of type K return their constant value.
 
-    get_neighbor(self, point, size=1, attribute=None)
-        Draw a neighbor of an initial solution, according to the search space bounds and dimensions types.
-
     random_point(self,size=1)
         Return a random point from the search space
 
@@ -167,18 +95,6 @@ class Searchspace:
     show(self,X,Y)
         Show solutions X associated to their values Y, according to the Searchspace
 
-    _create_neighborhood(self,neighborhood)
-        Create the neighborhood. See Searchspace.__init__
-
-    _get_real_neighbor(self, x, i)
-            Draw a neighbor of a Real attribute from the search space, using uniform distribution. According to its lower and upper bounds
-
-    _get_discrete_neighbor(self, x, i)
-            Draw a neighbor of a Discrete attribute from the search space, using discrete uniform distribution. According to its lower and upper bounds
-
-    _get_categorical_neighbor(self, x, i)
-            Draw a neighbor of a Categorical attribute from the search space, using discrete uniform distribution. According to all its possible value
-
     See Also
     --------
     LossFunc : Parent class for a loss function.
@@ -189,7 +105,6 @@ class Searchspace:
     >>> labels = ["learning rate","neurons","activation"]
     >>> types = ["R","D","C"]
     >>> values = [[-5.0, 5.0],[0, 20],["relu","tanh","sigmoid"]]
-    >>> neighborhood = [0.5,3,-1]
     >>> sp = Searchspace(labels,types,values, neighborhood)
 
     """
@@ -246,10 +161,6 @@ class Searchspace:
             len(labels) == len(types) == len(values)
         ), "Labels, types and values must have the same length"
 
-        assert (isinstance(neighborhood, list) and len(neighborhood) > 0) or (
-            isinstance(neighborhood, float) and 0 < neighborhood < 1
-        ), "neighborhood must be of the form [float|int|-1, ...], float: type='R', int: type='D', -1: type='C' or 'K' or must be a 0 < float < 1"
-
         assert all(isinstance(l, str) for l in labels), "Labels must be strings"
         assert all(
             t in valid_types for t in types
@@ -279,23 +190,6 @@ class Searchspace:
                     isinstance(v, list) and len(v) >= 2
                 ), f"Values of type 'C' must be of the form [value 1, value 2,...], got {v}"
 
-        if isinstance(neighborhood, list):
-            for n, t in zip(neighborhood, types):
-                if t == "R":
-                    assert isinstance(n, float) or isinstance(
-                        n, int
-                    ), f"neighborhood of type 'R' must be a float or an int, got {n}"
-
-                elif t == "D":
-                    assert isinstance(
-                        n, int
-                    ), f"neighborhood of type 'R' must be an int, got {n}"
-
-                else:
-                    assert (
-                        n == -1
-                    ), f"neighborhood of type 'C' or 'K' must be equal to -1, got {n}"
-
         ##############
         # PARAMETERS #
         ##############
@@ -313,44 +207,13 @@ class Searchspace:
 
         self.k_index = [i for i, x in enumerate(self.types) if x == "K"]
 
-        # if list is given do nothing, if a percentage is given, compute the neighborhood of a solution is located in an area corresponding to x% of the search space
-        self._create_neighborhood(neighborhood)
-
-    # Create the neighborhood for each variables
-    def _create_neighborhood(self, neighborhood):
-
-        """_create_neighborhood(neighborhood)
-
-        Create the neighborhood. See Searchspace.__init__
-
-        Parameters
-        ----------
-        neighborhood : {float, list[{float, int, -1}]}
-
-        """
-
-        self.neighborhood = []
-
-        if type(neighborhood) == float:
-
-            for i in range(self.n_variables):
-                if self.types[i] == "R":
-                    self.neighborhood.append(
-                        (self.values[i][1] - self.values[i][0]) * neighborhood
-                    )
-                elif self.types[i] == "D":
-                    self.neighborhood.append(
-                        int(
-                            np.ceil(
-                                (self.values[i][1] - self.values[i][0])
-                                * neighborhood
-                            )
-                        )
-                    )
-                else:
-                    self.neighborhood.append(-1)
-        else:
-            self.neighborhood = neighborhood
+    # Add addon in addons :)
+    def _add_addon(self, addon):
+        key = f"{addon.__class__.__bases__[0].__name__}".lower()
+        if hasattr(self, key):
+            logger.warning(f"A {key} already is already implemented")
+            logger.warning(f"{key} will be overwritten")
+        setattr(self, key, addon)
 
     # Return 1 or size=n random attribute from the search space, can exclude one attribute
     def random_attribute(self, size=1, replace=True, exclude=None):
@@ -480,172 +343,6 @@ class Searchspace:
         else:
             return [self.values[index] for _ in range(size)]
 
-    def _get_real_neighbor(self, x, i):
-
-        """_get_real_neighbor(x, i)
-
-        Draw a neighbor of a Real attribute from the search space, using uniform distribution. According to its lower and upper bounds
-
-        Parameters
-        ----------
-
-        x : float
-            Initial value
-        i : int
-            Dimension index
-
-        Returns
-        -------
-
-        v : float
-            Random neighbor of x
-
-        """
-
-        upper = np.min([x + self.neighborhood[i], self.values[i][1]])
-        lower = np.max([x - self.neighborhood[i], self.values[i][0]])
-        v = np.random.uniform(lower, upper)
-
-        while v == x:
-            v = np.random.uniform(lower, upper)
-
-        return float(v)
-
-    def _get_discrete_neighbor(self, x, i):
-
-        """_get_discrete_neighbor(x, i)
-
-        Draw a neighbor of a Discrete attribute from the search space, using discrete uniform distribution. According to its lower and upper bounds
-
-        Parameters
-        ----------
-
-        x : float
-            Initial value
-        i : int
-            Dimension index
-
-        Returns
-        -------
-
-        v : int
-            Random neighbor of x
-
-        """
-
-        upper = int(np.min([x + self.neighborhood[i], self.values[i][1]])) + 1
-        lower = int(np.max([x - self.neighborhood[i], self.values[i][0]]))
-        v = np.random.randint(lower, upper)
-
-        while v == x:
-            v = np.random.randint(lower, upper)
-
-        return int(v)
-
-    def _get_categorical_neighbor(self, x, i):
-
-        """_get_categorical_neighbor(self, x, i)
-
-        Draw a neighbor of a Categorical attribute from the search space, using discrete uniform distribution. According to all its possible value
-
-        Parameters
-        ----------
-
-        x : float
-            Initial value
-        i : int
-            Dimension index
-
-        Returns
-        -------
-
-        v : float
-            Random neighbor of x
-
-        """
-
-        idx = np.random.randint(len(self.values[i]))
-
-        while self.values[i][idx] == x:
-            idx = np.random.randint(len(self.values[i]))
-
-        v = self.values[i][idx]
-
-        return v
-
-    # Return a neighbor of a given point in the search space, can select neighbor of a particular attribute
-    def get_neighbor(self, point, size=1, attribute=None):
-
-        """get_neighbor(point, size=1, attribute=None)
-
-        Draw a neighbor of an initial solution, according to the search space bounds and dimensions types.
-
-        Parameters
-        ----------
-
-        point : list[{int, float, str}, {int, float, str}...]
-            Initial point.
-        size : int, default=1
-            Draw <size> neighbors of <point>.
-        size : str, default=None
-            Draw a neighbor of <point> at dimension of label <attribute>
-
-        Returns
-        -------
-
-        points : list[list[{int, float, str}, {int, float, str}...], ...]
-            List of neighbors of <point>.
-
-        """
-
-        points = []
-
-        if attribute == None:
-            for _ in range(size):
-                attribute = self.random_attribute()
-                index = self.labels.index(attribute)
-                neighbor = point[:]
-
-                if self.types[index] == "R":
-                    neighbor[index] = self._get_real_neighbor(
-                        point[index], index
-                    )
-
-                elif self.types[index] == "D":
-
-                    neighbor[index] = self._get_discrete_neighbor(
-                        point[index], index
-                    )
-
-                elif self.types[index] == "C":
-
-                    neighbor[index] = self._get_categorical_neighbor(
-                        point[index], index
-                    )
-
-                points.append(neighbor[:])
-        else:
-
-            index = self.labels.index(attribute)
-
-            if self.types[index] == "R":
-                for _ in range(size):
-                    points.append(self._get_real_neighbor(point[index], index))
-
-            elif self.types[index] == "D":
-                for _ in range(size):
-                    points.append(
-                        self._get_discrete_neighbor(point[index], index)
-                    )
-
-            elif self.types[index] == "C":
-                for _ in range(size):
-                    points.append(
-                        self._get_categorical_neighbor(point[index], index)
-                    )
-
-        return points
-
     # Return a random point of the search space
     def random_point(self, size=1):
 
@@ -685,103 +382,6 @@ class Searchspace:
             points.append(new_point[:])
 
         return points
-
-    # Convert a point to continuous, or convert a continuous point to a point from the search space
-    def convert_to_continuous(self, points, reverse=False, sub_values=False):
-
-        """convert_to_continuous(points,reverse=False,sub_values=False)
-
-        Convert given points from mixed to continuous, or, from continuous to mixed.
-
-        Parameters
-        ----------
-
-        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
-            List of points to convert
-        reverse : boolean, default=False
-            If False convert points from mixed to continuous, if True, from continuous to mixed
-        sub_values : boolean, default=True
-            If the search space is a subspace, uses the original values to convert if True, else uses its own bounds.
-            See Searchspace
-
-        Returns
-        -------
-
-        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
-            List of converted points. Points are list of float if converted to continuous, else list of mixed variables.
-
-        """
-
-        # Uses bounds from the original space if this object is a subspace.
-        if sub_values and self.sub_values != None:
-            val = self.sub_values
-
-        # Use initial bounds to convert
-        else:
-            val = self.values
-
-        res = []
-
-        # Continuous to mixed
-        if reverse:
-
-            for point in points:
-                converted = []
-                for att in range(self.n_variables):
-
-                    if self.types[att] == "R":
-
-                        converted.append(
-                            point[att] * (val[att][1] - val[att][0])
-                            + val[att][0]
-                        )
-
-                    elif self.types[att] == "D":
-
-                        converted.append(
-                            int(
-                                point[att] * (val[att][1] - val[att][0])
-                                + val[att][0]
-                            )
-                        )
-
-                    elif self.types[att] == "C":
-
-                        n_values = len(val[att])
-                        converted.append(val[att][int(point[att] * n_values)])
-
-                    elif self.types[att] == "K":
-                        converted.append(self.values[att])
-
-                res.append(converted[:])
-
-        # Mixed to continuous
-        else:
-
-            for point in points:
-                converted = []
-                for att in range(self.n_variables):
-
-                    if self.types[att] == "R" or self.types[att] == "D":
-
-                        converted.append(
-                            (point[att] - val[att][0])
-                            / (val[att][1] - val[att][0])
-                        )
-
-                    elif self.types[att] == "C":
-
-                        idx = self.values[att].index(point[att])
-                        n_values = len(val[att])
-
-                        converted.append(idx / n_values)
-
-                    elif self.types[att] == "K":
-                        converted.append(1)
-
-                res.append(converted[:])
-
-        return res
 
     def general_convert(self):
 
