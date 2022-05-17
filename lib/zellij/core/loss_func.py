@@ -7,7 +7,6 @@
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
-
 import numpy as np
 import os
 import shutil
@@ -922,7 +921,6 @@ def Loss(model=None, save=False, verbose=True, MPI=False):
     if model:
         return SerialLoss(model)
     else:
-
         def wrapper(model):
             if MPI:
                 return MPILoss(model, save, verbose)

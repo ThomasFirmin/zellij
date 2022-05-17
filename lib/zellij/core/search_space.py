@@ -105,7 +105,7 @@ class Mixed:
     >>> labels = ["learning rate","neurons","activation"]
     >>> types = ["R","D","C"]
     >>> values = [[-5.0, 5.0],[0, 20],["relu","tanh","sigmoid"]]
-    >>> sp = Searchspace(labels,types,values, neighborhood)
+    >>> sp = Mixed(labels,types,values, neighborhood)
 
     """
 

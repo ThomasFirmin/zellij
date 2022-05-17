@@ -20,11 +20,12 @@ import seaborn as sns
 
 import logging
 
+from zellij.strategies.utils.ga_utils.mutation import fixed_mutation
+
 logger = logging.getLogger("zellij.GA")
 
 
 class Genetic_algorithm(Metaheuristic):
-
     """Genetic_algorithm
 
     Genetic_algorithm (GA) implements a steady state genetic algorithm. It can be used for exploration and exploitation.
@@ -58,6 +59,24 @@ class Genetic_algorithm(Metaheuristic):
     generation : int
         Generation number of the GA.
 
+    mutation :
+        Mutation function
+
+    mutation_kwargs :
+        Arguments for the mutation function
+
+    crossover :
+        Crossover function
+
+    crossover_kwargs :
+        Arguments for the crossover function
+
+    selection :
+        Selection function
+
+    selection_kwargs :
+        Arguments for the selection function
+
     elitism : float, default=0.5
         Percentage of the best parents to keep in the next population by replacing the worst children.
         Default 50%.
@@ -75,19 +94,30 @@ class Genetic_algorithm(Metaheuristic):
     Examples
     --------
     >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import Searchspace
+    >>> from zellij.core.search_space import Mixed
     >>> from zellij.strategies.genetic_algorithm import Genetic_algorithm
-    >>> from zellij.utils.benchmark import himmelblau
-    >>> labels = ["a","b","c"]
-    >>> types = ["R","R","R"]
-    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
-    >>> sp = Searchspace(labels,types,values)
-    >>> lf = Loss()(himmelblau)
-    >>> ga = Genetic_algorithm(lf, sp, 1000, pop_size=25, generation=40,elitism=0.5)
+    >>> import numpy as np
+    >>> labels = ["a", "b", "c"]
+    >>> types = ["R", "R", "R"]
+    >>> values = [[-5, 5], [-5, 5], [-5, 5]]
+
+    >>> class ContinueNeighborhood(Mixed):
+    >>>     def __init__(self, labels, types, values):
+    >>>         super(ContinueNeighborhood, self).__init__(labels, types, values)
+    >>>     def get_neighbor(self, point, attribute, neighborhood=0.1):
+    >>>         index = self.labels.index(attribute)
+    >>>         label_neighbor = np.random.uniform(
+    >>>             np.max([point[index] - neighborhood, self.values[index][0]]),
+    >>>             np.min([point[index] + neighborhood, self.values[index][1]]))
+    >>>         return label_neighbor
+    >>> sp = ContinueNeighborhood(labels, types, values)
+    >>> @Loss(save=False, verbose=True)
+    >>> def himmelblau(x):
+    >>>     x_ar = np.array(x)
+    >>>     return np.sum(x_ar ** 4 - 16 * x_ar ** 2 + 5 * x_ar) * (1 / len(x_ar))
+    >>> ga = Genetic_algorithm(himmelblau, sp, 1000, pop_size=25, generation=40, elitism=0.5)
     >>> ga.run()
     >>> ga.show()
-
-
     .. image:: ../_static/ga_sp_ex.png
         :width: 924px
         :align: center
@@ -106,18 +136,24 @@ class Genetic_algorithm(Metaheuristic):
     """
 
     def __init__(
-        self,
-        loss_func,
-        search_space,
-        f_calls,
-        pop_size=10,
-        generation=1000,
-        elitism=0.5,
-        filename="",
-        verbose=True,
+            self,
+            loss_func,
+            search_space,
+            f_calls,
+            mutation=None,
+            mutation_kwargs=None,
+            crossover=None,
+            crossover_kwargs=None,
+            selection=None,
+            selection_kwargs=None,
+            pop_size=10,
+            generation=1000,
+            elitism=0.5,
+            filename="",
+            verbose=True,
     ):
 
-        """__init__(loss_func, search_space, f_calls, pop_size = 10, generation = 1000, verbose=True)
+        """__init__(loss_func, search_space, mutation, crossover, f_calls, pop_size = 10, generation = 1000, verbose=True)
 
         Initialize Genetic_algorithm class
 
@@ -128,6 +164,21 @@ class Genetic_algorithm(Metaheuristic):
 
         search_space : Searchspace
             Search space object containing bounds of the search space.
+
+        mutation :
+            Mutation function
+            If None, use the default fixed_mutation operator
+            kwargs: arguments not by default (ie: others than individual, sp)
+
+        crossover :
+            Crossover function
+            If None, use the default fixed_crossover operator
+            kwargs: arguments not by default (ie: others than individual)
+
+        selection :
+            Selection function
+            If None, use the default tournament operator
+            kwargs: arguments not by default (ie: others than individual)
 
         f_calls : int
             Maximum number of loss_func calls
@@ -156,6 +207,24 @@ class Genetic_algorithm(Metaheuristic):
         self.pop_size = pop_size
         self.generation = generation
         self.elitism = elitism
+
+        if mutation is None:
+            mutation = fixed_mutation
+            mutation_kwargs = {"proba": 1 / self.search_space.n_variables}
+        self.mutation_operator = mutation
+        self.mutation_kwargs = mutation_kwargs
+
+        if crossover is None:
+            crossover = tools.cxOnePoint
+            crossover_kwargs = {}
+        self.crossover_operator = crossover
+        self.crossover_kwargs = crossover_kwargs
+
+        if selection is None:
+            selection = tools.selTournament
+            selection_kwargs = {'tournsize': 3}
+        self.selection_operator = selection
+        self.selection_kwargs = selection_kwargs
 
         self.pop_historic = []
         self.fitness_historic = []
@@ -203,39 +272,6 @@ class Genetic_algorithm(Metaheuristic):
         return pcls(ind_init(c) for index, c in contents.iterrows())
 
     # Mutate operator
-    def mutate(self, individual, proba):
-
-        """mutate(self, individual, proba)
-
-        Mutate a given individual, using Searchspace neighborhood.
-
-        Parameters
-        ----------
-        individual : list[{int, float, str}]
-            Individual to mutate, in the mixed format.
-
-        proba : float
-            Probability to mutate a gene.
-
-        Returns
-        -------
-
-        individual : list[{int, float, str}]
-            Mutated individual
-
-        """
-
-        # For each dimension of a solution draw a probability to be muted
-        for index, label in enumerate(self.search_space.labels):
-            t = np.random.random()
-            if t < proba:
-
-                # Get a neighbor of the selected attribute
-                individual[0][index] = self.search_space.get_neighbor(
-                    individual[0], attribute=label
-                )[0]
-
-        return (individual,)
 
     # Run GA
     def run(self, H=None, n_process=1):
@@ -322,13 +358,11 @@ class Genetic_algorithm(Metaheuristic):
             pop = toolbox.population(n=self.pop_size)
 
         # Create crossover tool
-        toolbox.register("mate", tools.cxOnePoint)
+        toolbox.register("mate", self.crossover_operator, **self.crossover_kwargs)
         # Create mutation tool
-        toolbox.register(
-            "mutate", self.mutate, proba=1 / self.search_space.n_variables
-        )
+        toolbox.register("mutate", self.mutation_operator, search_space=self.search_space, **self.mutation_kwargs)
         # Create selection tool
-        toolbox.register("select", tools.selTournament, tournsize=3)
+        toolbox.register("select", self.selection_operator, **self.selection_kwargs)
 
         # Create a tool to select best individuals from a population
         bpn = int(self.pop_size * self.elitism)
@@ -412,7 +446,6 @@ class Genetic_algorithm(Metaheuristic):
 
             i = 0
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
-
                 # Clone individuals from crossover
                 children1 = toolbox.clone(child1)
                 children2 = toolbox.clone(child2)
