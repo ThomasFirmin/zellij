@@ -207,14 +207,6 @@ class Mixed:
 
         self.k_index = [i for i, x in enumerate(self.types) if x == "K"]
 
-    # Add addon in addons :)
-    def _add_addon(self, addon):
-        key = f"{addon.__class__.__bases__[0].__name__}".lower()
-        if hasattr(self, key):
-            logger.warning(f"A {key} already is already implemented")
-            logger.warning(f"{key} will be overwritten")
-        setattr(self, key, addon)
-
     # Return 1 or size=n random attribute from the search space, can exclude one attribute
     def random_attribute(self, size=1, replace=True, exclude=None):
 
