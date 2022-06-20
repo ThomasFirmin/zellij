@@ -110,11 +110,14 @@ class Genetic_algorithm(Metaheuristic):
     >>>             np.max([point[index] - neighborhood, self.values[index][0]]),
     >>>             np.min([point[index] + neighborhood, self.values[index][1]]))
     >>>         return label_neighbor
+
     >>> sp = ContinueNeighborhood(labels, types, values)
+
     >>> @Loss(save=False, verbose=True)
     >>> def himmelblau(x):
     >>>     x_ar = np.array(x)
     >>>     return np.sum(x_ar ** 4 - 16 * x_ar ** 2 + 5 * x_ar) * (1 / len(x_ar))
+
     >>> ga = Genetic_algorithm(himmelblau, sp, 1000, pop_size=25, generation=40, elitism=0.5)
     >>> ga.run()
     >>> ga.show()

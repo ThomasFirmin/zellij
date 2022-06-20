@@ -4,6 +4,7 @@ import random
 
 import logging
 
+from zellij.core.node import Node, DAGraph
 logger = logging.getLogger("zellij.variables")
 logger.setLevel(logging.INFO)
 
@@ -133,8 +134,8 @@ class IntVar(Variable):
 
     def __repr__(self):
         return (
-            super(IntVar, self).__repr__()
-            + f"\
+                super(IntVar, self).__repr__()
+                + f"\
         \t- Lower bound: {self.low_bound}\n\
         \t- Upper bound: {self.up_bound}\n"
         )
@@ -225,8 +226,8 @@ class FloatVar(Variable):
 
     def __repr__(self):
         return (
-            super(FloatVar, self).__repr__()
-            + f"\
+                super(FloatVar, self).__repr__()
+                + f"\
         \t- Lower bound: {self.low_bound}\n\
         \t- Upper bound: {self.up_bound}\n"
         )
@@ -245,7 +246,7 @@ class CatVar(Variable):
     features : list
         List of all choices.
     weights : list[float]
-        Wieghts associated to each elements of `features`. The sum of all
+        Weights associated to each elements of `features`. The sum of all
         positive elements of this list, must be equal to 1.
 
     Attributes
@@ -339,8 +340,8 @@ class CatVar(Variable):
 
     def __repr__(self):
         return (
-            super(CatVar, self).__repr__()
-            + f"\
+                super(CatVar, self).__repr__()
+                + f"\
         \t- Features: {self.features}\n"
         )
 
@@ -466,11 +467,11 @@ class ArrayVar(Variable):
             values_reprs += v.__repr__()
 
         return (
-            super(ArrayVar, self).__repr__()
-            + f"\
+                super(ArrayVar, self).__repr__()
+                + f"\
         \t- Length: {len(self)}\n=====\n[\n"
-            + values_reprs
-            + "\n]\n=====\n"
+                + values_reprs
+                + "\n]\n=====\n"
         )
 
 
@@ -599,8 +600,8 @@ class Block(Variable):
             values_reprs += v.__repr__()
 
         return (
-            super(Block, self).__repr__()
-            + f"\t Block of:{self.value.__repr__()}\n"
+                super(Block, self).__repr__()
+                + f"\t Block of:{self.value.__repr__()}\n"
         )
 
 
@@ -694,7 +695,10 @@ class DynamicBlock(Block):
         else:
             n_repeat = np.random.randint(1, self.repeat)
             for _ in range(n_repeat):
-                res.append([v.random() for v in self.value])
+                if len(self.value) > 0:
+                    res.append([v.random() for v in self.value])
+                else:
+                    res.append(self.value.random())
 
         return res
 
@@ -708,3 +712,170 @@ class DynamicBlock(Block):
 
         """
         return False
+
+
+class ChoiceVariable(ArrayVar):
+    def __init__(self, label, choices):
+        super(ChoiceVariable, self).__init__(label)
+        self.choices = choices
+
+    def random(self, size=1):
+        if size == 1:
+            choice = random.choice(self.choices)
+            return choice.random(size=1)
+        else:
+            res = []
+            for i in range(size):
+                choice = random.choice(self.choices)
+                res.append(choice.random(size=1))
+            return res
+    def __repr__(self):
+        choices_reprs = ""
+        for c in self.choices:
+            choices_reprs += c.__repr__()
+
+        return (
+                super(ChoiceVariable, self).__repr__()
+                + f"\
+                \t- Length: {len(self)}\n=====\n[\n"
+                + choices_reprs
+                + "\n]\n=====\n"
+        )
+
+
+
+# Directed Acyclic Graph for NAS.
+class DAGraphVariable(Variable):
+    def __init__(self, label, operations):
+        super(DAGraphVariable, self).__init__(label)
+        self.operations = operations
+
+    def random(self, size=1):
+        """random(size=1)
+
+        Parameters
+        ----------
+        size : int, default=None
+            Number of draws.
+
+        Returns DAGraph
+        -------
+
+        >>> from zellij.core.variables import DynamicBlock, ArrayVar, IntVar, FloatVar, ChoiceVariable, CatVar, DAGraphVariable
+        >>> layer1 = ArrayVar("Layer1", CatVar("Operation", ['LSTM', 'Dense']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']))
+        ... layer2 = ArrayVar("Layer2", CatVar("Operation", ['CNN']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']), IntVar("Filter", 1, 3))
+        ... layer3 = ArrayVar("Layer3", CatVar("Operation", ['Id', 'Zero']))
+        ... operations = ChoiceVariable("Candidates", [layer1, layer2, layer3])
+        ... ops = DynamicBlock('Nodes', operations, 4)
+        ... dag = DAGraphVariable("dag1", ops)
+        >>> print(dag)
+        DAGraphVariable:
+        	- Label: dag1
+        	- Operations:
+        DynamicBlock:
+                    - Label: Nodes
+             Block of:
+        ChoiceVariable:
+                    - Label: Candidates
+                    - Length: 0
+        =====
+        [
+        ]
+        =====
+                            - Length: 0
+        =====
+        [
+        ArrayVar:
+                    - Label: Layer1
+                    - Length: 3
+        =====
+        [
+        CatVar:
+                    - Label: Operation
+                    - Features: ['LSTM', 'Dense']
+        IntVar:
+                    - Label: N neurons
+                    - Lower bound: 1
+                    - Upper bound: 100
+        CatVar:
+                    - Label: Activation
+                    - Features: ['gelu', 'relu']
+        ]
+        =====
+        ArrayVar:
+                    - Label: Layer2
+                    - Length: 4
+        =====
+        [
+        CatVar:
+                    - Label: Operation
+                    - Features: ['CNN']
+        IntVar:
+                    - Label: N neurons
+                    - Lower bound: 1
+                    - Upper bound: 100
+        CatVar:
+                    - Label: Activation
+                    - Features: ['gelu', 'relu']
+        IntVar:
+                    - Label: Filter
+                    - Lower bound: 1
+                    - Upper bound: 3
+        ]
+        =====
+        ArrayVar:
+                    - Label: Layer3
+                    - Length: 1
+        =====
+        [
+        CatVar:
+                    - Label: Operation
+                    - Features: ['Id', 'Zero']
+        ]
+        =====
+        ]
+        =====
+        >>> print(dag.random())
+        ['Input'] -> [['CNN', 17, 'gelu', 1], ['LSTM', 83, 'relu'], ['Dense', 41, 'relu']]
+        ['CNN', 17, 'gelu', 1] -> [['LSTM', 83, 'relu']]
+        ['LSTM', 83, 'relu'] -> [['Dense', 41, 'relu']]
+        ['Dense', 41, 'relu'] -> []
+        ['LSTM', 83, 'relu'] -> [['Dense', 41, 'relu']]
+        ['Dense', 41, 'relu'] -> []
+        ['Dense', 41, 'relu'] -> []
+        """
+        operations = self.operations.random()
+        operations = [['Input']] + operations
+        nodes = np.empty(len(operations), dtype=np.dtype(Node))
+        connections = [[] for _ in range(len(operations))]
+        for i in range(1, len(operations)):
+            parents_ids = list(set(random.choices(range(i), k=i)))
+            for p in parents_ids:
+                connections[p].append(i)
+        n = len(connections)
+        for i in range(len(connections) - 1):
+            if len(connections[i]) == 0:
+                connections[i] = list(set(random.choices(range(i, n), k=n - i)))
+        for i in range(len(connections) - 1, -1, -1):
+            nodes[i] = Node(operations[i], [nodes[o] for o in connections[i]])
+        graph = DAGraph(nodes.tolist())
+        return graph
+
+    def isconstant(self):
+        """isconstant()
+
+        Returns
+        -------
+        out: False
+            Return False, a dynamic block cannot be constant. (It is a binary)
+
+        """
+        return False
+
+    def __repr__(self):
+        return (
+                super(DAGraphVariable, self).__repr__()
+                + f"\
+        \t- Operations:\n"
+                + self.operations.__repr__()
+        )

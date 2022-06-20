@@ -720,3 +720,5 @@ class Mixed:
         # dataf["loss_value"] = Y
         # parallel_coordinates(dataf, "loss_value", colormap="viridis_r")
         # plt.show()
+
+
