@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:13+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-09T14:07:27+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -65,7 +65,7 @@ class LossFunc(object):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, save=False, verbose=True):
+    def __init__(self, model, historic=True, save=False, verbose=True):
 
         """__init__(model, save=False)
 
@@ -84,8 +84,10 @@ class LossFunc(object):
         ##############
 
         self.model = model
+        self.historic = historic
         self.save = save
         self.verbose = verbose
+
         #############
         # VARIABLES #
         #############
@@ -361,6 +363,17 @@ class LossFunc(object):
 
         return rd, model
 
+    def get_best(self, n_process=1):
+        if self.historic:
+            best_idx = np.argpartition(self.all_scores, n_process)
+            best = [self.all_solutions[i] for i in best_idx[:n_process]]
+            min = [self.all_scores[i] for i in best_idx[:n_process]]
+        else:
+            best = self.best_sol
+            min = self.best_score
+
+        return best, min
+
     def reset(self):
         """reset()
 
@@ -397,96 +410,6 @@ class LossFunc(object):
             self.manager = enlighten.get_manager()
         else:
             self.manager = enlighten.get_manager(stream=None, enabled=False)
-
-
-class FDA_loss_func:
-
-    """FDA_loss_func
-
-    FDA_loss_func allows to wrap function of type f(x)=(y, model), so it can be used in by the Fractal Decomposition Algorithm.
-
-    Must be modified
-    """
-
-    def __init__(self, model, H, sp):
-
-        ##############
-        # PARAMETERS #
-        ##############
-
-        self.loss_func = model
-        self.H = H
-        self.search_space = sp
-
-    @property
-    def calls(self):
-        return self.loss_func.calls
-
-    @property
-    def save(self):
-        return self.loss_func.save
-
-    @property
-    def best_score(self):
-        return self.loss_func.best_score
-
-    @property
-    def best_sol(self):
-        return self.loss_func.best_sol
-
-    @property
-    def all_scores(self):
-        return self.loss_func.all_scores
-
-    @property
-    def all_solutions(self):
-        return self.loss_func.all_solutions
-
-    @property
-    def new_best(self):
-        return self.loss_func.new_best
-
-    @property
-    def labels(self):
-        return self.loss_func.labels
-
-    @labels.setter
-    def labels(self, v):
-        self.loss_func.labels = v
-
-    @property
-    def folder_name(self):
-        return self.loss_func.folder_name
-
-    @property
-    def outputs_path(self):
-        return self.loss_func.outputs_path
-
-    @property
-    def model_path(self):
-        return self.loss_func.model_path
-
-    @property
-    def plots_path(self):
-        return self.loss_func.plots_path
-
-    @property
-    def loss_file(self):
-        return self.loss_func.loss_file
-
-    @property
-    def file_created(self):
-        return self.loss_func.file_created
-
-    @file_created.setter
-    def file_created(self, v):
-        self.loss_func.file_created = v
-
-    def __call__(self, X, **kwargs):
-        res = self.loss_func(X, **kwargs)
-        X_c = self.search_space.convert_to_continuous(X)
-        self.H.add_point(res, X_c)
-        return res
 
 
 class MPILoss(LossFunc):
@@ -530,15 +453,15 @@ class MPILoss(LossFunc):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, save=False, verbose=True):
+    def __init__(self, model, historic=True, save=False, verbose=True):
 
-        """__init__(model, save=False)
+        """__init__(model, historic=True, save=False, verbose=True)
 
         Initialize MPI variables. For more info, see LossFunc.
 
         """
 
-        super().__init__(model, save, verbose)
+        super().__init__(model, historic, save, verbose)
 
         #################
         # MPI VARIABLES #
@@ -551,8 +474,8 @@ class MPILoss(LossFunc):
             self.p = self.comm.Get_size()
         except Exception as err:
             logger.error(
-                "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
-            You can use: pip install zellij[Parallel]"
+                """To use MPILoss object you need to install mpi4py and an MPI
+                distribution.\nYou can use: pip install zellij[Parallel]"""
             )
 
             raise err
@@ -802,15 +725,15 @@ class SerialLoss(LossFunc):
     MPILoss : Distributed version of LossFunc
     """
 
-    def __init__(self, model, save=False, verbose=True):
+    def __init__(self, model, historic=True, save=False, verbose=True):
 
-        """__init__(model, save=False)
+        """__init__(model, historic=True, save=False, verbose=True)
 
         Initialize SerialLoss.
 
         """
 
-        super().__init__(model, save, verbose)
+        super().__init__(model, historic, save, verbose)
 
     def __call__(self, X, **kwargs):
 
@@ -877,7 +800,7 @@ class SerialLoss(LossFunc):
 
 
 # Wrap different loss functions
-def Loss(model=None, save=False, verbose=True, MPI=False):
+def Loss(model=None, historic=True, save=False, verbose=True, MPI=False):
     """Loss(model=None, save=False, verbose=True, MPI=False)
 
     Wrap a function of type :math:`f(x)=y`. See `LossFunc` for more info.
@@ -923,8 +846,8 @@ def Loss(model=None, save=False, verbose=True, MPI=False):
     else:
         def wrapper(model):
             if MPI:
-                return MPILoss(model, save, verbose)
+                return MPILoss(model, historic, save, verbose)
             else:
-                return SerialLoss(model, save, verbose)
+                return SerialLoss(model, historic, save, verbose)
 
         return wrapper

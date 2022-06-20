@@ -1,16 +1,14 @@
 from abc import ABC, abstractmethod
+import math
 import numpy as np
 import random
+import copy
 
 import logging
 
 from zellij.core.node import Node, DAGraph
 logger = logging.getLogger("zellij.variables")
 logger.setLevel(logging.INFO)
-
-
-class Solution(ABC):
-    pass
 
 
 @abstractmethod
@@ -23,6 +21,15 @@ class Variable(ABC):
     ----------
     label : str
         Name of the variable.
+    kwargs : dict
+        Kwargs will be the different addons you want to add to a `Variable`.
+        Known addons are:
+        * to_discrete : VarConverter
+            * Will be called when converting to discrete is needed.
+        * to_continuous : VarConverter
+            * Will be called when converting to continuous is needed.
+        * neighbor : VarNeighborhood
+            * Will be called when a neighborhood is needed.
 
     Attributes
     ----------
@@ -30,11 +37,17 @@ class Variable(ABC):
 
     """
 
-    def __init__(self, label):
-        assert isinstance(label, str), logger.error(
-            f"Label must be a string, got {label}"
-        )
+    def __init__(self, label, **kwargs):
+        assert isinstance(
+            label, str
+        ), f"""
+        Label must be a string, got {label}
+        """
+
         self.label = label
+        self.kwargs = kwargs
+
+        self._add_addons(**kwargs)
 
     @abstractmethod
     def random(self, size=None):
@@ -44,9 +57,29 @@ class Variable(ABC):
     def isconstant(self):
         pass
 
+    @abstractmethod
+    def subset(self):
+        pass
+
+    def _add_addons(self, **kwargs):
+        for k in kwargs:
+
+            assert isinstance(
+                kwargs[k], VarAddon
+            ), f"""
+            Kwargs must be of type `VarAddon`, got {k}:{kwargs[k]}
+            """
+            if kwargs[k]:
+                setattr(self, k, copy.copy(kwargs[k]))
+                addon = getattr(self, k)
+                addon.target = self
+            else:
+                setattr(self, k, kwargs[k])
+                addon = getattr(self, k)
+                addon.target = self
+
     def __repr__(self):
-        return f"\n{self.__class__.__name__}:\n\
-        \t- Label: {self.label}\n"
+        return f"{self.__class__.__name__}({self.label}, "
 
 
 # Discrete
@@ -76,30 +109,31 @@ class IntVar(Variable):
     >>> from zellij.core.variables import IntVar
     >>> a = IntVar("test", 0, 5)
     >>> print(a)
-    FloatVar:
-                - Label: test
-                - Lower bound: 0
-                - Upper bound: 5.0
+    IntVar(test, [0;5])
     >>> a.random()
     1
 
     """
 
-    def __init__(self, label, lower, upper):
-        super(IntVar, self).__init__(label)
+    def __init__(self, label, lower, upper, **kwargs):
+        super(IntVar, self).__init__(label, **kwargs)
 
-        assert isinstance(upper, int), logger.error(
-            f"Upper bound must be an int, got {upper}"
-        )
+        assert isinstance(
+            upper, (int, np.integer)
+        ), f"""
+        Upper bound must be an int, got {upper}
+        """
 
-        assert isinstance(lower, int), logger.error(
-            f"Upper bound must be an int, got {lower}"
-        )
+        assert isinstance(
+            lower, (int, np.integer)
+        ), f"""
+        Lower bound must be an int, got {lower}
+        """
 
-        assert lower < upper, logger.error(
-            f"Lower bound must be strictly inferior to upper bound,\
-            got {lower}<{upper}"
-        )
+        assert (
+            lower < upper
+        ), f"""Lower bound must be
+        strictly inferior to upper bound,  got {lower}<{upper}"""
 
         self.low_bound = lower
         self.up_bound = upper
@@ -132,20 +166,44 @@ class IntVar(Variable):
         """
         return self.up_bound == self.lo_bounds
 
+    def subset(self, lower, upper):
+        assert isinstance(
+            upper, (int, np.integer)
+        ), f"""Upper bound must be an int, got {upper}"""
+        assert isinstance(
+            lower, (int, np.integer)
+        ), f"""Upper bound must be an int, got {lower}"""
+        assert (
+            lower >= self.low_bound
+        ), f"""
+        Subset lower bound must be higher than the initial lower bound,
+         got {lower}>{self.low_bound}
+        """
+
+        assert (
+            upper <= self.up_bound
+        ), f"""
+        Subset upper bound must be lower than the initial upper bound,
+         got {lower}<{upper}
+        """
+
+        if upper == lower:
+            return Constant(self.label, lower)
+        else:
+            return IntVar(self.label, lower, upper)
+
     def __repr__(self):
         return (
-                super(IntVar, self).__repr__()
-                + f"\
-        \t- Lower bound: {self.low_bound}\n\
-        \t- Upper bound: {self.up_bound}\n"
+            super(IntVar, self).__repr__()
+            + f"[{self.low_bound};{self.up_bound}])"
         )
 
 
 # Real
 class FloatVar(Variable):
-    """IntVar
+    """FloatVar
 
-    `IntVar` is a `Variable` discribing an Float variable.
+    `FloatVar` is a `Variable` discribing an Float variable.
 
     Parameters
     ----------
@@ -168,33 +226,42 @@ class FloatVar(Variable):
     >>> from zellij.core.variables import FloatVar
     >>> a = FloatVar("test", 0, 5.0)
     >>> print(a)
-    FloatVar:
-                - Label: test
-                - Lower bound: 0
-                - Upper bound: 5.0
+    FloatVar(test, [0;5.0])
     >>> a.random()
     2.2011985711663056
 
     """
 
-    def __init__(self, label, lower, upper, sampler=np.random.uniform):
-        super(FloatVar, self).__init__(label)
+    def __init__(
+        self,
+        label,
+        lower,
+        upper,
+        sampler=np.random.uniform,
+        tolerance=1e-14,
+        **kwargs,
+    ):
+        super(FloatVar, self).__init__(label, **kwargs)
 
-        assert isinstance(upper, float) or isinstance(upper, int), logger.error(
-            f"Upper bound must be an int or a float, got {upper}"
-        )
+        assert isinstance(
+            upper, (float, int, np.integer, np.floating)
+        ), f"""Upper bound must be an int or a float, got {upper}"""
 
-        assert isinstance(lower, int) or isinstance(lower, float), logger.error(
-            f"Upper bound must be an int or a float, got {lower}"
-        )
+        assert isinstance(
+            lower, (float, int, np.integer, np.floating)
+        ), f"""Lower bound must be an int or a float, got {lower}"""
 
-        assert lower < upper, logger.error(
-            f"Lower bound must be strictly inferior to upper bound, got {lower}<{upper}"
-        )
+        assert (
+            lower < upper
+        ), f"""Lower bound must be
+         strictly inferior to upper bound, got {lower}<{upper}"""
+
+        assert tolerance >= 0, f"""Tolerance must be > 0, got{tolerance}"""
 
         self.up_bound = upper
         self.low_bound = lower
         self.sampler = sampler
+        self.tolerance = tolerance
 
     def random(self, size=None):
         """random(size=None)
@@ -224,12 +291,51 @@ class FloatVar(Variable):
         """
         return self.up_bound == self.lo_bounds
 
+    def subset(self, lower, upper):
+        assert isinstance(
+            upper, (float, int, np.integer, np.floating)
+        ), f"""
+        Upper bound must be an int, got {upper}
+        """
+
+        assert isinstance(lower, int) or isinstance(
+            lower, (float, int, np.integer, np.floating)
+        ), f"""
+        Upper bound must be an int, got {lower}
+        """
+
+        assert (
+            lower - self.low_bound >= -self.tolerance
+            and lower - self.up_bound <= self.tolerance
+        ), f"""
+        Subset lower bound must be higher than the initial lower bound,
+        got {lower}>={self.low_bound}
+        """
+
+        assert (
+            upper - self.up_bound <= self.tolerance
+            and upper - self.low_bound >= -self.tolerance
+        ), f"""
+        Subset upper bound must be lower than the initial upper bound,
+        got {upper}<={self.up_bound}
+        """
+
+        if math.isclose(upper, lower, abs_tol=self.tolerance):
+            return Constant(self.label, float(lower))
+        else:
+            return FloatVar(
+                self.label,
+                lower,
+                upper,
+                sampler=self.sampler,
+                tolerance=self.tolerance,
+                **self.kwargs,
+            )
+
     def __repr__(self):
         return (
-                super(FloatVar, self).__repr__()
-                + f"\
-        \t- Lower bound: {self.low_bound}\n\
-        \t- Upper bound: {self.up_bound}\n"
+            super(FloatVar, self).__repr__()
+            + f"[{self.low_bound};{self.up_bound}])"
         )
 
 
@@ -259,36 +365,33 @@ class CatVar(Variable):
     >>> from zellij.core.variables import CatVar, IntVar
     >>> a = CatVar("test", ['a', 1, 2.56, IntVar("int", 100 , 200)])
     >>> print(a)
-    CatVar:
-                - Label: test
-                - Features: ['a', 1, 2.56,
-    IntVar:
-                - Label: int
-                - Lower bound: 100
-                - Upper bound: 200
-    ]
+    CatVar(test, ['a', 1, 2.56, IntVar(int, [100;200])])
     >>> a.random(10)
     ['a', 180, 2.56, 'a', 'a', 2.56, 185, 2.56, 105, 1]
 
     """
 
-    def __init__(self, label, features, weights=None):
-        super(CatVar, self).__init__(label)
+    def __init__(self, label, features, weights=None, **kwargs):
+        super(CatVar, self).__init__(label, **kwargs)
 
-        assert isinstance(features, list), logger.error(
-            f"Features must be a list with a length > 0, got{features}"
-        )
+        assert isinstance(
+            features, list
+        ), f"""
+        Features must be a list with a length > 0, got{features}
+        """
 
-        assert len(features) > 0, logger.error(
-            f"Features must be a list with a length > 0,\
-             got length= {len(features)}"
-        )
+        assert (
+            len(features) > 1
+        ), f"""
+        Features must be a list with a length > 1,
+        got length= {len(features)}
+        """
 
         self.features = features
 
-        assert isinstance(weights, list) or weights == None, logger.error(
-            f"`weights` must be a list or equal to None, got {weights}"
-        )
+        assert (
+            isinstance(weights, (list, np.ndarray)) or weights == None
+        ), f"""`weights` must be a list or equal to None, got {weights}"""
 
         if weights:
             self.weights = weights
@@ -338,12 +441,34 @@ class CatVar(Variable):
 
         return len(self.features) == 1
 
+    def subset(self, lower, upper):
+        assert (
+            upper in self.features
+        ), f"""
+        Upper bound is not in features of CatVar, got {upper}"""
+
+        assert (
+            lower in self.features
+        ), f"""
+        Lower bound is not in features of CatVar, got {lower}"""
+
+        if upper == lower:
+            return Constant(self.label, lower)
+        else:
+
+            lo_idx = self.features.index(lower)
+            up_idx = self.features.index(upper)
+
+            if lo_idx > up_idx:
+                return CatVar(
+                    self.label,
+                    self.features[lo_idx:] + self.features[: up_idx + 1],
+                )
+            else:
+                return CatVar(self.label, self.features[lo_idx : up_idx + 1])
+
     def __repr__(self):
-        return (
-                super(CatVar, self).__repr__()
-                + f"\
-        \t- Features: {self.features}\n"
-        )
+        return super(CatVar, self).__repr__() + f"{self.features})"
 
 
 # Array of variables
@@ -363,50 +488,34 @@ class ArrayVar(Variable):
     Examples
     --------
     >>> from zellij.core.variables import ArrayVar, IntVar, FloatVar, CatVar
-    >>> a = ArrayVar("test",
-    ...                     IntVar("int_1", 0,8),
-    ...                     IntVar("int_2", 4,45),
-    ...                     FloatVar("float_1", 2,12),
-    ...                     CatVar("cat_1", ["Hello", 87, 2.56]))
+    >>> a = ArrayVar(IntVar("int_1", 0,8),
+    ...              IntVar("int_2", 4,45),
+    ...              FloatVar("float_1", 2,12),
+    ...              CatVar("cat_1", ["Hello", 87, 2.56]))
     >>> print(a)
-    ArrayVar:
-                - Label: test
-                - Length: 4
-    =====
-    [
-
-    IntVar:
-                - Label: int_1
-                - Lower bound: 0
-                - Upper bound: 8
-
-    IntVar:
-                - Label: int_2
-                - Lower bound: 4
-                - Upper bound: 45
-
-    FloatVar:
-                - Label: float_1
-                - Lower bound: 2
-                - Upper bound: 12
-
-    CatVar:
-                - Label: cat_1
-                - Features: ['Hello', 87, 2.56]
-
-    ]
-    =====
+    ArrayVar(, [IntVar(int_1, [0;8]),
+                IntVar(int_2, [4;45]),
+                FloatVar(float_1, [2;12]),
+                CatVar(cat_1, ['Hello', 87, 2.56])])
     >>> a.random()
     [5, 15, 8.483221226216427, 'Hello']
     """
 
-    def __init__(self, label, *args):
-        super(ArrayVar, self).__init__(label)
+    def __init__(self, *args, label="", **kwargs):
 
-        assert all(isinstance(v, Variable) for v in args), logger.error(
-            f"All elements must inherit from `Variable`, got {args}"
-        )
+        assert all(
+            isinstance(v, Variable) for v in args
+        ), f"""
+        All elements must inherit from `Variable`,
+        got {args}
+        """
+
         self.values = args
+
+        for idx, v in enumerate(self.values):
+            setattr(v, "_idx", idx)
+
+        super(ArrayVar, self).__init__(label, **kwargs)
 
     def random(self, size=1):
         """random(size=1)
@@ -445,6 +554,30 @@ class ArrayVar(Variable):
         """
         return all(v.isconstant for v in self.values)
 
+    def subset(self, lower, upper):
+        assert isinstance(lower, (list, np.ndarray)) and (
+            len(lower) == len(self)
+        ), f"""
+            Lower bound must be a list containing lower bound of each
+            `Variable` composing `ArrayVar`, got {lower}
+            """
+
+        assert isinstance(upper, (list, np.ndarray)) and (
+            len(upper) == len(self)
+        ), f"""
+        Upper bound must be a list containing lower bound of each
+        `Variable` composing `ArrayVar`, got {upper}
+        """
+
+        new_values = []
+        for v, l, u in zip(self.values, lower, upper):
+            new_values.append(v.subset(l, u))
+
+        return ArrayVar(*new_values, label=self.label, **self.kwargs)
+
+    def index(self, value):
+        return value._idx
+
     def __iter__(self):
         self.index = 0
         return self
@@ -458,21 +591,18 @@ class ArrayVar(Variable):
         self.index += 1
         return res
 
+    def __getitem__(self, item):
+        return self.values[item]
+
     def __len__(self):
         return len(self.values)
 
     def __repr__(self):
         values_reprs = ""
         for v in self.values:
-            values_reprs += v.__repr__()
+            values_reprs += v.__repr__() + ","
 
-        return (
-                super(ArrayVar, self).__repr__()
-                + f"\
-        \t- Length: {len(self)}\n=====\n[\n"
-                + values_reprs
-                + "\n]\n=====\n"
-        )
+        return super(ArrayVar, self).__repr__() + f"[{values_reprs[:-1]}])"
 
 
 # Block of variable, fixed size
@@ -499,32 +629,9 @@ class Block(Variable):
     ...                     FloatVar("float_1", 2,12))
     >>> a = Block("size 3 Block", content, 3)
     >>> print(a)
-    Block:
-                - Label: size 3 Block
-         Block of:
-    ArrayVar:
-                - Label: test
-                - Length: 3
-    =====
-    [
-
-    IntVar:
-                - Label: int_1
-                - Lower bound: 0
-                - Upper bound: 8
-
-    IntVar:
-                - Label: int_2
-                - Lower bound: 4
-                - Upper bound: 45
-
-    FloatVar:
-                - Label: float_1
-                - Lower bound: 2
-                - Upper bound: 12
-
-    ]
-    =====
+    Block(size 3 Block, [IntVar(int_1, [0;8]),
+                         IntVar(int_2, [4;45]),
+                         FloatVar(float_1, [2;12]),])
     >>> a.random(3)
     [[[7, 22, 6.843164591359903],
         [5, 18, 10.608957810018786],
@@ -538,17 +645,23 @@ class Block(Variable):
 
     """
 
-    def __init__(self, label, value, repeat):
-        super(Block, self).__init__(label)
+    def __init__(self, label, value, repeat, **kwargs):
+        super(Block, self).__init__(label, **kwargs)
 
-        assert isinstance(value, Variable), logger.error(
-            f"Value must inherit from `Variable`, got {args}"
-        )
+        assert isinstance(
+            value, Variable
+        ), f"""
+        Value must inherit from `Variable`, got {args}
+        """
+
         self.value = value
 
-        assert isinstance(repeat, int) and repeat > 0, logger.error(
-            f"`repeat` must be a strictly positive int, got {repeat}."
-        )
+        assert (
+            isinstance(repeat, int) and repeat > 0
+        ), f"""
+        `repeat` must be a strictly positive int, got {repeat}.
+        """
+
         self.repeat = repeat
 
     def random(self, size=1):
@@ -594,15 +707,18 @@ class Block(Variable):
 
         return self.value.isconstant()
 
+    def subset(self, lower, upper):
+
+        new_values = v.subset(l, u)
+
+        return Block(self.label, new_values)
+
     def __repr__(self):
         values_reprs = ""
         for v in self.value:
-            values_reprs += v.__repr__()
+            values_reprs += v.__repr__() + ","
 
-        return (
-                super(Block, self).__repr__()
-                + f"\t Block of:{self.value.__repr__()}\n"
-        )
+        return super(Block, self).__repr__() + f"[{values_reprs}])"
 
 
 # Block of variables, with random size.
@@ -623,38 +739,14 @@ class DynamicBlock(Block):
     Examples
     --------
     >>> from zellij.core.variables import DynamicBlock, ArrayVar, FloatVar, IntVar
-    >>> content = ArrayVar("test",
-    ...                     IntVar("int_1", 0,8),
-    ...                     IntVar("int_2", 4,45),
-    ...                     FloatVar("float_1", 2,12))
+    >>> content = ArrayVar(IntVar("int_1", 0,8),
+    ...                    IntVar("int_2", 4,45),
+    ...                    FloatVar("float_1", 2,12))
     >>> a = DynamicBlock("max size 10 Block", content, 10)
     >>> print(a)
-    DynamicBlock:
-                - Label: max size 10 Block
-         Block of:
-    ArrayVar:
-                - Label: test
-                - Length: 3
-    =====
-    [
-
-    IntVar:
-                - Label: int_1
-                - Lower bound: 0
-                - Upper bound: 8
-
-    IntVar:
-                - Label: int_2
-                - Lower bound: 4
-                - Upper bound: 45
-
-    FloatVar:
-                - Label: float_1
-                - Lower bound: 2
-                - Upper bound: 12
-
-    ]
-    =====
+    DynamicBlock(max size 10 Block, [IntVar(int_1, [0;8]),
+                                     IntVar(int_2, [4;45]),
+                                     FloatVar(float_1, [2;12]),])
     >>> a.random()
     [[[3, 12, 10.662362255103403],
           [7, 9, 5.496860842510198],
@@ -665,8 +757,8 @@ class DynamicBlock(Block):
 
     """
 
-    def __init__(self, label, value, repeat):
-        super(DynamicBlock, self).__init__(label, value, repeat)
+    def __init__(self, label, value, repeat, **kwargs):
+        super(DynamicBlock, self).__init__(label, value, repeat, **kwargs)
 
     def random(self, size=1):
         """random(size=1)
@@ -712,6 +804,79 @@ class DynamicBlock(Block):
 
         """
         return False
+
+
+# Constant
+class Constant(Variable):
+    """Constant
+
+    `Constant` is a `Variable` discribing a constant of any type.
+
+    Parameters
+    ----------
+    label : str
+        Name of the variable.
+    value : object
+        Constant value
+
+    Attributes
+    ----------
+    label : str
+        Name of the variable.
+    value : object
+        Constant value
+
+    Examples
+    --------
+    >>> from zellij.core.variables import Constant
+    >>> a = Constant("test", 5)
+    >>> print(a)
+    Constant(test, 5)
+    >>> a.random()
+    5
+
+    """
+
+    def __init__(self, label, value, **kwargs):
+        super(Constant, self).__init__(label, **kwargs)
+
+        self.value = value
+
+    def random(self, size=1):
+        """random(size=None)
+
+        Parameters
+        ----------
+        size : int, default=None
+            Number of draws.
+
+        Returns
+        -------
+        out: int or list[int]
+            Return an int if `size`=1, a list[int] else.
+
+        """
+        if size > 1:
+            return [self.value] * size
+        else:
+            return self.value
+
+    def isconstant(self):
+        """isconstant()
+
+        Returns
+        -------
+        out: boolean
+            Return True
+
+        """
+        return True
+
+    def subset(self, l, u):
+        return self
+
+    def __repr__(self):
+        return super(Constant, self).__repr__() + f"{self.value})"
 
 
 class ChoiceVariable(ArrayVar):

@@ -1,85 +1,368 @@
-from zellij.core.addons import Converter
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-06T12:07:38+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-13T15:58:44+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
+from zellij.core.addons import VarConverter, Converter
 import numpy as np
 import logging
 
 logger = logging.getLogger("zellij.neighborhoods")
+logger.setLevel(logging.INFO)
+
+####################################
+# DO NOTHING
+####################################
 
 
-class ArrayConverter(Converter):
+class DoNothing(VarConverter):
     def convert(self, value):
-        pass
+        return value
 
     def reverse(self, value):
-        pass
+        return value
 
 
-class BlockConverter(Converter):
+class ArrayNothing(DoNothing):
+    pass
+
+
+class BlockNothing(DoNothing):
+    pass
+
+
+class DynamicBlockNothing(DoNothing):
+    pass
+
+
+class FloatNothing(DoNothing):
+    pass
+
+
+class IntNothing(DoNothing):
+    pass
+
+
+class CatNothing(DoNothing):
+    pass
+
+
+####################################
+# TO CONTINUOUS
+####################################
+
+
+class ArrayMinmax(VarConverter):
+    def __init__(self, variable=None):
+        super(ArrayMinmax, self).__init__(variable)
+        if variable:
+            assert all(
+                hasattr(v, "to_continuous") for v in self.target.values
+            ), logger.error(
+                f"To use `ArrayMinmax`, values in `ArrayVar` must have a `to_continuous` method. Use `to_continuous` kwarg when defining a variable"
+            )
+
     def convert(self, value):
-        pass
+        res = []
+
+        for variable, v in zip(self.target.values, value):
+            res.append(variable.to_continuous.convert(v))
+
+        return res
 
     def reverse(self, value):
-        pass
+        res = []
+
+        for variable, v in zip(self.target.values, value):
+            res.append(variable.to_continuous.reverse(v))
+
+        return res
 
 
-class DBlockConverter(Converter):
+class BlockMinmax(VarConverter):
+    def __init__(self, variable=None):
+        super(BlockMinmax, self).__init__(variable)
+
+        assert hasattr(self.target.value, "to_continuous"), logger.error(
+            f"To use `BlockMinmax`, value in `Block` must have a `to_continuous` method. Use `to_continuous` kwarg when defining a variable"
+        )
+
     def convert(self, value):
-        pass
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be equal to `Block` length,\
+             got {len(value)}(value)=={self.target.repeat}(Block)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.target.value.to_continuous.convert(v))
+
+        return res
 
     def reverse(self, value):
-        pass
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be equal to `Block` length,\
+             got {len(value)}(value)=={self.target.repeat}(Block)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.target.value.to_continuous.reverse(v))
+
+        return res
 
 
-class FloatMinmax(Converter):
+class DynamicBlockMinmax(VarConverter):
+    def __init__(self, variable=None):
+        super(DynamicBlockMinmax, self).__init__(variable)
+
+        assert hasattr(self.target.value, "to_continuous"), logger.error(
+            f"To use `DynamicBlockMinmax`, value in `DynamicBlock` must have a `to_continuous` method. Use `to_continuous` kwarg when defining a variable"
+        )
+
     def convert(self, value):
-        pass
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be inferior or equal to `DynamicBlock`\
+            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.target.value.to_continuous.convert(v))
+
+        return res
 
     def reverse(self, value):
-        pass
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be inferior or equal to `DynamicBlock`\
+            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.target.value.to_continuous.reverse(v))
+
+        return res
 
 
-class IntMinmax(Converter):
+class FloatMinmax(VarConverter):
     def convert(self, value):
-        pass
+        return (value - self.target.low_bound) / (
+            self.target.up_bound - self.target.low_bound
+        )
 
     def reverse(self, value):
-        pass
+        return (
+            value * (self.target.up_bound - self.target.low_bound)
+            + self.target.low_bound
+        )
 
 
-class CatMinmax(Converter):
+class IntMinmax(VarConverter):
     def convert(self, value):
-        pass
+        return (value - self.target.low_bound) / (
+            self.target.up_bound - self.target.low_bound
+        )
 
     def reverse(self, value):
-        pass
+        return int(
+            value * (self.target.up_bound - self.target.low_bound)
+            + self.target.low_bound
+        )
 
 
-class FloatBinning(Converter):
+class CatMinmax(VarConverter):
     def convert(self, value):
-        pass
+
+        return self.target.features.index(value) / len(self.target.features)
 
     def reverse(self, value):
-        pass
+        return self.target.features[int(value * len(self.target.features))]
 
 
-class IntBinning(Converter):
+class ConstantMinmax(VarConverter):
     def convert(self, value):
-        pass
+        return 1.0
 
     def reverse(self, value):
-        pass
+        return self.target.value
 
 
-class CatBinning(Converter):
-    def convert(self, value):
-        pass
-
-    def reverse(self, value):
-        pass
+####################################
+# TO DISCRETE
+####################################
 
 
-class Minmax(Converter):
-    def __init__(self, search_space):
-        super(Minmax, self).__init__(search_space)
+class ArrayBinning(VarConverter):
+    def __init__(self, variable=None):
+        super(ArrayBinning, self).__init__(variable)
+
+        assert all(
+            hasattr(v, "to_discrete") for v in self.target.values
+        ), logger.error(
+            f"To use `ArrayBinning`, values in `ArrayVar` must have a `to_discrete` method. Use `to_discrete` kwarg when defining a variable"
+        )
+
+    def convert(self, value, K):
+
+        if isinstance(K, list):
+            assert len(K) == len(value), logger.error(
+                f"length of `K`(number of bins) must be equal to\
+                `ArrayVar` length, got {K}=={len(value)}"
+            )
+        else:
+            K = [K] * len(value)
+
+        res = []
+
+        for variable, v, k in zip(self.target.values, value, K):
+            res.append(variable.to_discrete.convert(v, k))
+
+        return res
+
+    def reverse(self, value, K):
+        res = []
+
+        if isinstance(K, list):
+            assert len(K) == len(value), logger.error(
+                f"length of `K`(number of bins) must be equal to\
+                `ArrayVar` length, got {K}=={len(value)}"
+            )
+        else:
+            K = [K] * len(value)
+
+        for variable, v, k in zip(self.target.values, value, K):
+            res.append(variable.to_discrete.reverse(v, k))
+
+        return res
+
+
+class BlockBinning(VarConverter):
+    def __init__(self, variable=None):
+        super(BlockBinning, self).__init__(variable)
+
+        assert hasattr(self.target.value, "to_discrete"), logger.error(
+            f"To use `BlockBinning`, value in `Block` must have a `to_discrete` method. Use `to_discrete` kwarg when defining a variable"
+        )
+
+    def convert(self, value, K):
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be equal to `Block` length,\
+             got {len(value)}(value)=={self.target.repeat}(Block)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.target.value.to_discrete.convert(v, K))
+
+        return res
+
+    def reverse(self, value, K):
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be equal to `Block` length,\
+             got {len(value)}(value)=={self.target.repeat}(Block)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.target.value.to_discrete.reverse(v, K))
+
+        return res
+
+
+class DynamicBlockBinning(VarConverter):
+    def __init__(self, variable=None):
+        super(DynamicBlockBinning, self).__init__(variable)
+
+        assert hasattr(self.target.value, "to_discrete"), logger.error(
+            f"To use `DynamicBlockBinning`, value in `DynamicBlock` must have a `to_discrete` method. Use `to_discrete` kwarg when defining a variable"
+        )
+
+    def convert(self, value, K):
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be inferior or equal to `DynamicBlock`\
+            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.target.value.to_discrete.convert(v, K))
+
+        return res
+
+    def reverse(self, value, K):
+
+        assert len(value) == self.target.repeat, logger.error(
+            f"Length of value must be inferior or equal to `DynamicBlock`\
+            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
+        )
+
+        res = []
+        for v in value:
+            res.append(self.value.target.to_discrete.reverse(v, K))
+
+        return res
+
+
+class FloatBinning(VarConverter):
+    def convert(self, value, K):
+        bins = np.linspace(self.target.low_bound, self.target.up_bound, K)
+        return np.digitize(value, bins)
+
+    def reverse(self, value, K):
+        bins = np.linspace(self.target.low_bound, self.target.up_bound, K)
+
+        return bins[value]
+
+
+class IntBinning(VarConverter):
+    def convert(self, value, K):
+        return value
+
+    def reverse(self, value, K):
+        return value
+
+
+class CatBinning(VarConverter):
+    def convert(self, value, K):
+        return self.target.features.index(value)
+
+    def reverse(self, value, K):
+        return self.target.features[value]
+
+
+class ConstantBinning(VarConverter):
+    def convert(self, value, K):
+        return 1
+
+    def reverse(self, value, K):
+        return self.target.value
+
+
+####################################
+# SEARCH SPACE CONVERTER
+####################################
+
+
+class Continuous(Converter):
+    def __init__(self, search_space=None):
+        super(Continuous, self).__init__(search_space)
+        if search_space:
+            assert hasattr(self.target.values, "to_continuous"), logger.error(
+                f"To use `Intervals`, values in Searchspace must have a `to_continuous` method. Use `neighbor` kwarg when defining a variable"
+            )
 
     # Convert a point to continuous
     def convert(self, points, sub_values=False):
@@ -105,42 +388,24 @@ class Minmax(Converter):
         """
 
         # Use bounds from the original space if this object is a subspace.
-        if sub_values and self.search_space.sub_values != None:
-            val = self.search_space.sub_values
+        if sub_values and self.target._god.values != None:
+            val = self.target._god.values
 
         # Use initial bounds to convert
         else:
-            val = self.search_space.values
+            val = self.target.values
 
         res = []
 
         # Mixed to continuous
-        for point in points:
-            converted = []
-            for att in range(self.search_space.n_variables):
+        if isinstance(points[0], (list, np.ndarray)):
+            res = []
+            for point in points:
+                res.append(val.to_continuous.convert(point))
 
-                if (
-                    self.search_space.types[att] == "R"
-                    or self.search_space.types[att] == "D"
-                ):
-
-                    converted.append(
-                        (point[att] - val[att][0]) / (val[att][1] - val[att][0])
-                    )
-
-                elif self.search_space.types[att] == "C":
-
-                    idx = self.search_space.values[att].index(point[att])
-                    n_values = len(val[att])
-
-                    converted.append(idx / n_values)
-
-                elif self.search_space.types[att] == "K":
-                    converted.append(1)
-
-            res.append(converted[:])
-
-        return res
+            return res
+        else:
+            return val.to_continuous.convert(points)
 
     # Convert a continuous point to a mixed point
     def reverse(self, points, sub_values=False):
@@ -166,98 +431,41 @@ class Minmax(Converter):
         """
 
         # Use bounds from the original space if this object is a subspace.
-        if sub_values and self.search_space.sub_values != None:
-            val = self.search_space.sub_values
+        if sub_values and self.target._god.values != None:
+            val = self.target._god.values
 
         # Use initial bounds to convert
         else:
-            val = self.search_space.values
+            val = self.target.values
 
-        res = []
+        # Mixed to continuous
+        if isinstance(points[0], (list, np.ndarray)):
+            res = []
+            for point in points:
+                res.append(val.to_continuous.reverse(point))
 
-        # Continuous to mixed
-        for point in points:
-            converted = []
-            for att in range(self.search_space.n_variables):
-
-                if self.search_space.types[att] == "R":
-
-                    converted.append(
-                        point[att] * (val[att][1] - val[att][0]) + val[att][0]
-                    )
-
-                elif self.search_space.types[att] == "D":
-
-                    converted.append(
-                        int(
-                            point[att] * (val[att][1] - val[att][0])
-                            + val[att][0]
-                        )
-                    )
-
-                elif self.search_space.types[att] == "C":
-
-                    n_values = len(val[att])
-                    converted.append(val[att][int(point[att] * n_values)])
-
-                elif self.search_space.types[att] == "K":
-                    converted.append(self.search_space.values[att])
-
-            res.append(converted[:])
-
-        return res
+            return res
+        else:
+            return val.to_continuous.reverse(points)
 
 
-class Binning(Converter):
+class Discrete(Converter):
     def __init__(self, search_space, K):
-        super(Binning, self).__init__(search_space)
+        super(Discrete, self).__init__(search_space)
+        assert hasattr(self.target.values, "to_continuous"), logger.error(
+            f"To use `Intervals`, values in Searchspace must have a `to_discrete` method. Use `neighbor` kwarg when defining a variable"
+        )
 
         # if a list is given
         if isinstance(K, list):
-            assert len(K) > 0, logger.error(
-                "K must be a list of length > 0, a float or an int,\
-                float: type='R', int: type='D', -1: type='C' or 'K'"
+            assert len(K) == len(search_space.size), logger.error(
+                f"length of `K`(number of bins) must be equal to\
+                `ArrayVar` length, got {K}=={search_space.size}"
             )
 
-            for n, t in zip(K, self.search_space.types):
-                if t == "R":
-                    assert isinstance(n, int) and n > 0, logger.error(
-                        f"For type 'R', K must be an int > 0, got {n}"
-                    )
-
-                elif t == "D":
-                    assert isinstance(n, int) and (
-                        n > 0 or n == -1
-                    ), logger.error(
-                        f"For type 'D', K must be an int > 0 or =-1, got {n}"
-                    )
-
-                else:
-                    assert n == -1, logger.error(
-                        f"For type 'C' or 'K', K must be equal to -1, got {n}"
-                    )
-
+            self.K = K
         else:
-            assert isinstance(K, int) or isinstance(K, float), logger.error(
-                "K must be a list of length > 0, a float or an int,\
-                float: type='R', int: type='D', -1: type='C' or 'K'"
-            )
-            K = [K] * self.search_space.n_variables
-
-            # Update K, -1 for type !="R"
-            for t, idx in enumerate(self.search_space.types):
-                if t == "D" or t == "C" or t == "K":
-                    K[idx] = -1
-
-        self.K = K
-
-        # Compute all bins
-        self.bins = [None] * self.search_space.n_variables
-        for v, k, idx in zip(
-            self.search_space.values, K, range(self.search_space.n_variables)
-        ):
-            if k != -1:
-                self.bins[idx] = np.linspace(v[0], v[1], k)
+            self.K = [K] * search_space.size
 
     # Convert a point to continuous
     def convert(self, points, sub_values=False):
@@ -283,8 +491,8 @@ class Binning(Converter):
         """
 
         # Use bounds from the original space if this object is a subspace.
-        if sub_values and self.search_space.sub_values != None:
-            val = self.search_space.sub_values
+        if sub_values and self.search_space._god.values != None:
+            val = self.search_space._god.values
 
         # Use initial bounds to convert
         else:
@@ -294,16 +502,7 @@ class Binning(Converter):
 
         # Mixed to discrete
         for point in points:
-            converted = []
-            for bin, idx in enumerate(self.bins):
-
-                if bin:
-                    converted.append(np.digitize(point[idx], bin))
-
-                elif self.search_space.types[idx] == "K":
-                    converted.append(point[idx])
-
-            res.append(converted[:])
+            res.append(val.to_discrete.convert(point, self.K))
 
         return res
 
@@ -331,8 +530,8 @@ class Binning(Converter):
         """
 
         # Use bounds from the original space if this object is a subspace.
-        if sub_values and self.search_space.sub_values != None:
-            val = self.search_space.sub_values
+        if sub_values and self.search_space._god.values != None:
+            val = self.search_space._god.values
 
         # Use initial bounds to convert
         else:
@@ -340,34 +539,8 @@ class Binning(Converter):
 
         res = []
 
-        # Continuous to mixed
+        # Mixed to discrete
         for point in points:
-            converted = []
-            for att in range(self.search_space.n_variables):
-
-                if self.search_space.types[att] == "R":
-
-                    converted.append(
-                        point[att] * (val[att][1] - val[att][0]) + val[att][0]
-                    )
-
-                elif self.search_space.types[att] == "D":
-
-                    converted.append(
-                        int(
-                            point[att] * (val[att][1] - val[att][0])
-                            + val[att][0]
-                        )
-                    )
-
-                elif self.search_space.types[att] == "C":
-
-                    n_values = len(val[att])
-                    converted.append(val[att][int(point[att] * n_values)])
-
-                elif self.search_space.types[att] == "K":
-                    converted.append(self.search_space.values[att])
-
-            res.append(converted[:])
+            res.append(val.to_discrete.reverse(point, self.K))
 
         return res

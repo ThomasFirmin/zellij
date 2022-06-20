@@ -2,13 +2,14 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:45:06+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-09T15:06:43+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 from zellij.core.metaheuristic import Metaheuristic
+from zellij.core.addons import Mutator, Selector, Crossover
 from deap import base
 from deap import creator
 from deap import tools
@@ -20,12 +21,11 @@ import seaborn as sns
 
 import logging
 
-from zellij.strategies.utils.ga_utils.mutation import fixed_mutation
-
 logger = logging.getLogger("zellij.GA")
 
 
 class Genetic_algorithm(Metaheuristic):
+
     """Genetic_algorithm
 
     Genetic_algorithm (GA) implements a steady state genetic algorithm. It can be used for exploration and exploitation.
@@ -59,24 +59,6 @@ class Genetic_algorithm(Metaheuristic):
     generation : int
         Generation number of the GA.
 
-    mutation :
-        Mutation function
-
-    mutation_kwargs :
-        Arguments for the mutation function
-
-    crossover :
-        Crossover function
-
-    crossover_kwargs :
-        Arguments for the crossover function
-
-    selection :
-        Selection function
-
-    selection_kwargs :
-        Arguments for the selection function
-
     elitism : float, default=0.5
         Percentage of the best parents to keep in the next population by replacing the worst children.
         Default 50%.
@@ -94,33 +76,28 @@ class Genetic_algorithm(Metaheuristic):
     Examples
     --------
     >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import Mixed
+    >>> from zellij.core.search_space import ContinuousSearchspace
+    >>> from zellij.core.variables import FloatVar, ArrayVar
+    >>> from zellij.utils.neighborhoods import FloatInterval, ArrayInterval, Intervals
     >>> from zellij.strategies.genetic_algorithm import Genetic_algorithm
-    >>> import numpy as np
-    >>> labels = ["a", "b", "c"]
-    >>> types = ["R", "R", "R"]
-    >>> values = [[-5, 5], [-5, 5], [-5, 5]]
-
-    >>> class ContinueNeighborhood(Mixed):
-    >>>     def __init__(self, labels, types, values):
-    >>>         super(ContinueNeighborhood, self).__init__(labels, types, values)
-    >>>     def get_neighbor(self, point, attribute, neighborhood=0.1):
-    >>>         index = self.labels.index(attribute)
-    >>>         label_neighbor = np.random.uniform(
-    >>>             np.max([point[index] - neighborhood, self.values[index][0]]),
-    >>>             np.min([point[index] + neighborhood, self.values[index][1]]))
-    >>>         return label_neighbor
-
-    >>> sp = ContinueNeighborhood(labels, types, values)
-
-    >>> @Loss(save=False, verbose=True)
-    >>> def himmelblau(x):
-    >>>     x_ar = np.array(x)
-    >>>     return np.sum(x_ar ** 4 - 16 * x_ar ** 2 + 5 * x_ar) * (1 / len(x_ar))
-
-    >>> ga = Genetic_algorithm(himmelblau, sp, 1000, pop_size=25, generation=40, elitism=0.5)
+    >>> from zellij.utils.operators import NeighborMutation, DeapTournament, DeapOnePoint
+    >>> from zellij.utils.benchmark import himmelblau
+    ...
+    >>> lf = Loss()(himmelblau)
+    >>> sp = ContinuousSearchspace(ArrayVar(
+    ...                           FloatVar("a",-5,5, neighbor=FloatInterval(0.5)),
+    ...                           FloatVar("b",-5,5,neighbor=FloatInterval(0.5)),
+    ...                           neighbor=ArrayInterval())
+    ...                         ,lf, neighbor=Intervals(),
+    ...                         mutation = NeighborMutation(0.5),
+    ...                         selection = DeapTournament(3),
+    ...                         crossover = DeapOnePoint())
+    ...
+    >>> ga = Genetic_algorithm(sp, 1000, pop_size=25, generation=40,elitism=0.5)
     >>> ga.run()
     >>> ga.show()
+
+
     .. image:: ../_static/ga_sp_ex.png
         :width: 924px
         :align: center
@@ -139,49 +116,24 @@ class Genetic_algorithm(Metaheuristic):
     """
 
     def __init__(
-            self,
-            loss_func,
-            search_space,
-            f_calls,
-            mutation=None,
-            mutation_kwargs=None,
-            crossover=None,
-            crossover_kwargs=None,
-            selection=None,
-            selection_kwargs=None,
-            pop_size=10,
-            generation=1000,
-            elitism=0.5,
-            filename="",
-            verbose=True,
+        self,
+        search_space,
+        f_calls,
+        pop_size=10,
+        generation=1000,
+        elitism=0.5,
+        filename="",
+        verbose=True,
     ):
 
-        """__init__(loss_func, search_space, mutation, crossover, f_calls, pop_size = 10, generation = 1000, verbose=True)
+        """__init__(search_space, f_calls, pop_size = 10, generation = 1000, verbose=True)
 
         Initialize Genetic_algorithm class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
-
         search_space : Searchspace
             Search space object containing bounds of the search space.
-
-        mutation :
-            Mutation function
-            If None, use the default fixed_mutation operator
-            kwargs: arguments not by default (ie: others than individual, sp)
-
-        crossover :
-            Crossover function
-            If None, use the default fixed_crossover operator
-            kwargs: arguments not by default (ie: others than individual)
-
-        selection :
-            Selection function
-            If None, use the default tournament operator
-            kwargs: arguments not by default (ie: others than individual)
 
         f_calls : int
             Maximum number of loss_func calls
@@ -205,29 +157,31 @@ class Genetic_algorithm(Metaheuristic):
 
         """
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        super().__init__(search_space, f_calls, verbose)
+        assert hasattr(search_space, "mutation") and isinstance(
+            search_space.mutation, Mutator
+        ), f"""When using :ref:`ga`, :ref:`sp` must have a `mutation` operator
+        and of type: Mutator, use `mutation` kwarg when defining the :ref:`sp`
+        ex:\n
+        >>> ContinuousSearchspace(values, loss, mutation=...)"""
+
+        assert hasattr(search_space, "selection") and isinstance(
+            search_space.selection, Selector
+        ), f"""When using :ref:`ga`, :ref:`sp` must have a `selection` operator
+        and of type: Selector, use `mutation` kwarg when defining the :ref:`sp`
+        ex:\n
+        >>> ContinuousSearchspace(values, loss, selection=...)"""
+
+        assert hasattr(search_space, "crossover") and isinstance(
+            search_space.crossover, Crossover
+        ), f"""When using :ref:`ga`, :ref:`sp` must have a `mutation` operator
+        and of type: Selector, use `crossover` kwarg when defining the :ref:`sp`
+        ex:\n
+        >>> ContinuousSearchspace(values, loss, crossover=...)"""
 
         self.pop_size = pop_size
         self.generation = generation
         self.elitism = elitism
-
-        if mutation is None:
-            mutation = fixed_mutation
-            mutation_kwargs = {"proba": 1 / self.search_space.n_variables}
-        self.mutation_operator = mutation
-        self.mutation_kwargs = mutation_kwargs
-
-        if crossover is None:
-            crossover = tools.cxOnePoint
-            crossover_kwargs = {}
-        self.crossover_operator = crossover
-        self.crossover_kwargs = crossover_kwargs
-
-        if selection is None:
-            selection = tools.selTournament
-            selection_kwargs = {'tournsize': 3}
-        self.selection_operator = selection
-        self.selection_kwargs = selection_kwargs
 
         self.pop_historic = []
         self.fitness_historic = []
@@ -237,14 +191,14 @@ class Genetic_algorithm(Metaheuristic):
         self.ga_save = ""
 
     # Define what an individual is
-    def define_individual(self):
+    def define_individual(self, sp):
         """define_individual(self)
 
         Describe how an individual should be initialized. Here a random point from SearchSpace is sampled.
 
         """
         # Select one random point from the search space
-        solution = self.search_space.random_point()[0]
+        solution = sp.random_point()
 
         return solution
 
@@ -268,13 +222,11 @@ class Genetic_algorithm(Metaheuristic):
             filename,
             sep=",",
             decimal=".",
-            usecols=self.search_space.n_variables,
+            usecols=self.search_space.size,
         )
         contents = data.tail(pop_size)
 
         return pcls(ind_init(c) for index, c in contents.iterrows())
-
-    # Mutate operator
 
     # Run GA
     def run(self, H=None, n_process=1):
@@ -304,7 +256,7 @@ class Genetic_algorithm(Metaheuristic):
         # Progress bar
         self.build_bar(self.generation)
 
-        self.loss_func.file_created = False
+        self.search_space.loss.file_created = False
 
         logger.info("Starting")
 
@@ -338,8 +290,13 @@ class Genetic_algorithm(Metaheuristic):
 
         # Start from a random population
         else:
-            # Determine what is an individual
-            toolbox.register("hyperparameters", self.define_individual)
+            if H:
+                sp = H
+            else:
+                sp = self.search_space
+
+            # Determine what an individual is
+            toolbox.register("hyperparameters", self.define_individual, sp)
 
             # Determine the way to build individuals for the population
             toolbox.register(
@@ -360,12 +317,10 @@ class Genetic_algorithm(Metaheuristic):
             # Build the population
             pop = toolbox.population(n=self.pop_size)
 
-        # Create crossover tool
-        toolbox.register("mate", self.crossover_operator, **self.crossover_kwargs)
-        # Create mutation tool
-        toolbox.register("mutate", self.mutation_operator, search_space=self.search_space, **self.mutation_kwargs)
-        # Create selection tool
-        toolbox.register("select", self.selection_operator, **self.selection_kwargs)
+        # Create operators
+        self.search_space.mutation._build(toolbox)
+        self.search_space.selection._build(toolbox)
+        self.search_space.crossover._build(toolbox)
 
         # Create a tool to select best individuals from a population
         bpn = int(self.pop_size * self.elitism)
@@ -384,11 +339,10 @@ class Genetic_algorithm(Metaheuristic):
 
         # Progress bar
         self.pending_pb(len(solutions))
-
-        fitnesses = self.loss_func(solutions, generation=0)
+        fitnesses = self.search_space.loss(solutions, generation=0)
 
         self.update_main_pb(
-            len(solutions), explor=True, best=self.loss_func.new_best
+            len(solutions), explor=True, best=self.search_space.loss.new_best
         )
 
         # Map computed fitness to individual fitness value
@@ -398,9 +352,9 @@ class Genetic_algorithm(Metaheuristic):
         fits = [ind.fitness.values[0] for ind in pop]
 
         # Save file
-        if self.loss_func.save:
+        if self.search_space.loss.save:
             self.ga_save = os.path.join(
-                self.loss_func.outputs_path, "ga_population.csv"
+                self.search_space.loss.outputs_path, "ga_population.csv"
             )
             with open(self.ga_save, "a") as f:
                 f.write(
@@ -422,7 +376,9 @@ class Genetic_algorithm(Metaheuristic):
 
         logger.info("Evolution starting...")
         g = 0
-        while g < self.generation and self.loss_func.calls < self.f_calls:
+        while (
+            g < self.generation and self.search_space.loss.calls < self.f_calls
+        ):
             g += 1
 
             # Progress bar
@@ -431,30 +387,27 @@ class Genetic_algorithm(Metaheuristic):
             # Update all of fame
             best_of_all.update(pop)
 
-            if self.verbose:
-                logger.debug("Generation: " + str(g))
+            logger.debug("Generation: " + str(g))
 
-                # Selection operator
-                logger.debug("Selection...")
+            # Selection operator
+            logger.debug("Selection...")
 
-            offspring = toolbox.select(pop, k=len(pop))
-
-            offspring = list(map(toolbox.clone, offspring))
+            offspring = self.search_space.selection(pop, k=len(pop))
 
             children = []
 
             # Crossover operator
-            if self.verbose:
-                logger.debug("Crossover...")
+            logger.debug("Crossover...")
 
             i = 0
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
+
                 # Clone individuals from crossover
                 children1 = toolbox.clone(child1)
                 children2 = toolbox.clone(child2)
 
                 # Apply crossover
-                toolbox.mate(children1[0], children2[0])
+                self.search_space.crossover(children1[0], children2[0])
                 # Delete children fitness inherited from the parents
                 del children1.fitness.values
                 del children2.fitness.values
@@ -464,13 +417,12 @@ class Genetic_algorithm(Metaheuristic):
                 children.append(children2)
 
             # Mutate children
-            if self.verbose:
-                logger.debug("Mutation...")
-            for mutant in children:
-                toolbox.mutate(mutant)
+            logger.debug("Mutation...")
 
-            if self.verbose:
-                logger.debug("Evaluating population n°" + str(g))
+            for mutant in children:
+                toolbox.mutate(mutant[0])
+
+            logger.debug("Evaluating population n°" + str(g))
 
             # Compute dynamically fitnesses
             solutions = []
@@ -479,11 +431,13 @@ class Genetic_algorithm(Metaheuristic):
             # progress bar
             self.pending_pb(len(solutions))
 
-            fitnesses = self.loss_func(solutions, generation=g)
+            fitnesses = self.search_space.loss(solutions, generation=g)
 
             # Progress bar
             self.update_main_pb(
-                len(solutions), explor=True, best=self.loss_func.new_best
+                len(solutions),
+                explor=True,
+                best=self.search_space.loss.new_best,
             )
 
             # Map computed fitness to individual fitness value
@@ -497,7 +451,7 @@ class Genetic_algorithm(Metaheuristic):
             fits = [ind.fitness.values[0] for ind in pop]
 
             # Save new population
-            if self.loss_func.save:
+            if self.search_space.loss.save:
                 with open(self.ga_save, "a") as f:
                     for ind, cout in zip(pop, fits):
                         f.write(
@@ -593,7 +547,7 @@ class Genetic_algorithm(Metaheuristic):
 
         if save:
             save_path = os.path.join(
-                self.loss_func.plots_path, f"heatmap_ga.png"
+                self.search_space.loss.plots_path, f"heatmap_ga.png"
             )
             plt.savefig(save_path, bbox_inches="tight")
             plt.close()
@@ -617,7 +571,7 @@ class Genetic_algorithm(Metaheuristic):
 
         if save:
             save_path = os.path.join(
-                self.loss_func.plots_path, f"lineplot_ga.png"
+                self.search_space.loss.plots_path, f"lineplot_ga.png"
             )
 
             plt.savefig(save_path, bbox_inches="tight")

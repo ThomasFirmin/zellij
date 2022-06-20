@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:45:43+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-05-31T10:56:15+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -58,7 +58,6 @@ class ILS(Metaheuristic):
 
     def __init__(
         self,
-        loss_func,
         search_space,
         f_calls,
         red_rate=0.5,
@@ -66,20 +65,17 @@ class ILS(Metaheuristic):
         verbose=True,
     ):
 
-        """__init__(loss_func, search_space, f_calls,save=False,verbose=True)
+        """__init__(search_space, f_calls,save=False,verbose=True)
 
         Initialize ILS class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
-
         search_space : Searchspace
             Search space object containing bounds of the search space.
 
         f_calls : int
-            Maximum number of loss_func calls
+            Maximum number of :ref:`lf` calls
 
         red_rate : float, default=0.5
             determine the step reduction rate ate each iteration.
@@ -92,7 +88,14 @@ class ILS(Metaheuristic):
 
         """
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        super().__init__(search_space, f_calls, verbose)
+        assert hasattr(search_space, "to_continuous") or isinstance(
+            search_space, ContinuousSearchspace
+        ), logger.error(
+            f"""If the `search_space` is not a `ContinuousSearchspace`,
+            the user must give a `Converter` to the :ref:`sp` object
+            with the kwarg `to_continuous`"""
+        )
 
         self.red_rate = red_rate
         self.precision = precision
@@ -136,35 +139,48 @@ class ILS(Metaheuristic):
         scores = np.zeros(3, dtype=float)
 
         if X0:
-            points = np.tile(X0, (3, 1))
-            points[points > 1] = 1
-            points[points < 0] = 0
+            if isinstance(self.search_space, ContinuousSearchspace):
+                self.X0 = np.array(X0)
+            else:
+                self.X0 = np.array(
+                    self.search_space.to_continuous.convert([X0], True)[0]
+                )
+
+            points = np.tile(self.X0, (3, 1))
 
         elif H:
             points = np.tile(H.center, (3, 1))
-            points[points > 1] = 1
-            points[points < 0] = 0
         else:
-            raise ValueError("No starting point given to Simulated Annealing")
+            raise ValueError(
+                "No starting point given to Intensive Local Search"
+            )
 
         if Y0:
-            scores[0] = Y0
+            self.Y0 = Y0
         else:
-            scores[0] = self.loss_func(
-                self.search_space.convert_to_continuous([points[0]], True, True)
-            )[0]
+            logger.info("ILS evaluating initial solution")
+            if isinstance(self.search_space, ContinuousSearchspace):
+                self.Y0 = self.search_space.loss([self.X0], algorithm="ILS")[0]
+            else:
+                self.Y0 = self.search_space.loss(
+                    self.search_space.to_continuous.reverse([self.X0], True),
+                    algorithm="ILS",
+                )[0]
 
         step = H.radius
 
-        while step > self.precision and self.loss_func.calls < self.f_calls:
+        while (
+            step > self.precision
+            and self.search_space.loss.calls < self.f_calls
+        ):
             i = 0
             improvement = False
             # logging
             logger.debug(f"ILS {step}>{self.precision}")
 
             while (
-                i < self.search_space.n_variables
-                and self.loss_func.calls < self.f_calls
+                i < self.search_space.size
+                and self.search_space.loss.calls < self.f_calls
             ):
 
                 # logging
@@ -182,11 +198,17 @@ class ILS(Metaheuristic):
                 points[2][points[2] > 1] = 1
                 points[2][points[2] < 0] = 0
 
-                scores[1:] = self.loss_func(
-                    self.search_space.convert_to_continuous(
-                        points[1:], True, True
+                if isinstance(self.search_space, ContinuousSearchspace):
+                    scores[1:] = self.search_space.loss(
+                        points[1:], algorithm="ILS"
                     )
-                )
+                else:
+                    scores[1:] = self.search_space.loss(
+                        self.search_space.to_continuous.reverse(
+                            points[1:], True
+                        ),
+                        algorithm="ILS",
+                    )
 
                 min_index = np.argmin(scores)
 
@@ -196,7 +218,7 @@ class ILS(Metaheuristic):
                     improvement = True
 
                 self.update_main_pb(
-                    2, explor=False, best=self.loss_func.new_best
+                    2, explor=False, best=self.search_space.loss.new_best
                 )
                 self.meta_pb.update(2)
 
