@@ -30,3 +30,8 @@ def fixed_mutation(individual, search_space, proba):
                 point=individual[0], attribute=label
             )
     return individual
+
+
+def DAGraphMutation(individual, proba):
+    for node in individual.nodes:
+        t = np.random.random()
