@@ -1,16 +1,22 @@
-from abc import ABC, abstractmethod
-from zellij.core.variables import Variable
-from zellij.core.search_space import SearchSpace
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-05T16:18:04+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-02T11:40:04+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
 
+
+from abc import ABC, abstractmethod
 import logging
 
-logger = logging.getLogger("zellij.Addons")
+logger = logging.getLogger("zellij.addons")
 
 
-class Addons(ABC):
-    def __init__(self, object):
+class Addon(ABC):
+    def __init__(self, object=None):
         self.target = object
-        self._add_addon(self.target, self)
 
     @property
     def target(self):
@@ -20,69 +26,50 @@ class Addons(ABC):
     def target(self, object):
         self._target = object
 
-    # Add addon in addons :)
-    def _add_addon(self, object, addon):
-        key = f"{addon.__class__.__bases__[0].__name__}".lower()
-        if hasattr(self, key):
-            logger.warning(f"A {key} already is already implemented")
-            logger.warning(f"{key} will be overwritten")
-        setattr(addon, key, object)
 
-    def delete(self):
-        key = f"{self.__class__.__bases__[0].__name__}".lower()
-        if hasattr(self, key):
-            logger.info(f"{key} will be deleted")
-            delattr(self.target, key)
-        else:
-            logger.warning(f"{key} is not implemented this object")
-
-
-class VarAddons(Addons):
-    def __init__(self, variable):
-        super(VarAddons, self).__init__(variable)
+class VarAddon(Addon):
+    def __init__(self, variable=None):
+        super(VarAddon, self).__init__(variable)
 
     @property
     def target(self):
-        assert isinstance()
-        return self._search_space
+        return self._target
 
-    @search_space.setter
-    def search_space(self, search_space):
-        self._search_space = search_space
+    @target.setter
+    def target(self, variable):
+        from zellij.core.variables import Variable
 
-    def delete(self):
-        key = f"{self.__class__.__bases__[0].__name__}".lower()
-        if hasattr(self, key):
-            logger.info(f"{key} will be deleted")
-            delattr(self.search_space, key)
-        else:
-            logger.warning(f"{key} is not implemented this search space")
+        if variable:
+            assert isinstance(variable, Variable), logger.error(
+                f"Object must be a `Variable` for {self.__class__.__name__}, got {variable}"
+            )
+
+        self._target = variable
 
 
-class SearchSpaceAddons(Addons):
-    def __init__(self, search_space):
-        self.search_space = search_space
-        self.search_space._add_addon(self)
+class SearchSpaceAddon(Addon):
+    def __init__(self, search_space=None):
+        super(SearchSpaceAddon, self).__init__(search_space)
 
     @property
-    def search_space(self):
-        return self._search_space
+    def target(self):
+        return self._target
 
-    @search_space.setter
-    def search_space(self, search_space):
-        self._search_space = search_space
+    @target.setter
+    def target(self, search_space):
+        from zellij.core.search_space import Searchspace
 
-    def delete(self):
-        key = f"{self.__class__.__bases__[0].__name__}".lower()
-        if hasattr(self, key):
-            logger.info(f"{key} will be deleted")
-            delattr(self.search_space, key)
-        else:
-            logger.warning(f"{key} is not implemented this search space")
+        if search_space:
+            assert isinstance(search_space, Searchspace), logger.error(
+                f"Object must be a `Searchspace` for {self.__class__.__name__},\
+                 got {search_space}"
+            )
+
+        self._target = search_space
 
 
-class Neighborhood(Addons):
-    def __init__(self, search_space, neighborhood):
+class Neighborhood(SearchSpaceAddon):
+    def __init__(self, neighborhood, search_space=None):
         super(Neighborhood, self).__init__(search_space)
         self.neighborhood = neighborhood
 
@@ -95,8 +82,22 @@ class Neighborhood(Addons):
         pass
 
 
-class Converter(Addons):
-    def __init__(self, search_space):
+class VarNeighborhood(VarAddon):
+    def __init__(self, neighborhood, variable=None):
+        super(VarAddon, self).__init__(variable)
+        self.neighborhood = neighborhood
+
+    @property
+    def neighborhood(self):
+        return self._neighborhood
+
+    @abstractmethod
+    def __call__(self, point, size=1):
+        pass
+
+
+class Converter(SearchSpaceAddon):
+    def __init__(self, search_space=None):
         super(Converter, self).__init__(search_space)
 
     @abstractmethod
@@ -108,29 +109,47 @@ class Converter(Addons):
         pass
 
 
-class Operator(Addons):
-    def __init__(self, search_space):
+class VarConverter(VarAddon):
+    def __init__(self, variable=None):
+        super(VarConverter, self).__init__(variable)
+
+    @abstractmethod
+    def convert(self):
+        pass
+
+    @abstractmethod
+    def reverse(self):
+        pass
+
+
+class Operator(SearchSpaceAddon):
+    def __init__(self, search_space=None):
         super(Operator, self).__init__(search_space)
 
+    @abstractmethod
+    def __call__(self):
+        pass
 
-class Mutator(Operator):
-    def __init__(self, search_space):
+
+class Mutator(SearchSpaceAddon):
+    def __init__(self, search_space=None):
         super(Mutator, self).__init__(search_space)
 
 
-class Crossover(Operator):
-    def __init__(self, search_space):
+class Crossover(SearchSpaceAddon):
+    def __init__(self, search_space=None):
         super(Crossover, self).__init__(search_space)
 
 
-class Selection(Operator):
-    def __init__(self, search_space):
-        super(Selection, self).__init__(search_space)
+class Selector(SearchSpaceAddon):
+    def __init__(self, search_space=None):
+        super(Selector, self).__init__(search_space)
 
 
-class Distance(Addons):
-    def __init__(self, search_space):
+class Distance(SearchSpaceAddon):
+    def __init__(self, search_space=None, weights=None):
         super(Distance, self).__init__(search_space)
+        self.weights = None
 
     @abstractmethod
     def __call__(self, point_a, point_b):
