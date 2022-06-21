@@ -15,8 +15,10 @@ from zellij.core.variables import (
     CatVar,
     Constant,
     ArrayVar,
+    Block, DynamicBlock, DAGraphVariable,
 )
 import numpy as np
+import random
 import logging
 import copy
 
@@ -51,7 +53,7 @@ class ArrayInterval(VarNeighborhood):
     @VarNeighborhood.target.setter
     def target(self, variable):
 
-        assert isinstance(variable, ArrayVar) or variable == None, logger.error(
+        assert isinstance(variable, ArrayVar) or variable is None, logger.error(
             f"Target object must be an `ArrayVar` for {self.__class__.__name__},\
              got {variable}"
         )
@@ -62,24 +64,129 @@ class ArrayInterval(VarNeighborhood):
             assert all(
                 hasattr(v, "neighbor") for v in self.target.values
             ), logger.error(
-                f"To use `ArrayInterval`, values in `ArrayVar` must have a `neighbor` method. Use `neighbor` kwarg when defining a variable"
+                f"To use `ArrayInterval`, values in `ArrayVar` must have a `neighbor` method. Use `neighbor` kwarg "
+                f"when defining a variable "
             )
 
 
 class BlockInterval(VarNeighborhood):
+    def __init__(self, variable=None, neighborhood=None):
+        super(BlockInterval, self).__init__(variable)
+        self.neighborhood = neighborhood
+
     def __call__(self, value, size=1):
-        raise NotImplementedError(
-            f"{self.__class__.__name__}\
-        neighborhood is not yet implemented"
+        res = []
+        for _ in size:
+            variables_idx = list(set(np.random.choice(range(self.target.repeat), size=self.target.repeat)))
+            inter = copy.deepcopy(value)
+            for i in variables_idx:
+                inter[i] = self.target.value[i].neighbor(value[i])
+            res.append(inter)
+        return res
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        if neighborhood:
+            self.target.value.neighborhood = neighborhood
+        self._neighborhood = None
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+        assert isinstance(variable, Block) or variable is None, logger.error(
+            f"Target object must be a `Block` for {self.__class__.__name__},\
+             got {variable}"
         )
+        self._target = variable
+
+        if variable is not None:
+            assert hasattr(self.target.value, "neighbor"), logger.error(
+                f"To use `Block`, value for `Block` must have a `neighbor` method. Use `neighbor` kwarg "
+                f"when defining a variable "
+            )
 
 
-class DynamicBlockInterval(VarNeighborhood):
+class DAGraphInterval(VarNeighborhood):
+
+    def __init__(self, variable=None, neighborhood=None):
+        super(DAGraphInterval, self).__init__(variable)
+        self.neighborhood = neighborhood
+
     def __call__(self, value, size=1):
-        raise NotImplementedError(
-            f"{self.__class__.__name__}\
-        neighborhood is not yet implemented"
+        res = []
+        for _ in size:
+            inter = value.copy()
+            for n in inter.nodes:
+                n.operation = self.target.operations.value.neighborhood(n.operation)
+            res.append(inter)
+        return res
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        if neighborhood is not None:
+            self.target.operations.value.neighborhood = neighborhood
+        self._neighborhood = None
+
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+        assert isinstance(variable, DAGraphVariable) or variable is None, logger.error(
+            f"Target object must be a `DAGraphVariable` for {self.__class__.__name__},\
+             got {variable}"
         )
+        self._target = variable
+
+        if variable is not None:
+            assert hasattr(self.target.operations.value, "neighbor"), logger.error(
+                f"To use `DAGraphVariable`, value for operations for `DAGraphVariable` must have a `neighbor` method. "
+                f"Use `neighbor` kwarg when defining a variable "
+            )
+
+
+class Interval(VarNeighborhood):
+
+    def __init__(self, variable=None, neighborhood=None):
+        super(Interval, self).__init__(variable)
+        self.neighborhood = neighborhood
+
+    def __call__(self, value, size=1):
+        res = []
+        for _ in size:
+            new_repeat = np.random.randint(self.target.repeat - self.neighborhood,
+                                           self.target.repeat - self.neighborhood)
+            inter = copy.deepcopy(value)
+            if new_repeat > self.target.repeat:
+                inter = inter + self.target.random(new_repeat - self.target.repeat)
+            if new_repeat < self.target.repeat:
+                deleted_idx = list(set(random.sample(range(self.target.repeat), self.target.repeat - new_repeat)))
+                for index in sorted(deleted_idx, reverse=True):
+                    del inter[index]
+            variables_idx = list(set(np.random.choice(range(new_repeat), size=new_repeat)))
+            for i in variables_idx:
+                inter[i] = self.target.value[i].neighbor(value[i])
+            res.append(inter)
+        return res
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        if isinstance(neighborhood, list):
+            self._neighborhood = neighborhood[0]
+            self.target.value.neighborhood = neighborhood[1]
+        else:
+            self._neighborhood = neighborhood
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+        assert isinstance(variable, DynamicBlock) or variable is None, logger.error(
+            f"Target object must be a `DynamicBlock` for {self.__class__.__name__},\
+             got {variable}"
+        )
+        self._target = variable
+
+        if variable is not None:
+            assert hasattr(self.target.value, "neighbor"), logger.error(
+                f"To use `DynamicBlock`, value for `DynamicBlock` must have a `neighbor` method. Use `neighbor` kwarg "
+                f"when defining a variable "
+            )
 
 
 class FloatInterval(VarNeighborhood):
@@ -187,7 +294,7 @@ class CatInterval(VarNeighborhood):
 
     @VarNeighborhood.neighborhood.setter
     def neighborhood(self, neighborhood=None):
-        if neighborhood != None:
+        if neighborhood is not None:
             logger.warning(
                 f"`neighborhood`= {neighborhood} is useless for \
             {self.__class__.__name__}, it will be replaced by None"
@@ -197,8 +304,7 @@ class CatInterval(VarNeighborhood):
 
     @VarNeighborhood.target.setter
     def target(self, variable):
-
-        assert isinstance(variable, CatVar) or variable == None, logger.error(
+        assert isinstance(variable, CatVar) or variable is None, logger.error(
             f"Target object must be a `CatInterval` for {self.__class__.__name__},\
              got {variable}"
         )
@@ -226,7 +332,6 @@ class ConstantInterval(VarNeighborhood):
 
     @VarNeighborhood.target.setter
     def target(self, variable):
-
         assert isinstance(variable, Constant) or variable == None, logger.error(
             f"Target object must be a `ConstantInterval` for {self.__class__.__name__}\
             , got {variable}"
@@ -281,7 +386,6 @@ class Intervals(Neighborhood):
         points = []
 
         for att in attribute:
-
             inter = copy.deepcopy(point)
             inter[att._idx] = att.neighbor(point[att._idx])
             points.append(inter)

@@ -15,7 +15,7 @@ class Node(object):
         return out
 
     def __repr__(self):
-        return self.operation
+        return self.operation.__repr__()
 
     def is_eq(self, node):
         eq = self.operation == node.operation and len(node.outputs) == len(self.outputs)
@@ -64,6 +64,13 @@ class DAGraph(object):
 
     def __str__(self):
         return self.root.__str__()
+
+    def __repr__(self):
+        nodes_reprs = ""
+        for n in self.nodes:
+            nodes_reprs += n.operation.__repr__()  + f" -> {[c.operation for c in n.outputs]}\n"
+        return nodes_reprs
+
 
     def copy(self):
         new_nodes = [Node(self.leaf.operation, [])]

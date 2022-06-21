@@ -11,6 +11,7 @@
 from abc import ABC, abstractmethod
 import logging
 
+
 logger = logging.getLogger("zellij.addons")
 
 
@@ -38,7 +39,6 @@ class VarAddon(Addon):
     @target.setter
     def target(self, variable):
         from zellij.core.variables import Variable
-
         if variable:
             assert isinstance(variable, Variable), logger.error(
                 f"Object must be a `Variable` for {self.__class__.__name__}, got {variable}"
@@ -81,6 +81,10 @@ class Neighborhood(SearchSpaceAddon):
     def get_neighbor(self, point, size=1):
         pass
 
+    @neighborhood.setter
+    def neighborhood(self, value):
+        self._neighborhood = value
+
 
 class VarNeighborhood(VarAddon):
     def __init__(self, neighborhood, variable=None):
@@ -94,6 +98,10 @@ class VarNeighborhood(VarAddon):
     @abstractmethod
     def __call__(self, point, size=1):
         pass
+
+    @neighborhood.setter
+    def neighborhood(self, value):
+        self._neighborhood = value
 
 
 class Converter(SearchSpaceAddon):

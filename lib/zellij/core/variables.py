@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 import math
 import numpy as np
 import random
@@ -6,7 +7,9 @@ import copy
 
 import logging
 
+from zellij.core.addons import VarAddon
 from zellij.core.node import Node, DAGraph
+
 logger = logging.getLogger("zellij.variables")
 logger.setLevel(logging.INFO)
 
@@ -58,7 +61,7 @@ class Variable(ABC):
         pass
 
     @abstractmethod
-    def subset(self):
+    def subset(self, *kwargs):
         pass
 
     def _add_addons(self, **kwargs):
@@ -131,7 +134,7 @@ class IntVar(Variable):
         """
 
         assert (
-            lower < upper
+                lower < upper
         ), f"""Lower bound must be
         strictly inferior to upper bound,  got {lower}<{upper}"""
 
@@ -164,7 +167,7 @@ class IntVar(Variable):
             False otherwise.
 
         """
-        return self.up_bound == self.lo_bounds
+        return self.up_bound == self.low_bound
 
     def subset(self, lower, upper):
         assert isinstance(
@@ -174,14 +177,14 @@ class IntVar(Variable):
             lower, (int, np.integer)
         ), f"""Upper bound must be an int, got {lower}"""
         assert (
-            lower >= self.low_bound
+                lower >= self.low_bound
         ), f"""
         Subset lower bound must be higher than the initial lower bound,
          got {lower}>{self.low_bound}
         """
 
         assert (
-            upper <= self.up_bound
+                upper <= self.up_bound
         ), f"""
         Subset upper bound must be lower than the initial upper bound,
          got {lower}<{upper}
@@ -194,8 +197,8 @@ class IntVar(Variable):
 
     def __repr__(self):
         return (
-            super(IntVar, self).__repr__()
-            + f"[{self.low_bound};{self.up_bound}])"
+                super(IntVar, self).__repr__()
+                + f"[{self.low_bound};{self.up_bound}])"
         )
 
 
@@ -233,13 +236,13 @@ class FloatVar(Variable):
     """
 
     def __init__(
-        self,
-        label,
-        lower,
-        upper,
-        sampler=np.random.uniform,
-        tolerance=1e-14,
-        **kwargs,
+            self,
+            label,
+            lower,
+            upper,
+            sampler=np.random.uniform,
+            tolerance=1e-14,
+            **kwargs,
     ):
         super(FloatVar, self).__init__(label, **kwargs)
 
@@ -252,7 +255,7 @@ class FloatVar(Variable):
         ), f"""Lower bound must be an int or a float, got {lower}"""
 
         assert (
-            lower < upper
+                lower < upper
         ), f"""Lower bound must be
          strictly inferior to upper bound, got {lower}<{upper}"""
 
@@ -289,7 +292,7 @@ class FloatVar(Variable):
             False otherwise.
 
         """
-        return self.up_bound == self.lo_bounds
+        return self.up_bound == self.low_bound
 
     def subset(self, lower, upper):
         assert isinstance(
@@ -305,16 +308,16 @@ class FloatVar(Variable):
         """
 
         assert (
-            lower - self.low_bound >= -self.tolerance
-            and lower - self.up_bound <= self.tolerance
+                lower - self.low_bound >= -self.tolerance
+                and lower - self.up_bound <= self.tolerance
         ), f"""
         Subset lower bound must be higher than the initial lower bound,
         got {lower}>={self.low_bound}
         """
 
         assert (
-            upper - self.up_bound <= self.tolerance
-            and upper - self.low_bound >= -self.tolerance
+                upper - self.up_bound <= self.tolerance
+                and upper - self.low_bound >= -self.tolerance
         ), f"""
         Subset upper bound must be lower than the initial upper bound,
         got {upper}<={self.up_bound}
@@ -334,8 +337,8 @@ class FloatVar(Variable):
 
     def __repr__(self):
         return (
-            super(FloatVar, self).__repr__()
-            + f"[{self.low_bound};{self.up_bound}])"
+                super(FloatVar, self).__repr__()
+                + f"[{self.low_bound};{self.up_bound}])"
         )
 
 
@@ -381,16 +384,16 @@ class CatVar(Variable):
         """
 
         assert (
-            len(features) > 1
+                len(features) > 0
         ), f"""
-        Features must be a list with a length > 1,
+        Features must be a list with a length > 0,
         got length= {len(features)}
         """
 
         self.features = features
 
         assert (
-            isinstance(weights, (list, np.ndarray)) or weights == None
+                isinstance(weights, (list, np.ndarray)) or weights is None
         ), f"""`weights` must be a list or equal to None, got {weights}"""
 
         if weights:
@@ -443,12 +446,12 @@ class CatVar(Variable):
 
     def subset(self, lower, upper):
         assert (
-            upper in self.features
+                upper in self.features
         ), f"""
         Upper bound is not in features of CatVar, got {upper}"""
 
         assert (
-            lower in self.features
+                lower in self.features
         ), f"""
         Lower bound is not in features of CatVar, got {lower}"""
 
@@ -465,10 +468,13 @@ class CatVar(Variable):
                     self.features[lo_idx:] + self.features[: up_idx + 1],
                 )
             else:
-                return CatVar(self.label, self.features[lo_idx : up_idx + 1])
+                return CatVar(self.label, self.features[lo_idx: up_idx + 1])
 
     def __repr__(self):
-        return super(CatVar, self).__repr__() + f"{self.features})"
+        features_reprs = ""
+        for f in self.features:
+            features_reprs += f.__repr__() + ","
+        return super(CatVar, self).__repr__() + f"[{features_reprs}])"
 
 
 # Array of variables
@@ -501,7 +507,7 @@ class ArrayVar(Variable):
     [5, 15, 8.483221226216427, 'Hello']
     """
 
-    def __init__(self, *args, label="", **kwargs):
+    def __init__(self, label, *args, **kwargs):
 
         assert all(
             isinstance(v, Variable) for v in args
@@ -556,14 +562,14 @@ class ArrayVar(Variable):
 
     def subset(self, lower, upper):
         assert isinstance(lower, (list, np.ndarray)) and (
-            len(lower) == len(self)
+                len(lower) == len(self)
         ), f"""
             Lower bound must be a list containing lower bound of each
             `Variable` composing `ArrayVar`, got {lower}
             """
 
         assert isinstance(upper, (list, np.ndarray)) and (
-            len(upper) == len(self)
+                len(upper) == len(self)
         ), f"""
         Upper bound must be a list containing lower bound of each
         `Variable` composing `ArrayVar`, got {upper}
@@ -651,13 +657,13 @@ class Block(Variable):
         assert isinstance(
             value, Variable
         ), f"""
-        Value must inherit from `Variable`, got {args}
+        Value must inherit from `Variable`, got {value}
         """
 
         self.value = value
 
         assert (
-            isinstance(repeat, int) and repeat > 0
+                isinstance(repeat, int) and repeat > 0
         ), f"""
         `repeat` must be a strictly positive int, got {repeat}.
         """
@@ -686,11 +692,17 @@ class Block(Variable):
             for _ in range(size):
                 block = []
                 for _ in range(self.repeat):
-                    block.append([v.random() for v in self.value])
+                    if isinstance(self.value, Iterable) and (len(self.value) > 0):
+                        block.append([v.random() for v in self.value])
+                    else:
+                        block.append(self.value.random())
                 res.append(block)
         else:
             for _ in range(self.repeat):
-                res.append([v.random() for v in self.value])
+                if isinstance(self.value, Iterable) and (len(self.value) > 0):
+                    res.append([v.random() for v in self.value])
+                else:
+                    res.append(self.value.random())
 
         return res
 
@@ -708,17 +720,21 @@ class Block(Variable):
         return self.value.isconstant()
 
     def subset(self, lower, upper):
+        new_values = []
+        for v, l, u in zip(self.value, lower, upper):
+            new_values.append(v.subset(l, u))
 
-        new_values = v.subset(l, u)
-
-        return Block(self.label, new_values)
+        return Block(self.label, new_values, self.repeat)
 
     def __repr__(self):
         values_reprs = ""
-        for v in self.value:
-            values_reprs += v.__repr__() + ","
+        if isinstance(self.value, Iterable) and (len(self.value) > 0):
+            for v in self.value:
+                values_reprs += v.__repr__() + ","
 
-        return super(Block, self).__repr__() + f"[{values_reprs}])"
+            return super(Block, self).__repr__() + f"[{values_reprs}])"
+        else:
+            return super(Block, self).__repr__() + f"{self.value.__repr__()}"
 
 
 # Block of variables, with random size.
@@ -760,11 +776,12 @@ class DynamicBlock(Block):
     def __init__(self, label, value, repeat, **kwargs):
         super(DynamicBlock, self).__init__(label, value, repeat, **kwargs)
 
-    def random(self, size=1):
+    def random(self, size=1, n_repeat=None):
         """random(size=1)
 
         Parameters
         ----------
+        n_repeat : size of randomly generated block
         size : int, default=None
             Number of draws.
 
@@ -780,14 +797,16 @@ class DynamicBlock(Block):
         if size > 1:
             for _ in range(size):
                 block = []
-                n_repeat = np.random.randint(1, self.repeat)
+                if n_repeat is None:
+                    n_repeat = np.random.randint(1, self.repeat)
                 for _ in range(n_repeat):
                     block.append([v.random() for v in self.value])
                 res.append(block)
         else:
-            n_repeat = np.random.randint(1, self.repeat)
+            if n_repeat is None:
+                n_repeat = np.random.randint(1, self.repeat)
             for _ in range(n_repeat):
-                if len(self.value) > 0:
+                if isinstance(self.value, list) and (len(self.value) > 0):
                     res.append([v.random() for v in self.value])
                 else:
                     res.append(self.value.random())
@@ -878,41 +897,14 @@ class Constant(Variable):
     def __repr__(self):
         return super(Constant, self).__repr__() + f"{self.value})"
 
-
-class ChoiceVariable(ArrayVar):
-    def __init__(self, label, choices):
-        super(ChoiceVariable, self).__init__(label)
-        self.choices = choices
-
-    def random(self, size=1):
-        if size == 1:
-            choice = random.choice(self.choices)
-            return choice.random(size=1)
-        else:
-            res = []
-            for i in range(size):
-                choice = random.choice(self.choices)
-                res.append(choice.random(size=1))
-            return res
-    def __repr__(self):
-        choices_reprs = ""
-        for c in self.choices:
-            choices_reprs += c.__repr__()
-
-        return (
-                super(ChoiceVariable, self).__repr__()
-                + f"\
-                \t- Length: {len(self)}\n=====\n[\n"
-                + choices_reprs
-                + "\n]\n=====\n"
-        )
-
-
-
 # Directed Acyclic Graph for NAS.
 class DAGraphVariable(Variable):
-    def __init__(self, label, operations):
-        super(DAGraphVariable, self).__init__(label)
+    def __init__(self, label, operations, **kwargs):
+        super(DAGraphVariable, self).__init__(label, **kwargs)
+
+        assert isinstance(operations, DynamicBlock) ,f"""
+        Operations must inherit from `DynamicBlock`, got {operations}
+        """
         self.operations = operations
 
     def random(self, size=1):
@@ -926,88 +918,25 @@ class DAGraphVariable(Variable):
         Returns DAGraph
         -------
 
-        >>> from zellij.core.variables import DynamicBlock, ArrayVar, IntVar, FloatVar, ChoiceVariable, CatVar, DAGraphVariable
+        >>> from zellij.core.variables import DynamicBlock, ArrayVar, IntVar, FloatVar, CatVar, DAGraphVariable
         >>> layer1 = ArrayVar("Layer1", CatVar("Operation", ['LSTM', 'Dense']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']))
         ... layer2 = ArrayVar("Layer2", CatVar("Operation", ['CNN']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']), IntVar("Filter", 1, 3))
         ... layer3 = ArrayVar("Layer3", CatVar("Operation", ['Id', 'Zero']))
-        ... operations = ChoiceVariable("Candidates", [layer1, layer2, layer3])
+        ... operations = CatVar("Candidates", [layer1, layer2, layer3])
         ... ops = DynamicBlock('Nodes', operations, 4)
         ... dag = DAGraphVariable("dag1", ops)
         >>> print(dag)
-        DAGraphVariable:
-        	- Label: dag1
-        	- Operations:
-        DynamicBlock:
-                    - Label: Nodes
-             Block of:
-        ChoiceVariable:
-                    - Label: Candidates
-                    - Length: 0
-        =====
-        [
-        ]
-        =====
-                            - Length: 0
-        =====
-        [
-        ArrayVar:
-                    - Label: Layer1
-                    - Length: 3
-        =====
-        [
-        CatVar:
-                    - Label: Operation
-                    - Features: ['LSTM', 'Dense']
-        IntVar:
-                    - Label: N neurons
-                    - Lower bound: 1
-                    - Upper bound: 100
-        CatVar:
-                    - Label: Activation
-                    - Features: ['gelu', 'relu']
-        ]
-        =====
-        ArrayVar:
-                    - Label: Layer2
-                    - Length: 4
-        =====
-        [
-        CatVar:
-                    - Label: Operation
-                    - Features: ['CNN']
-        IntVar:
-                    - Label: N neurons
-                    - Lower bound: 1
-                    - Upper bound: 100
-        CatVar:
-                    - Label: Activation
-                    - Features: ['gelu', 'relu']
-        IntVar:
-                    - Label: Filter
-                    - Lower bound: 1
-                    - Upper bound: 3
-        ]
-        =====
-        ArrayVar:
-                    - Label: Layer3
-                    - Length: 1
-        =====
-        [
-        CatVar:
-                    - Label: Operation
-                    - Features: ['Id', 'Zero']
-        ]
-        =====
-        ]
-        =====
+        DAGraphVariable(dag1,
+        - Operations:
+        DynamicBlock(Nodes, CatVar(Candidates,
+        [ArrayVar(Layer1, [CatVar(Operation, ['LSTM', 'Dense']),IntVar(N neurons, [1;100]),
+            CatVar(Activation, ['gelu', 'relu'])]),
+        ArrayVar(Layer2, [CatVar(Operation, ['CNN']),IntVar(N neurons, [1;100]),CatVar(Activation, ['gelu', 'relu']),
+            IntVar(Filter, [1;3])]),
+        ArrayVar(Layer3, [CatVar(Operation, ['Id', 'Zero'])])])
         >>> print(dag.random())
-        ['Input'] -> [['CNN', 17, 'gelu', 1], ['LSTM', 83, 'relu'], ['Dense', 41, 'relu']]
-        ['CNN', 17, 'gelu', 1] -> [['LSTM', 83, 'relu']]
-        ['LSTM', 83, 'relu'] -> [['Dense', 41, 'relu']]
-        ['Dense', 41, 'relu'] -> []
-        ['LSTM', 83, 'relu'] -> [['Dense', 41, 'relu']]
-        ['Dense', 41, 'relu'] -> []
-        ['Dense', 41, 'relu'] -> []
+        ['Input'] -> [['LSTM', 42, 'gelu']]
+        ['LSTM', 42, 'gelu'] -> []
         """
         operations = self.operations.random()
         operations = [['Input']] + operations
@@ -1036,6 +965,10 @@ class DAGraphVariable(Variable):
 
         """
         return False
+
+    def subset(self, lower, upper):
+        new_values = self.operations.subset(lower, upper)
+        return DAGraphVariable(self.label, new_values)
 
     def __repr__(self):
         return (

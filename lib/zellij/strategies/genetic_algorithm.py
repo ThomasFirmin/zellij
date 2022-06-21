@@ -218,13 +218,8 @@ class Genetic_algorithm(Metaheuristic):
         Initialize a population of individual, from a file, to DEAP.
 
         """
-        data = pd.read_csv(
-            filename,
-            sep=",",
-            decimal=".",
-            usecols=self.search_space.size,
-        )
-        contents = data.tail(pop_size)
+        data = pd.read_csv(filename, sep=",", usecols=self.search_space.size)
+        contents = data.tail(self.pop_size)
 
         return pcls(ind_init(c) for index, c in contents.iterrows())
 
@@ -314,7 +309,7 @@ class Genetic_algorithm(Metaheuristic):
 
             logger.info("Creation of the initial population...")
 
-            # Build the population
+            # Build the populationze
             pop = toolbox.population(n=self.pop_size)
 
         # Create operators
