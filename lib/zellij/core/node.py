@@ -81,13 +81,14 @@ class DAGraph(object):
                 if not any(o in old_nodes for o in n.outputs):
                     new_outputs = []
                     for old_n in n.outputs:
-                        i = len(new_nodes) - 1
-                        found = False
-                        while i >= 0 and not found:
-                            if old_n.is_eq(new_nodes[i]):
-                                new_outputs.append(new_nodes[i])
-                                found = True
-                            i -=1
+                        if old_n is not None:
+                            i = len(new_nodes) - 1
+                            found = False
+                            while i >= 0 and not found:
+                                if old_n.is_eq(new_nodes[i]):
+                                    new_outputs.append(new_nodes[i])
+                                    found = True
+                                i -=1
                     new_nodes = [Node(n.operation, new_outputs)] + new_nodes
                     old_nodes.remove(n)
         return DAGraph(new_nodes)

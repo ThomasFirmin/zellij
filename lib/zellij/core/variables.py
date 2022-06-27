@@ -375,7 +375,6 @@ class CatVar(Variable):
     """
 
     def __init__(self, label, features, weights=None, **kwargs):
-        super(CatVar, self).__init__(label, **kwargs)
 
         assert isinstance(
             features, list
@@ -400,6 +399,9 @@ class CatVar(Variable):
             self.weights = weights
         else:
             self.weights = [1 / len(features)] * len(features)
+
+        super(CatVar, self).__init__(label, **kwargs)
+
 
     def random(self, size=1):
         """random(size=1)
@@ -652,8 +654,6 @@ class Block(Variable):
     """
 
     def __init__(self, label, value, repeat, **kwargs):
-        super(Block, self).__init__(label, **kwargs)
-
         assert isinstance(
             value, Variable
         ), f"""
@@ -669,6 +669,8 @@ class Block(Variable):
         """
 
         self.repeat = repeat
+        super(Block, self).__init__(label, **kwargs)
+
 
     def random(self, size=1):
         """random(size=1)
@@ -897,15 +899,16 @@ class Constant(Variable):
     def __repr__(self):
         return super(Constant, self).__repr__() + f"{self.value})"
 
+
 # Directed Acyclic Graph for NAS.
 class DAGraphVariable(Variable):
     def __init__(self, label, operations, **kwargs):
-        super(DAGraphVariable, self).__init__(label, **kwargs)
-
         assert isinstance(operations, DynamicBlock) ,f"""
         Operations must inherit from `DynamicBlock`, got {operations}
         """
         self.operations = operations
+        super(DAGraphVariable, self).__init__(label, **kwargs)
+
 
     def random(self, size=1):
         """random(size=1)
@@ -916,8 +919,7 @@ class DAGraphVariable(Variable):
             Number of draws.
 
         Returns DAGraph
-        -------
-
+        ---------
         >>> from zellij.core.variables import DynamicBlock, ArrayVar, IntVar, FloatVar, CatVar, DAGraphVariable
         >>> layer1 = ArrayVar("Layer1", CatVar("Operation", ['LSTM', 'Dense']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']))
         ... layer2 = ArrayVar("Layer2", CatVar("Operation", ['CNN']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']), IntVar("Filter", 1, 3))

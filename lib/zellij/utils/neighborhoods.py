@@ -26,12 +26,12 @@ logger = logging.getLogger("zellij.neighborhoods")
 
 
 class ArrayInterval(VarNeighborhood):
-    def __init__(self, variable=None, neighborhood=None):
+    def __init__(self, neighborhood=None, variable=None):
         super(ArrayInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
+        self._neighborhood = neighborhood
 
     def __call__(self, value, size=1):
-        variables = np.random.choice(self.target.values, size=size)
+        variables = np.random.choice(self._target.values, size=size)
 
         res = []
 
@@ -45,7 +45,7 @@ class ArrayInterval(VarNeighborhood):
     @VarNeighborhood.neighborhood.setter
     def neighborhood(self, neighborhood=None):
         if neighborhood:
-            for var, neig in zip(self.target.values, neighborhood):
+            for var, neig in zip(self._target.values, neighborhood):
                 var.neighborhood = neig
 
         self._neighborhood = None
@@ -62,7 +62,7 @@ class ArrayInterval(VarNeighborhood):
 
         if variable != None:
             assert all(
-                hasattr(v, "neighbor") for v in self.target.values
+                hasattr(v, "neighbor") for v in self._target.values
             ), logger.error(
                 f"To use `ArrayInterval`, values in `ArrayVar` must have a `neighbor` method. Use `neighbor` kwarg "
                 f"when defining a variable "
@@ -70,24 +70,24 @@ class ArrayInterval(VarNeighborhood):
 
 
 class BlockInterval(VarNeighborhood):
-    def __init__(self, variable=None, neighborhood=None):
+    def __init__(self, neighborhood=None, variable=None):
+        self._neighborhood = neighborhood
         super(BlockInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
 
     def __call__(self, value, size=1):
         res = []
         for _ in size:
-            variables_idx = list(set(np.random.choice(range(self.target.repeat), size=self.target.repeat)))
+            variables_idx = list(set(np.random.choice(range(self._target.repeat), size=self._target.repeat)))
             inter = copy.deepcopy(value)
             for i in variables_idx:
-                inter[i] = self.target.value[i].neighbor(value[i])
+                inter[i] = self._target.value[i].neighbor(value[i])
             res.append(inter)
         return res
 
     @VarNeighborhood.neighborhood.setter
     def neighborhood(self, neighborhood=None):
         if neighborhood:
-            self.target.value.neighborhood = neighborhood
+            self._target.value.neighborhood = neighborhood
         self._neighborhood = None
 
     @VarNeighborhood.target.setter
@@ -107,16 +107,16 @@ class BlockInterval(VarNeighborhood):
 
 class DAGraphInterval(VarNeighborhood):
 
-    def __init__(self, variable=None, neighborhood=None):
+    def __init__(self, neighborhood=None, variable=None):
         super(DAGraphInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
+        self._neighborhood = neighborhood
 
     def __call__(self, value, size=1):
         res = []
-        for _ in size:
+        for _ in range(size):
             inter = value.copy()
             for n in inter.nodes:
-                n.operation = self.target.operations.value.neighborhood(n.operation)
+                n.operation = self.target.operations.value.neighbor(n.operation)
             res.append(inter)
         return res
 
@@ -125,7 +125,6 @@ class DAGraphInterval(VarNeighborhood):
         if neighborhood is not None:
             self.target.operations.value.neighborhood = neighborhood
         self._neighborhood = None
-
 
     @VarNeighborhood.target.setter
     def target(self, variable):
@@ -142,17 +141,17 @@ class DAGraphInterval(VarNeighborhood):
             )
 
 
-class Interval(VarNeighborhood):
+class DynamicInterval(VarNeighborhood):
 
-    def __init__(self, variable=None, neighborhood=None):
-        super(Interval, self).__init__(variable)
-        self.neighborhood = neighborhood
+    def __init__(self, neighborhood=None, variable=None):
+        self._neighborhood = neighborhood
+        super(DynamicInterval, self).__init__(variable)
 
     def __call__(self, value, size=1):
         res = []
         for _ in size:
-            new_repeat = np.random.randint(self.target.repeat - self.neighborhood,
-                                           self.target.repeat - self.neighborhood)
+            new_repeat = np.random.randint(self.target.repeat - self._neighborhood,
+                                           self.target.repeat - self._neighborhood)
             inter = copy.deepcopy(value)
             if new_repeat > self.target.repeat:
                 inter = inter + self.target.random(new_repeat - self.target.repeat)
@@ -183,7 +182,7 @@ class Interval(VarNeighborhood):
         self._target = variable
 
         if variable is not None:
-            assert hasattr(self.target.value, "neighbor"), logger.error(
+            assert hasattr(self._target.value, "neighbor"), logger.error(
                 f"To use `DynamicBlock`, value for `DynamicBlock` must have a `neighbor` method. Use `neighbor` kwarg "
                 f"when defining a variable "
             )
@@ -191,8 +190,8 @@ class Interval(VarNeighborhood):
 
 class FloatInterval(VarNeighborhood):
     def __call__(self, value, size=1):
-        upper = np.min([value + self.neighborhood, self.target.up_bound])
-        lower = np.max([value - self.neighborhood, self.target.low_bound])
+        upper = np.min([value + self._neighborhood, self._target.up_bound])
+        lower = np.max([value - self._neighborhood, self._target.low_bound])
 
         if size > 1:
             res = []
@@ -233,8 +232,8 @@ class FloatInterval(VarNeighborhood):
 class IntInterval(VarNeighborhood):
     def __call__(self, value, size=1):
 
-        upper = np.min([value + self.neighborhood, self.target.up_bound])
-        lower = np.max([value - self.neighborhood, self.target.low_bound])
+        upper = np.min([value + self._neighborhood, self._target.up_bound])
+        lower = np.max([value - self._neighborhood, self._target.low_bound])
 
         if size > 1:
             res = []
@@ -273,23 +272,23 @@ class IntInterval(VarNeighborhood):
 
 
 class CatInterval(VarNeighborhood):
-    def __init__(self, variable=None, neighborhood=None):
+    def __init__(self, neighborhood=None, variable=None):
         super(CatInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
+        self._neighborhood = neighborhood
 
     def __call__(self, value, size=1):
         if size > 1:
             res = []
             for _ in range(size):
-                v = self.target.random()
+                v = self._target.random()
                 while v == value:
-                    v = self.target.random()
+                    v = self._target.random()
                 res.append(v)
             return res
         else:
-            v = self.target.random()
+            v = self._target.random()
             while v == value:
-                v = self.target.random()
+                v = self._target.random()
             return v
 
     @VarNeighborhood.neighborhood.setter
@@ -312,13 +311,13 @@ class CatInterval(VarNeighborhood):
 
 
 class ConstantInterval(VarNeighborhood):
-    def __init__(self, variable=None, neighborhood=None):
+    def __init__(self, neighborhood=None, variable=None):
         super(ConstantInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
+        self._neighborhood = neighborhood
 
     def __call__(self, value, size=1):
         logger.warning("Calling `neighbor` of a constant is useless")
-        return self.target.value
+        return self._target.value
 
     @VarNeighborhood.neighborhood.setter
     def neighborhood(self, neighborhood=None):
@@ -346,7 +345,7 @@ class Intervals(Neighborhood):
     @Neighborhood.neighborhood.setter
     def neighborhood(self, neighborhood):
         if neighborhood:
-            for var, neig in zip(self.target.values, neighborhood):
+            for var, neig in zip(self._target.values, neighborhood):
                 var.neighbor.neighborhood = neig
 
         self._neighborhood = None
@@ -355,7 +354,7 @@ class Intervals(Neighborhood):
     def target(self, object):
         self._target = object
         if object:
-            assert hasattr(self.target.values, "neighbor"), logger.error(
+            assert hasattr(self._target.values, "neighbor"), logger.error(
                 f"To use `Intervals`, values in Searchspace must have a `neighbor` method. Use `neighbor` kwarg when defining a variable"
             )
 
@@ -381,7 +380,7 @@ class Intervals(Neighborhood):
             List of neighbors of <point>.
 
         """
-        attribute = self.target.random_attribute(size=size, exclude=Constant)
+        attribute = self._target.random_attribute(size=size, exclude=Constant)
 
         points = []
 

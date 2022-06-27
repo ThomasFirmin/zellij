@@ -6,6 +6,7 @@
 # @Last modified time: 2022-06-02T11:57:26+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
+import random
 
 from zellij.core.addons import Mutator, Crossover, Selector
 from zellij.core.node import remove_node_from_list, DAGraph
@@ -127,15 +128,32 @@ class DeapOnePoint(Crossover):
         self.toolbox.mate(children1, children2)
 
 
-class DAGraphCrossover(Crossover):
+class DAGTwoPoint(Crossover):
 
     def __init__(self, search_space=None):
-        super(DAGraphCrossover, self).__init__(search_space)
+        super(DAGTwoPoint, self).__init__(search_space)
 
     def _build(self, toolbox):
         toolbox.register("mate", self)
 
-    def __call__(self, g1, g2):
+    def __call__(self, ind1, ind2):
+        size = min(len(ind1), len(ind2))
+        cxpoint1 = random.randint(1, size)
+        cxpoint2 = random.randint(1, size - 1)
+        if cxpoint2 >= cxpoint1:
+            cxpoint2 += 1
+        else:  # Swap the two cx points
+            cxpoint1, cxpoint2 = cxpoint2, cxpoint1
+
+        ind1[cxpoint1:cxpoint2], ind2[cxpoint1:cxpoint2] \
+            = ind2[cxpoint1:cxpoint2], ind1[cxpoint1:cxpoint2]
+
+        for i in range(cxpoint1, cxpoint2):
+            if isinstance(ind1[i], DAGraph):
+                ind1[i], ind2[i] = self.dag_crossover(ind1[i], ind2[i])
+        return ind1, ind2
+
+    def dag_crossover(self, g1, g2):
         graph1 = g1.copy()
         graph2 = g2.copy()
         subset_1 = []
