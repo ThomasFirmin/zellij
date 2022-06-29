@@ -68,7 +68,7 @@ class DAGraph(object):
     def __repr__(self):
         nodes_reprs = ""
         for n in self.nodes:
-            nodes_reprs += n.operation.__repr__()  + f" -> {[c.operation for c in n.outputs]}\n"
+            nodes_reprs += n.operation.__repr__()  + f" -> {[c.operation for c in n.outputs if c != None]}\n"
         return nodes_reprs
 
 
@@ -81,14 +81,19 @@ class DAGraph(object):
                 if not any(o in old_nodes for o in n.outputs):
                     new_outputs = []
                     for old_n in n.outputs:
-                        if old_n is not None:
-                            i = len(new_nodes) - 1
-                            found = False
-                            while i >= 0 and not found:
+                        i = 0
+                        found = False
+                        while i < len(new_nodes) and not found:
+                            try:
                                 if old_n.is_eq(new_nodes[i]):
                                     new_outputs.append(new_nodes[i])
                                     found = True
-                                i -=1
+                            except IndexError:
+                                print(i, " || ", new_nodes)
+                                raise IndexError
+                            i -=1
                     new_nodes = [Node(n.operation, new_outputs)] + new_nodes
                     old_nodes.remove(n)
+        for n in new_nodes:
+            n.outputs = list(set(n.outputs))
         return DAGraph(new_nodes)

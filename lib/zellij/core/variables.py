@@ -951,7 +951,7 @@ class DAGraphVariable(Variable):
         n = len(connections)
         for i in range(len(connections) - 1):
             if len(connections[i]) == 0:
-                connections[i] = list(set(random.choices(range(i, n), k=n - i)))
+                connections[i] = list(set(random.choices(range(i+1, n), k=n - i)))
         for i in range(len(connections) - 1, -1, -1):
             nodes[i] = Node(operations[i], [nodes[o] for o in connections[i]])
         graph = DAGraph(nodes.tolist())

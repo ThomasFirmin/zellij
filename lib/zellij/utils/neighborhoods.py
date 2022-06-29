@@ -32,15 +32,18 @@ class ArrayInterval(VarNeighborhood):
 
     def __call__(self, value, size=1):
         variables = np.random.choice(self._target.values, size=size)
-
-        res = []
-
-        for v in variables:
+        if size == 1:
+            v = variables[0]
             inter = copy.deepcopy(value)
             inter[v._idx] = v.neighbor(value[v._idx])
-            res.append(inter)
-
-        return res
+            return inter
+        else:
+            res = []
+            for v in variables:
+                inter = copy.deepcopy(value)
+                inter[v._idx] = v.neighbor(value[v._idx])
+                res.append(inter)
+            return res
 
     @VarNeighborhood.neighborhood.setter
     def neighborhood(self, neighborhood=None):
@@ -112,19 +115,33 @@ class DAGraphInterval(VarNeighborhood):
         self._neighborhood = neighborhood
 
     def __call__(self, value, size=1):
-        res = []
-        for _ in range(size):
+        if size == 1:
             inter = value.copy()
-            for n in inter.nodes:
-                n.operation = self.target.operations.value.neighbor(n.operation)
-            res.append(inter)
-        return res
+            variables_idx = list(set(np.random.choice(range(1, len(inter.nodes)), size=self._neighborhood)))
+            for i in variables_idx:
+                if inter.nodes[i].operation != ['Input']:
+                    new_ops = self.target.operations.value.neighbor(inter.nodes[i].operation)
+                    inter.nodes[i].operation = new_ops
+            return inter
+        else:
+            res = []
+
+            for _ in range(size):
+                inter = value.copy()
+                variables_idx = list(set(np.random.choice(range(1, len(inter.nodes)), size=self._neighborhood)))
+                for i in variables_idx:
+                    if inter.nodes[i].operation != ['Input']:
+                        inter.nodes[i].operation = self.target.operations.value.neighbor(inter.nodes[i].operation)
+                res.append(inter)
+            return res
 
     @VarNeighborhood.neighborhood.setter
     def neighborhood(self, neighborhood=None):
-        if neighborhood is not None:
+        if isinstance(neighborhood, list):
+            self._neighborhood = neighborhood[0]
             self.target.operations.value.neighborhood = neighborhood
-        self._neighborhood = None
+        else:
+            self._neighborhood = neighborhood
 
     @VarNeighborhood.target.setter
     def target(self, variable):
@@ -373,6 +390,7 @@ class Intervals(Neighborhood):
         size : int, default=1
             Draw <size> neighbors of <point>.
 
+        Returns
         Returns
         -------
 

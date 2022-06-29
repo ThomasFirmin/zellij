@@ -54,7 +54,6 @@ class NeighborMutation(Mutator):
             if np.random.random() < self.probability and not isinstance(
                     val, Constant
             ):
-                print(individual)
                 # Get a neighbor of the selected attribute
                 individual[val._idx] = val.neighbor(individual[val._idx])
 
@@ -145,8 +144,7 @@ class DAGTwoPoint(Crossover):
         else:  # Swap the two cx points
             cxpoint1, cxpoint2 = cxpoint2, cxpoint1
 
-        ind1[cxpoint1:cxpoint2], ind2[cxpoint1:cxpoint2] \
-            = ind2[cxpoint1:cxpoint2], ind1[cxpoint1:cxpoint2]
+        ind1[cxpoint1:cxpoint2], ind2[cxpoint1:cxpoint2] = ind2[cxpoint1:cxpoint2], ind1[cxpoint1:cxpoint2]
 
         for i in range(cxpoint1, cxpoint2):
             if isinstance(ind1[i], DAGraph):
