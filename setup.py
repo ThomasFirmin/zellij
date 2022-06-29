@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-11T16:12:13+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-05-31T17:02:52+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
 import setuptools
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -49,12 +59,14 @@ setuptools.setup(
     packages=setuptools.find_packages("lib"),
     install_requires=[
         "numpy>=1.21.4",
+        "scipy>=1.7.3",
         "DEAP>=1.3.1",
         "botorch>=0.6.3.1",
         "gpytorch>=1.6.0",
         "matplotlib>=3.5.0",
         "seaborn>=0.11.2",
         "pandas>=1.3.4",
+        "enlighten>=1.10.2",
     ],
     extras_require={"mpi": ["mpi4py>=3.1.2"], "docs": docs_extras},
     python_requires=">=3.6",

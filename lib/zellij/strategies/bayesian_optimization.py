@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:45:01+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-09T15:12:31+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -18,6 +18,7 @@ from gpytorch.mlls.sum_marginal_log_likelihood import ExactMarginalLogLikelihood
 from botorch.optim import optimize_acqf
 from botorch.acquisition.analytic import ExpectedImprovement
 from botorch import fit_gpytorch_model
+from zellij.core.search_space import ContinuousSearchspace
 import time
 
 import logging
@@ -39,12 +40,10 @@ class Bayesian_optimization(Metaheuristic):
 
     Attributes
     ----------
-    loss_func : Loss
-        Loss function to optimize. must be of type f(x)=y
     search_space : Searchspace
         Search space object containing bounds of the search space
     f_calls : int
-        Maximum number of loss_func calls
+        Maximum number of :ref:`lf` calls
     verbose : bool
         If False, there will be no print and no progress bar.
     surrogate : botorch.models.model.Model, default=SingleTaskGP
@@ -75,19 +74,16 @@ class Bayesian_optimization(Metaheuristic):
     Examples
     --------
     >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import Searchspace
+    >>> from zellij.core.search_space import ContinuousSearchspace
+    >>> from zellij.core.variables import FloatVar, ArrayVar
     >>> from zellij.utils.benchmark import himmelblau
     >>> from zellij.strategies.bayesian_optimization import Bayesian_optimization
     >>> import botorch
     >>> import gpytorch
     ...
-    >>> labels = ["a","b","c"]
-    >>> types = ["R","R","R"]
-    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
-    >>> sp = Searchspace(labels,types,values)
     >>> lf = Loss()(himmelblau)
-    ...
-    >>> bo = Bayesian_optimization(lf, sp, 500,
+    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
+    >>> bo = Bayesian_optimization(sp, 500,
     ...       acquisition=botorch.acquisition.monte_carlo.qExpectedImprovement,
     ...       q=5)
     >>> bo.run()
@@ -109,7 +105,6 @@ class Bayesian_optimization(Metaheuristic):
 
     def __init__(
         self,
-        loss_func,
         search_space,
         f_calls,
         verbose=True,
@@ -125,12 +120,10 @@ class Bayesian_optimization(Metaheuristic):
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
         search_space : Searchspace
             Search space object containing bounds of the search space
         f_calls : int
-            Maximum number of loss_func calls
+            Maximum number of :ref:`lf` calls
         verbose : bool
             If False, there will be no print and no progress bar.
         surrogate : botorch.models.model.Model, default=SingleTaskGP
@@ -152,11 +145,19 @@ class Bayesian_optimization(Metaheuristic):
             Use GPU if available
         """
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        super().__init__(search_space, f_calls, verbose)
 
         ##############
         # PARAMETERS #
         ##############
+
+        assert hasattr(search_space, "to_continuous") or isinstance(
+            search_space, ContinuousSearchspace
+        ), logger.error(
+            f"""If the `search_space` is not a `ContinuousSearchspace`,
+            the user must give a `Converter` to the :ref:`sp` object
+            with the kwarg `to_continuous`"""
+        )
 
         self.acquisition = acquisition
         self.surrogate = surrogate
@@ -174,14 +175,24 @@ class Bayesian_optimization(Metaheuristic):
         )
         self.dtype = torch.double
 
-        self.bounds = torch.tensor(
-            [
-                [0.0] * self.search_space.n_variables,
-                [1.0] * self.search_space.n_variables,
-            ],
-            device=self.device,
-            dtype=self.dtype,
-        )
+        if isinstance(self.search_space, ContinuousSearchspace):
+            self.bounds = torch.tensor(
+                [
+                    [v.low_bound for v in self.search_space.values],
+                    [v.up_bound for v in self.search_space.values],
+                ],
+                device=self.device,
+                dtype=self.dtype,
+            )
+        else:
+            self.bounds = torch.tensor(
+                [
+                    [0.0] * self.search_space.size,
+                    [1.0] * self.search_space.size,
+                ],
+                device=self.device,
+                dtype=self.dtype,
+            )
 
         self.best_observed = []
 
@@ -191,23 +202,18 @@ class Bayesian_optimization(Metaheuristic):
             )
         )
 
-    def _generate_initial_data(self):
+    def _generate_initial_data(self, sp):
         # generate training data
         train_x = torch.rand(
             self.initial_size,
-            self.search_space.n_variables,
+            self.search_space.size,
             device=self.device,
             dtype=self.dtype,
         )
-        train_obj = -torch.tensor(
-            self.loss_func(
-                self.search_space.convert_to_continuous(train_x.numpy(), True)
-            )
-        ).unsqueeze(
-            -1
-        )  # add output dimension
+        res = sp.loss(sp.to_continuous.reverse(train_x.numpy()), algorithm="BO")
+        train_obj = -torch.tensor(res).unsqueeze(-1)  # add output dimension
 
-        return train_x, train_obj, -self.loss_func.best_score
+        return train_x, train_obj, -sp.loss.best_score
 
     def _initialize_model(self, train_x, train_obj, state_dict=None):
 
@@ -233,7 +239,8 @@ class Bayesian_optimization(Metaheuristic):
     def _optimize_acqf_and_get_observation(
         self, acq_func, restarts=10, raw=512
     ):
-        """Optimizes the acquisition function, and returns a new candidate and a noisy observation."""
+        """Optimizes the acquisition function, and returns a new candidate
+        and a noisy observation."""
 
         # optimize
         candidates, _ = optimize_acqf(
@@ -251,22 +258,23 @@ class Bayesian_optimization(Metaheuristic):
         # progress bar
         self.pending_pb(len(new_x))
 
-        new_obj = -torch.tensor(
-            self.loss_func(
-                self.search_space.convert_to_continuous(new_x.numpy(), True)
+        if isinstance(self.search_space, ContinuousSearchspace):
+            res = self.search_space.loss(new_x.numpy(), algorithm="BO")
+        else:
+            res = self.search_space.loss(
+                self.search_space.to_continuous.reverse(new_x.numpy()),
+                algorithm="BO",
             )
-        ).unsqueeze(
-            -1
-        )  # add output dimension
+        new_obj = -torch.tensor(res).unsqueeze(-1)  # add output dimension
 
         # progress bar
         self.update_main_pb(
-            len(new_x), explor=True, best=self.loss_func.new_best
+            len(new_x), explor=True, best=self.search_space.loss.new_best
         )
 
         return new_x, new_obj
 
-    def run(self, n_process=1):
+    def run(self, H=None, n_process=1):
 
         """run(n_process=1)
 
@@ -274,18 +282,27 @@ class Bayesian_optimization(Metaheuristic):
 
         Parameters
         ----------
+        H : Fractal, optional
+            When used by FDA, a fractal corresponding to the current subspace is given
+
         n_process : int, default=1
             Determine the number of best solution found to return.
 
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the <n_process> best found points
+            to the continuous format.
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the <n_process> best found scores associated
+            to best_sol.
 
         """
+        if H:
+            sp = H
+        else:
+            sp = self.search_space
 
         # progress bar
         self.build_bar(self.iterations)
@@ -298,7 +315,7 @@ class Bayesian_optimization(Metaheuristic):
             train_x,
             train_obj,
             best_observed_value,
-        ) = self._generate_initial_data()
+        ) = self._generate_initial_data(sp)
 
         # progress bar
         self.pending_pb(self.initial_size)
@@ -307,17 +324,18 @@ class Bayesian_optimization(Metaheuristic):
 
         # progress bar
         self.update_main_pb(
-            self.initial_size, explor=True, best=self.loss_func.new_best
+            self.initial_size, explor=True, best=self.search_space.loss.new_best
         )
         self.meta_pb.update()
 
-        self.best_observed.append(self.loss_func.best_score)
+        self.best_observed.append(self.search_space.loss.best_score)
 
         iteration = 1
 
         # run N_BATCH rounds of BayesOpt after the initial random batch
         while (
-            iteration < self.iterations and self.loss_func.calls < self.f_calls
+            iteration < self.iterations
+            and self.search_space.loss.calls < self.f_calls
         ):
 
             # fit the models
@@ -325,7 +343,7 @@ class Bayesian_optimization(Metaheuristic):
 
             acqf = self.acquisition(
                 model=model,
-                best_f=-self.loss_func.best_score,
+                best_f=-self.search_space.loss.best_score,
                 sampler=self.sampler,
                 X_baseline=(train_x,),
                 **{
@@ -354,7 +372,7 @@ class Bayesian_optimization(Metaheuristic):
             )
 
             # update progress
-            self.best_observed.append(self.loss_func.best_score)
+            self.best_observed.append(self.search_space.loss.best_score)
             self.best_idx.append(iteration)
 
             iteration += 1
@@ -362,12 +380,8 @@ class Bayesian_optimization(Metaheuristic):
             # progress bar
             self.meta_pb.update()
 
-        best_idx = np.argpartition(self.loss_func.all_scores, n_process)
-        best = [self.loss_func.all_solutions[i] for i in best_idx[:n_process]]
-        min = [self.loss_func.all_scores[i] for i in best_idx[:n_process]]
-
-        # self.close_bar()
-        return best, min
+        self.close_bar()
+        return self.search_space.loss.get_best(n_process)
 
     def show(self, filepath=None, save=False):
 
@@ -378,7 +392,8 @@ class Bayesian_optimization(Metaheuristic):
         Parameters
         ----------
         filepath : str, default=""
-            If a filepath is given, the method will read files insidethe folder and will try to plot contents.
+            If a filepath is given, the method will read files insidethe folder
+            and will try to plot contents.
 
         save : boolean, default=False
             Save figures

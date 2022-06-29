@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:45:47+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-01T16:54:56+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -34,10 +34,6 @@ class Simulated_annealing(Metaheuristic):
 
     Attributes
     ----------
-
-    loss_func : Loss
-        :ref:`lf` to optimize. must be of type f(x)=y
-
     search_space : Searchspace
         :ref:`sp` object containing bounds of the search space.
 
@@ -69,21 +65,24 @@ class Simulated_annealing(Metaheuristic):
     --------
 
     >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import Searchspace
+    >>> from zellij.core.search_space import ContinuousSearchspace
+    >>> from zellij.core.variables import FloatVar, ArrayVar
+    >>> from zellij.utils.neighborhoods import FloatInterval, ArrayInterval, Intervals
     >>> from zellij.strategies.simulated_annealing import Simulated_annealing
     >>> from zellij.strategies.utils.cooling import MulExponential
     >>> from zellij.utils.benchmark import himmelblau
     ...
-    >>> labels = ["a","b","c"]
-    >>> types = ["R","R","R"]
-    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
-    >>> sp = Searchspace(labels,types,values)
     >>> lf = Loss()(himmelblau)
+    >>> sp = ContinuousSearchspace(ArrayVar(
+    ...                           FloatVar("a",-5,5, neighbor=FloatInterval(0.5)),
+    ...                           FloatVar("b",-5,5,neighbor=FloatInterval(0.5)),
+    ...                           neighbor=ArrayInterval())
+    ...                         ,lf, neighbor=Intervals())
     ...
     >>> cooling = MulExponential(0.85,100,2,3)
-    >>> sa = Simulated_annealing(lf, sp, 100, cooling, 1)
+    >>> sa = Simulated_annealing(sp, 100, cooling, 1)
     ...
-    >>> point = sp.random_point()[0]
+    >>> point = sp.random_point()
     >>> sa.run(point, lf([point])[0])
     >>> sa.show()
 
@@ -100,19 +99,14 @@ class Simulated_annealing(Metaheuristic):
     """
 
     # Initialize simulated annealing
-    def __init__(
-        self, loss_func, search_space, f_calls, cooling, max_iter, verbose=True
-    ):
+    def __init__(self, search_space, f_calls, cooling, max_iter, verbose=True):
 
-        """__init__(self,loss_func, search_space, f_calls, cooling, max_iter, verbose=True)
+        """__init__(search_space, f_calls, cooling, max_iter, verbose=True)
 
         Initialize Genetic_algorithm class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
-
         search_space : Searchspace
             Search space object containing bounds of the search space.
 
@@ -136,7 +130,7 @@ class Simulated_annealing(Metaheuristic):
 
         """
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        super().__init__(search_space, f_calls, verbose)
 
         # Max iteration after each temperature decrease
         self.max_iter = max_iter
@@ -181,7 +175,7 @@ class Simulated_annealing(Metaheuristic):
 
         """
 
-        self.loss_func.file_created = False
+        self.search_space.loss.file_created = False
 
         if X0:
             self.X0 = X0
@@ -194,8 +188,11 @@ class Simulated_annealing(Metaheuristic):
             self.Y0 = Y0
         else:
             logger.info("Simulated annealing evaluating initial solution")
-            self.Y0 = self.loss_func(
-                self.search_space.convert_to_continuous([self.X0], True)
+            self.Y0 = self.search_space.loss(
+                [self.X0],
+                temperature=self.cooling.Tcurrent,
+                probability=0.0,
+                algorithm="SA",
             )[0]
 
         self.n_best.append(X0)
@@ -228,19 +225,21 @@ class Simulated_annealing(Metaheuristic):
         T_actu = self.cooling.Tcurrent
 
         # Simulated annealing starting
-        while T_actu and self.loss_func.calls < self.f_calls:
+        while T_actu and self.search_space.loss.calls < self.f_calls:
             iteration = 0
             while (
                 iteration < self.max_iter
-                and self.loss_func.calls < self.f_calls
+                and self.search_space.loss.calls < self.f_calls
             ):
 
-                neighbors = self.search_space.get_neighbor(X, size=n_process)
+                neighbors = self.search_space.neighbor.get_neighbor(
+                    X, size=n_process
+                )
 
                 # Update progress bar
                 self.pending_pb(len(neighbors))
 
-                loss_values = self.loss_func(
+                loss_values = self.search_space.loss(
                     neighbors,
                     temperature=self.record_temp[-1],
                     probability=self.record_proba[-1],
@@ -248,7 +247,9 @@ class Simulated_annealing(Metaheuristic):
 
                 # Update progress bar
                 self.update_main_pb(
-                    len(neighbors), explor=False, best=self.loss_func.new_best
+                    len(neighbors),
+                    explor=False,
+                    best=self.search_space.loss.new_best,
                 )
 
                 index_min = np.argmin(loss_values)
@@ -299,16 +300,16 @@ class Simulated_annealing(Metaheuristic):
                 self.meta_pb.update()
 
                 logger.debug(
-                    f"ITERATION: {self.loss_func.calls}/{self.f_calls}"
+                    f"ITERATION: {self.search_space.loss.calls}/{self.f_calls}"
                 )
 
                 self.record_temp.append(T_actu)
 
                 # Save file
-                if self.loss_func.save:
+                if self.search_space.loss.save:
                     if not self.file_created:
                         self.sa_save = os.path.join(
-                            self.loss_func.outputs_path, "sa_best.csv"
+                            self.search_space.loss.outputs_path, "sa_best.csv"
                         )
                         with open(self.sa_save, "w") as f:
                             f.write(
@@ -346,9 +347,14 @@ class Simulated_annealing(Metaheuristic):
         logger.info(f"Best parameters: {X_p} score: {cout_X_p}")
         logger.info("Ending")
 
-        best_idx = np.argpartition(self.loss_func.all_scores, n_process)
-        best = [self.loss_func.all_solutions[i] for i in best_idx[:n_process]]
-        min = [self.loss_func.all_scores[i] for i in best_idx[:n_process]]
+        best_idx = np.argpartition(self.search_space.loss.all_scores, n_process)
+        best = [
+            self.search_space.loss.all_solutions[i]
+            for i in best_idx[:n_process]
+        ]
+        min = [
+            self.search_space.loss.all_scores[i] for i in best_idx[:n_process]
+        ]
 
         self.cooling.reset()
         self.close_bar()
@@ -475,7 +481,7 @@ class Simulated_annealing(Metaheuristic):
 
         if save:
             save_path = os.path.join(
-                self.loss_func.plots_path, f"sa_summary.png"
+                self.search_space.loss.plots_path, f"sa_summary.png"
             )
 
             plt.savefig(save_path, bbox_inches="tight")

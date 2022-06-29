@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:45:45+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-05-31T10:56:18+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -52,31 +52,35 @@ class PHS(Metaheuristic):
     Searchspace : Describes what a loss function is in Zellij
     """
 
-    def __init__(self, loss_func, search_space, f_calls, verbose=True):
+    def __init__(self, search_space, f_calls, verbose=True):
 
-        """__init__(self, loss_func, search_space, f_calls,verbose=True)
+        """__init__(search_space, f_calls,verbose=True)
 
         Initialize PHS class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
-
         search_space : Searchspace
             Search space object containing bounds of the search space.
 
         f_calls : int
-            Maximum number of loss_func calls
+            Maximum number of :ref:`lf` calls
 
         verbose : boolean, default=True
             Algorithm verbosity
 
         """
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        super().__init__(search_space, f_calls, verbose)
+        assert hasattr(search_space, "to_continuous") or isinstance(
+            search_space, ContinuousSearchspace
+        ), logger.error(
+            f"""If the `search_space` is not a `ContinuousSearchspace`,
+            the user must give a `Converter` to the :ref:`sp` object
+            with the kwarg `to_continuous`"""
+        )
 
-    def run(self, H=None, n_process=1):
+    def run(self, H, n_process=1):
         """run(H=None, n_process=1)
 
         Parameters
@@ -96,31 +100,30 @@ class PHS(Metaheuristic):
 
         """
 
-        if H:
-            assert isinstance(H, Hypersphere), logger.error(
-                f"PHS should use Hyperspheres, got {H.__class__.__name__}"
-            )
+        assert isinstance(H, Hypersphere), logger.error(
+            f"PHS should use Hyperspheres, got {H.__class__.__name__}"
+        )
 
-        current_idx = len(self.loss_func.all_solutions)
-        points = np.zeros((3, self.search_space.n_variables), dtype=float)
+        current_idx = len(self.search_space.loss.all_solutions)
+        points = np.zeros((3, self.search_space.size), dtype=float)
 
         self.build_bar(self.f_calls)
 
         # logging
         logger.info("Starting")
 
-        current_idx = len(self.loss_func.all_solutions)
-        points = np.empty((3, self.search_space.n_variables), dtype=float)
+        current_idx = len(self.search_space.loss.all_solutions)
+        points = np.empty((3, self.search_space.size), dtype=float)
 
         # logging
         logger.info("Starting")
 
         self.pending_pb(3)
 
-        if self.loss_func.calls < self.f_calls:
+        if self.search_space.loss.calls < self.f_calls:
 
             radius_part = (
-                H.inflation * H.radius / np.sqrt(self.search_space.n_variables)
+                H.inflation * H.radius / np.sqrt(self.search_space.size)
             )
 
             points[0] = H.center
@@ -131,27 +134,26 @@ class PHS(Metaheuristic):
             points[points < 0] = 0
 
         logger.info(f"Evaluating points")
-        scores = self.loss_func(
-            self.search_space.convert_to_continuous(points, True, True)
-        )
+        if isinstance(self.search_space, ContinuousSearchspace):
+            scores = self.search_space.loss(train_x.numpy(), algorithm="PHS")
+        else:
+            scores = self.search_space.loss(
+                self.search_space.to_continuous.reverse(points, True),
+                algorithm="PHS",
+            )
 
-        self.update_main_pb(3, explor=True, best=self.loss_func.new_best)
+        self.update_main_pb(
+            3, explor=True, best=self.search_space.loss.new_best
+        )
         self.meta_pb.update(3)
 
         logger.info("Ending")
-
-        scores = np.array(scores)
-        idx = np.array(np.argsort(scores))[:n_process]
-
-        # best solution found
-        best_sol = points[idx]
-        best_scores = scores[idx]
 
         self.close_bar()
 
         logger.info("CGS ending")
 
-        return best_sol, best_scores
+        return self.search_space.loss.get_best(n_process)
 
     def show(self, filepath="", save=False):
 

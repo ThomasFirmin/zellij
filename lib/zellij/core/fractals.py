@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:11+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-20T11:51:02+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -19,14 +19,16 @@ from zellij.strategies.utils.spoke_dart import (
     Hyperplane,
     HalfLine,
 )
+from zellij.core.search_space import Searchspace
+from zellij.core.variables import FloatVar, Constant
+from zellij.strategies.utils.direct_utils import SigmaInf
 
 import logging
 
 logger = logging.getLogger("zellij.fractal")
-logger.setLevel(logging.INFO)
 
 
-class Fractal(object):
+class Fractal(Searchspace):
     """Fractal
 
     Fractal is an abstract class used in Fractal Decomposition. This class is used to build a partition tree of fractals. Each object contains a reference to its father, references to its children, its bounds,\
@@ -80,88 +82,57 @@ class Fractal(object):
 
     See Also
     --------
-    LossFunc : Defines what a loss function is
+    :ref:`lf` : Defines what a loss function is
     Tree_search : Defines how to explore and exploit a fractal partition tree.
-    SearchSpace : Initial search space used to build fractal.
+    :ref:`sp` : Initial search space used to build fractal.
     Hypercube : Inherited Fractal type
     Hypersphere : Inherited Fractal type
     """
 
+    _instances = {}
+    _instances_count = {}
+    _god = None
+
     def __init__(
         self,
-        lo_bounds,
-        up_bounds,
-        father="root",
-        level=0,
-        id=0,
-        children=[],
-        score=None,
+        values,
+        loss,
+        heuristic="prout",
+        **kwargs,
     ):
 
-        """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None)
+        """__init__(self,values,loss,father="root",level=0,id=0,children=[],score=None,**kwargs)
 
         Parameters
         ----------
-        lo_bounds : list[float]
-            Contains the lower bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
-
-        up_bounds : list[float]
-            Contains the upper bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
-
-        father : Fractal, default='root'
-            Reference to the parent of the current fractal.
-
-        level : int, default=0
-            Current level of the fractal in the partition tree. See Tree_search.
-
-        id : int, default=0
-            Identifier of a fractal. Combined to the id of itf parents, the id is unique.
-
-        children : list[Fractal], default=[]
-            References to all children of the current fractal. If no child is given, children will be built by the method create_children during the tree building.
-
-        score : {float, int}, default=None
-            Heuristic value associated to the fractal after an exploration.  If no score is given, it will be built after the execution of an exploration strategy inside the fractal.
-
+        heuristic : callable
+            Determine using using current state of the algorithm, how to score the current fractal. Used informations are given to the function at the following order:
+            - The current fractal
+            - The best solution found so far (converted to continuous)
+            - The best score found so far (computed with the loss function)
         """
 
-        self.lo_bounds = np.array(lo_bounds)
-        self.up_bounds = np.array(up_bounds)
+        super(Fractal, self).__init__(values, loss, **kwargs)
 
-        self.id = id
-        self.father = father
         self.children = []
-        self.score = score
-        self.level = level
+        self.score = float("inf")
 
-        self.min_score = float("inf")
-        self.best_sol = None
-        self.solutions = []
-        self.all_scores = []
+    def __new__(cls, *args, **kwargs):
+        obj = super(Fractal, cls).__new__(cls)
+        if cls not in cls._instances:
+            obj.id = 0
+            obj.father = "root"
+            obj.level = 0
+            cls._god = obj
+            cls._instances[cls] = obj
+            cls._instances_count[cls] = 0
+        else:
+            cls._instances_count[cls] += 1
+            obj.id = cls._instances_count[cls]
+            obj.level = None
+            obj.father = None
 
-    def add_point(self, score, solution):
-
-        """add_point(self,score, solution)
-
-        This method adds a point associated to its evaluation by the loss function (f(solution)=score), to the historic of the fractal,\
-         and determine if this point is the best one among all evaluated points inside the fractal.
-
-        Parameters
-        ----------
-        score : {int, float}
-            Score associated to the evaluated solution
-
-        solution : list[{int, float, str}]
-            It corresponds to a point in the mixed format inside the fractal and associated to its evaluation (score).
-
-        """
-        for sol, sco in zip(solution, score):
-            self.solutions.append(sol)
-            self.all_scores.append(sco)
-
-            if sco < self.min_score:
-                self.min_score = sco
-                self.best_sol = sol
+        return obj
 
     @abc.abstractmethod
     def create_children(self):
@@ -171,6 +142,24 @@ class Fractal(object):
 
         """
         pass
+
+    def compute_score(self, idx):
+        self.score = self.heuristic(self.loss, idx)
+
+    @property
+    def father(self):
+        return self._father
+
+    @father.setter
+    def father(self, f):
+        assert f != self, f"Father of a Fractal cannot be `self`"
+        self._father = f
+
+    def subspace(self, low_bounds, up_bounds, **kwargs):
+        new = super(Fractal, self).subspace(low_bounds, up_bounds, **kwargs)
+        new.father = self
+        new.level = self.level + 1
+        return new
 
 
 class Hypercube(Fractal):
@@ -204,13 +193,10 @@ class Hypercube(Fractal):
 
     def __init__(
         self,
-        lo_bounds,
-        up_bounds,
-        father="root",
-        level=0,
-        id=0,
-        children=[],
-        score=None,
+        values,
+        loss,
+        heuristic="prout",
+        **kwargs,
     ):
 
         """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None)
@@ -240,11 +226,57 @@ class Hypercube(Fractal):
 
         """
 
-        super().__init__(
-            lo_bounds, up_bounds, father, level, id, children, score
-        )
+        super(Hypercube, self).__init__(values, loss, **kwargs)
 
-        self.dim = len(self.up_bounds)
+        continuous = True
+        for v in self.values:
+            if not (
+                isinstance(v, FloatVar)
+                or (isinstance(v, Constant) and isinstance(v.value, float))
+            ):
+                continuous = False
+
+        if continuous:
+            self.lo_bounds = np.zeros(self.size)
+            self.up_bounds = np.zeros(self.size)
+            for i, v in enumerate(self.values):
+                if isinstance(v, FloatVar):
+                    self.lo_bounds[i] = v.low_bound
+                    self.up_bounds[i] = v.up_bound
+                else:
+                    self.lo_bounds[i] = v.value
+                    self.up_bounds[i] = v.value
+
+            self.to_convert = False
+
+        elif all(hasattr(v, "to_continuous") for v in self.values):
+            logger.warning(
+                f"""Be carefull, for {self.__class__.__name__}  with
+            mixed variables, the Searchspace wil be approximated by the unit
+            hypercube. Upper and lower bounds will be between [0,1],
+            the `to_continuous` conversion method must take this into account.
+            For example, Minmax converter can be used."""
+            )
+
+            assert hasattr(
+                self, "to_continuous"
+            ), f"""When {self.__class__.__name__} as mixed variables,
+            a `to_continuous` method must be implemented.
+            Use the `to_continuous` kwargs when defining the :ref:`Searchspace`
+            """
+
+            self.lo_bounds = np.array([0.0] * self.size)
+            self.up_bounds = np.array([1.0] * self.size)
+            self.to_convert = True
+
+        else:
+            raise ValueError(
+                f"""For {self.__class__.__name__}, all variables
+            must be `FloatVar`, or all variables must have a `to_continuous`
+            method added at the initialization of the variable.
+            Got {self.values}.
+            ex:\n>>> FloatVar("test",-5,5,to_continuous=...)."""
+            )
 
     def create_children(self):
 
@@ -255,15 +287,13 @@ class Hypercube(Fractal):
 
         """
 
-        level = self.level + 1
-
         up_m_lo = self.up_bounds - self.lo_bounds
         radius = np.abs(up_m_lo / 2)
         bounds = [[self.lo_bounds, self.up_bounds]]
 
         # Hyperplan bisecting
         next_b = []
-        for i in range(self.dim):
+        for i in range(self.size):
             next_b = []
             for b in bounds:
 
@@ -280,178 +310,27 @@ class Hypercube(Fractal):
             bounds = copy.deepcopy(next_b)
 
         # Create Hypercube
-        n_h = 0
-        for b in bounds:
-            h = Hypercube(b[0], b[1], self, level, n_h)
-            self.children.append(h)
-            n_h += 1
+        if self.to_convert:
+            for b in bounds:
+                h = self.subspace(
+                    self.to_continuous.reverse(b[0]),
+                    self.to_continuous.reverse(b[1]),
+                )
+                self.children.append(h)
+        else:
+            for b in bounds:
+                h = self.subspace(list(b[0]), list(b[1]))
+                self.children.append(h)
 
     def __repr__(self):
-        if type(self.father) == str:
-            id = "root"
-        else:
-            id = str(self.father.id)
 
         return (
-            "ID: "
+            super(Hypercube, self).__repr__()
+            + "\n"
+            + "ID: "
             + str(self.id)
             + " son of "
-            + id
-            + "\n"
-            + "BOUNDS: "
-            + str(self.lo_bounds)
-            + "|"
-            + str(self.up_bounds)
-            + "\n"
-        )
-
-
-class Hypersphere2(Fractal):
-
-    """Hypersphere
-
-    The Hypersphere is a basic hypervolume to decompose the SearchSpace. It is one of the most computationally efficient, to decompose the SearchSpace.
-    To decompose an hypersphere by equalsize hypersphere the complexity is equal to $2*d$, d is the dimension, moreover building an hypersphere is easy, it only needs a center and its radius.
-    However the space coverage is poor, indeed the volume of an hypersphere tends to 0, when the dimension tends to infinity. To partially tackle this problem, an inflation rate allows bigger hypersphere,
-    but this will create overlapping hypervolumes.
-
-    Attributes
-    ----------
-
-    dim : int
-        Number of dimensions
-
-    inflation : float
-        Inflation rate of hyperspheres. Be carefull a too large inflation can result to hypersphere with identical center and radius.
-
-    center : list[float]
-        List of floats containing the coordinates
-
-    radius : list[float]
-        List of floats containing the radius for each dimension (in case the initial SearchSpace is not an hypercube).
-
-    Methods
-    -------
-
-    create_children(self)
-        Method which defines how to build children Hyperspheres based on the current Hypersphere.
-
-
-    See Also
-    --------
-    LossFunc : Defines what a loss function is
-    Tree_search : Defines how to explore and exploit a fractal partition tree.
-    SearchSpace : Initial search space used to build fractal.
-    Fractal : Parent class. Basic object to define what a fractal is.
-    Hypercube : Another hypervolume, with different properties
-    """
-
-    def __init__(
-        self,
-        lo_bounds,
-        up_bounds,
-        father="root",
-        level=0,
-        id=0,
-        inflation=1.75,
-        children=[],
-        score=None,
-    ):
-
-        """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, inflation=1.75, children=[], score=None)
-
-        Parameters
-        ----------
-        lo_bounds : list[float]
-            Contains the lower bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
-
-        up_bounds : list[float]
-            Contains the upper bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
-
-        father : Fractal, default='root'
-            Reference to the parent of the current fractal.
-
-        level : int, default=0
-            Current level of the fractal in the partition tree. See Tree_search.
-
-        id : int, default=0
-            Identifier of a fractal. Combined to the id of itf parents, the id is unique.
-
-        children : list[Fractal], default=[]
-            References to all children of the current fractal.
-            If no child IS given, children will be built by the method create_children during the tree building.
-
-        score : {float, int}, default=None
-            Heuristic value associated to the fractal after an exploration.  If no score is given, it will be built after the execution of an exploration strategy inside the fractal.
-
-        """
-
-        super().__init__(
-            lo_bounds, up_bounds, father, level, id, children, score
-        )
-
-        self.dim = len(self.up_bounds)
-
-        up_m_lo = self.up_bounds - self.lo_bounds
-        center = self.lo_bounds + (up_m_lo) / 2
-        radius = up_m_lo[0] / 2
-
-        self.center = center
-        self.radius = radius
-
-        self.inflation = inflation
-
-        self.radius = self.radius * self.inflation
-
-    def create_children(self):
-
-        """create_children(self)
-
-        Method which defines how to build children Hypercubes based on the current Hypercube.
-        It uses Hyperplan bisecting to build children. To build an Hypercube, it only requires lower and upper bounds.
-
-        """
-
-        level = self.level + 1
-
-        r_p = self.radius / (1 + np.sqrt(2))
-
-        n_h = 0
-        for i in range(self.dim):
-
-            n_h += 1
-            center = np.copy(self.center)
-            center[i] += ((-1) ** i) * (self.radius - r_p)
-
-            lo = np.maximum(center - r_p, self.lo_bounds)
-            up = np.minimum(center + r_p, self.up_bounds)
-
-            h = Hypersphere(lo, up, self, level, n_h, inflation=self.inflation)
-            self.children.append(h)
-
-            n_h += 1
-            center = np.copy(self.center)
-            center[i] -= ((-1) ** i) * (self.radius - r_p)
-
-            lo = np.maximum(center - r_p, self.lo_bounds)
-            up = np.minimum(center + r_p, self.up_bounds)
-
-            h = Hypersphere(lo, up, self, level, n_h, inflation=self.inflation)
-            self.children.append(h)
-
-    def __repr__(self):
-        if type(self.father) == str:
-            id = "root"
-        else:
-            id = str(self.father.id)
-
-        return (
-            "ID: "
-            + str(self.id)
-            + " son of "
-            + id
-            + " at level "
-            + str(self.level)
+            + f"{self.father.id}"
             + "\n"
             + "BOUNDS: "
             + str(self.lo_bounds)
@@ -503,29 +382,23 @@ class Hypersphere(Fractal):
 
     def __init__(
         self,
-        lo_bounds,
-        up_bounds,
-        father="root",
-        level=0,
-        id=0,
-        radius=None,
-        center=None,
+        values,
+        loss,
+        heuristic="prout",
         inflation=1.75,
-        children=[],
-        score=None,
+        compute_bounds=False,
+        **kwargs,
     ):
 
-        """__init__(father,lo_bounds,up_bounds,level,id,children=[],score=None)
+        """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None)
 
         Parameters
         ----------
         lo_bounds : list[float]
             Contains the lower bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
-            /!\ Those bounds are clipped in case the hypersphere is outside the decision space
 
         up_bounds : list[float]
             Contains the upper bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
-            /!\ Those bounds are clipped in case the hypersphere is outside the decision space
 
         father : Fractal, default='root'
             Reference to the parent of the current fractal.
@@ -534,39 +407,81 @@ class Hypersphere(Fractal):
             Current level of the fractal in the partition tree. See Tree_search.
 
         id : int, default=0
-            Identifier of a fractal. Combined to the id of its parents, the id is unique.
+            Identifier of a fractal. Combined to the id of itf parents, the id is unique.
 
         children : list[Fractal], default=[]
-            References to all children of the current fractal.
-            If no child is given, children will be built by the method create_children during the tree building.
+            References to all children of the current fractal. If no child is given, children will be built by the method create_children during the tree building.
 
         score : {float, int}, default=None
-            Heuristic value associated to the fractal after an exploration.
-            If no score is given, it will be built after the execution of an exploration inside the fractal.
+            Heuristic value associated to the fractal after an exploration.  If no score is given, it will be built after the execution of an exploration strategy inside the fractal.
 
         """
 
-        super().__init__(
-            lo_bounds, up_bounds, father, level, id, children, score
-        )
+        super(Hypersphere, self).__init__(values, loss, **kwargs)
 
-        if isinstance(father, str):
-            self.original_up = self.lo_bounds
-            self.original_down = self.up_bounds
-        else:
-            self.original_up = father.original_up
-            self.original_down = father.original_down
-
-        self.dim = len(self.up_bounds)
-
-        if center is None or radius is None:
-            up_m_lo = self.up_bounds - self.lo_bounds
-            center = self.lo_bounds + (up_m_lo) / 2
-            radius = up_m_lo[0] / 2
-
-        self.center = center
         self.inflation = inflation
-        self.radius = radius * self.inflation
+        self.compute_bounds = compute_bounds
+
+        continuous = True
+        for v in self.values:
+            if not (
+                isinstance(v, FloatVar)
+                or (isinstance(v, Constant) and isinstance(v.value, float))
+            ):
+                continuous = False
+
+        if continuous:
+            self.to_convert = False
+
+            if self.compute_bounds or self.level == 0:
+                self.lo_bounds = np.zeros(self.size)
+                self.up_bounds = np.zeros(self.size)
+                for i, v in enumerate(self.values):
+                    if isinstance(v, FloatVar):
+                        self.lo_bounds[i] = v.low_bound
+                        self.up_bounds[i] = v.up_bound
+                    else:
+                        self.lo_bounds[i] = v.value
+                        self.up_bounds[i] = v.value
+
+        elif all(hasattr(v, "to_continuous") for v in self.values):
+            logger.warning(
+                f"""Be carefull, for {self.__class__.__name__}  with
+            mixed variables, the Searchspace wil be approximated by the unit
+            hypercube. Upper and lower bounds will be between [0,1],
+            the `to_continuous` conversion method must take this into account.
+            For example, Minmax converter can be used."""
+            )
+
+            assert hasattr(
+                self, "to_continuous"
+            ), f"""When {self.__class__.__name__} as mixed variables,
+            a `to_continuous` method must be implemented.
+            Use the `to_continuous` kwargs when defining the :ref:`Searchspace`
+            """
+
+            self.to_convert = True
+
+            if self.compute_bounds or self.level == 0:
+                self.lo_bounds = np.array([0.0] * self.size)
+                self.up_bounds = np.array([1.0] * self.size)
+
+        else:
+            raise ValueError(
+                f"""For {self.__class__.__name__}, all variables
+            must be `FloatVar`, or all variables must have a `to_continuous`
+            method added at the initialization of the variable.
+            Got {self.values}.
+            ex:\n>>> FloatVar("test",-5,5,to_continuous=...)."""
+            )
+
+        if self.level == 0:
+            up_m_lo = self.up_bounds - self.lo_bounds
+            self.center = self.lo_bounds + (up_m_lo) / 2
+            self.radius = up_m_lo[0] / 2 * self.inflation
+        else:
+            self.center = None
+            self.radius = None
 
     def create_children(self):
 
@@ -577,87 +492,71 @@ class Hypersphere(Fractal):
 
         """
 
-        level = self.level + 1
-
         r_p = self.radius / (1 + np.sqrt(2))
 
-        n_h = 0
-        for i in range(self.dim):
-
-            logger.info(f"Building children n°{n_h}/{self.dim*2}")
+        for i in range(self.size):
 
             center = np.copy(self.center)
-            center[i] += r_p
-            center[i] = np.minimum(center[i], 1)
+            center[i] += self.radius - r_p
 
-            lo = center - r_p
-            lo[lo < 0] = 0
-            lo[lo > 1] = 1
+            lo = np.maximum(center - r_p, self._god.lo_bounds)
+            up = np.minimum(center + r_p, self._god.up_bounds)
 
-            up = center + r_p
-            up[up < 0] = 0
-            up[up > 1] = 1
-
-            h = Hypersphere(
-                lo,
-                up,
-                self,
-                level,
-                n_h,
-                center=np.copy(center),
-                radius=r_p,
-                inflation=self.inflation,
+            if self.to_convert:
+                h = self.subspace(
+                    self.to_continuous.reverse(lo, sub_values=True),
+                    self.to_continuous.reverse(up, sub_values=True),
+                )
+            else:
+                h = self.subspace(lo, up)
+            h.center = np.minimum(
+                np.maximum(center, self._god.lo_bounds), self._god.up_bounds
             )
-
+            h.radius = r_p
             self.children.append(h)
-            n_h += 1
-
-            logger.info(f"Building children n°{n_h}/{self.dim*2}")
 
             center = np.copy(self.center)
-            center[i] -= r_p
-            center[i] = np.maximum(center[i], 0)
+            center[i] -= self.radius - r_p
 
-            lo = center - r_p
-            lo[lo < 0] = 0
-            lo[lo > 1] = 1
+            lo = np.maximum(center - r_p, self._god.lo_bounds)
+            up = np.minimum(center + r_p, self._god.up_bounds)
 
-            up = center + r_p
-            up[up < 0] = 0
-            up[up > 1] = 1
-
-            h = Hypersphere(
-                lo,
-                up,
-                self,
-                level,
-                n_h,
-                center=np.copy(center),
-                radius=r_p,
-                inflation=self.inflation,
+            if self.to_convert:
+                h = self.subspace(
+                    self.to_continuous.reverse(lo, sub_values=True),
+                    self.to_continuous.reverse(up, sub_values=True),
+                )
+            else:
+                h = self.subspace(lo, up)
+            h.center = np.minimum(
+                np.maximum(center, self._god.lo_bounds), self._god.up_bounds
             )
-
+            h.radius = r_p
             self.children.append(h)
-            n_h += 1
+
+    def subspace(self, low_bounds, up_bounds):
+        new = super(Hypersphere, self).subspace(low_bounds, up_bounds)
+        new.inflation = self.inflation
+        return new
 
     def __repr__(self):
-        if type(self.father) == str:
-            id = "root"
-        else:
-            id = str(self.father.id)
 
         return (
-            "ID: "
+            super(Hypersphere, self).__repr__()
+            + "\n"
+            + "ID: "
             + str(self.id)
             + " son of "
-            + id
-            + " at level "
-            + str(self.level)
+            + f"{self.father.id}"
             + "\n"
-            + "BOUNDS: "
-            + str(self.lo_bounds)
-            + "|"
-            + str(self.up_bounds)
+            + "Center: "
+            + str(self.center)
+            + "\n"
+            + "Radius: "
+            + str(self.radius)
+            + "\n"
+            + "Inflation: "
+            + str(self.inflation)
             + "\n"
         )
 
@@ -692,14 +591,11 @@ class Section(Fractal):
 
     def __init__(
         self,
-        lo_bounds,
-        up_bounds,
-        father="root",
-        level=0,
-        id=0,
-        children=[],
-        score=None,
-        n=2,
+        values,
+        loss,
+        heuristic="prout",
+        section=2,
+        **kwargs,
     ):
 
         """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, n=2)
@@ -729,29 +625,72 @@ class Section(Fractal):
 
         """
 
-        super().__init__(
-            lo_bounds, up_bounds, father, level, id, children, score
+        super(Section, self).__init__(values, loss, **kwargs)
+
+        assert section > 1, logger.error(
+            f"{section}-Section is not possible, section must be > 1"
         )
 
-        assert n > 1, logger.error(
-            f"{n}-Section is not possible, n must be > 1"
-        )
+        self.section = section
 
-        self.dim = len(self.up_bounds)
-        self.section = n
+        continuous = True
+        for v in self.values:
+            if not (
+                isinstance(v, FloatVar)
+                or (isinstance(v, Constant) and isinstance(v.value, float))
+            ):
+                continuous = False
+
+        if continuous:
+            self.lo_bounds = np.zeros(self.size)
+            self.up_bounds = np.zeros(self.size)
+            for i, v in enumerate(self.values):
+                if isinstance(v, FloatVar):
+                    self.lo_bounds[i] = v.low_bound
+                    self.up_bounds[i] = v.up_bound
+                else:
+                    self.lo_bounds[i] = v.value
+                    self.up_bounds[i] = v.value
+
+            self.to_convert = False
+
+        elif all(hasattr(v, "to_continuous") for v in self.values):
+            logger.warning(
+                f"""Be carefull, for {self.__class__.__name__}  with
+            mixed variables, the Searchspace wil be approximated by the unit
+            hypercube. Upper and lower bounds will be between [0,1],
+            the `to_continuous` conversion method must take this into account.
+            For example, Minmax converter can be used."""
+            )
+
+            assert hasattr(
+                self, "to_continuous"
+            ), f"""When {self.__class__.__name__} as mixed variables,
+            a `to_continuous` method must be implemented.
+            Use the `to_continuous` kwargs when defining the :ref:`Searchspace`
+            """
+
+            self.lo_bounds = np.array([0.0] * self.size)
+            self.up_bounds = np.array([1.0] * self.size)
+            self.to_convert = True
+
+        else:
+            raise ValueError(
+                f"""For {self.__class__.__name__}, all variables
+            must be `FloatVar`, or all variables must have a `to_continuous`
+            method added at the initialization of the variable.
+            Got {self.values}.
+            ex:\n>>> FloatVar("test",-5,5,to_continuous=...)."""
+            )
 
         up_m_lo = self.up_bounds - self.lo_bounds
-        self.center = self.lo_bounds + (up_m_lo) / 2
         self.longest = np.argmax(up_m_lo)
-        self.length = up_m_lo[self.longest]
+        self.width = up_m_lo[self.longest]
+        self.center = up_m_lo / 2
 
     def create_children(self):
 
-        level = self.level + 1
-
-        n_h = 0
-
-        new_val = self.length / self.section
+        new_val = self.width / self.section
 
         lo = np.copy(self.lo_bounds)
         up = np.copy(self.up_bounds)
@@ -759,7 +698,14 @@ class Section(Fractal):
 
         for i in range(self.section):
 
-            h = Section(lo, up, self, level, n_h, n=self.section)
+            if self.to_convert:
+                h = self.subspace(
+                    self.to_continuous.reverse(lo, sub_values=True),
+                    self.to_continuous.reverse(up, sub_values=True),
+                    section=self.section,
+                )
+            else:
+                h = self.subspace(lo, up, section=self.section)
 
             self.children.append(h)
 
@@ -767,8 +713,6 @@ class Section(Fractal):
             up = np.copy(h.up_bounds)
             lo[self.longest] += new_val
             up[self.longest] += new_val
-
-            n_h += 1
 
     def __repr__(self):
         if type(self.father) == str:
@@ -1817,3 +1761,550 @@ class BoxedVoronoi(Voronoi):
         self.lo_bounds = np.nanmin(sampled_bounds, axis=0)
         self.up_bounds = np.nanmax(sampled_bounds, axis=0)
         del self.hyperplanes
+
+
+class Direct(Fractal):
+
+    """Direct
+
+    Performs a n-Section of the search space. 3-Section: DIRECT, 2-Section: BIRECT
+
+    Attributes
+    ----------
+
+    dim : int
+        Number of dimensions
+
+    Methods
+    -------
+
+    create_children(self)
+        Method which defines how to build children Hyper-rectangles based on the current Hyper-rectangle.
+
+
+    See Also
+    --------
+    LossFunc : Defines what a loss function is
+    Tree_search : Defines how to explore and exploit a fractal partition tree.
+    SearchSpace : Initial search space used to build fractal.
+    Fractal : Parent class. Basic object to define what a fractal is.
+    Hypercube : Another hypervolume, with different properties
+    """
+
+    def __init__(
+        self,
+        values,
+        loss,
+        max_calls,
+        heuristic="prout",
+        force_convert=False,
+        sigma=SigmaInf(),
+        **kwargs,
+    ):
+
+        """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, n=2)
+
+        Parameters
+        ----------
+        lo_bounds : list[float]
+            Contains the lower bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
+
+        up_bounds : list[float]
+            Contains the upper bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
+
+        father : Fractal, default='root'
+            Reference to the parent of the current fractal.
+
+        level : int, default=0
+            Current level of the fractal in the partition tree. See Tree_search.
+
+        id : int, default=0
+            Identifier of a fractal. Combined to the id of itf parents, the id is unique.
+
+        children : list[Fractal], default=[]
+            References to all children of the current fractal. If no child is given, children will be built by the method create_children during the tree building.
+
+        score : {float, int}, default=None
+            Heuristic value associated to the fractal after an exploration.  If no score is given, it will be built after the execution of an exploration strategy inside the fractal.
+
+        """
+
+        super(Direct, self).__init__(values, loss, **kwargs)
+
+        self.force_convert = force_convert
+
+        count_constant = 0
+
+        continuous = True
+        for v in self.values:
+            if isinstance(v, Constant):
+                count_constant += 1
+                if not isinstance(v.value, float):
+                    continuous = False
+            elif not isinstance(v, FloatVar):
+                continuous = False
+
+        if count_constant == len(self.values):
+            self.is_constant = True
+        else:
+            self.is_constant = False
+
+        if continuous and not self.force_convert:
+            self.lo_bounds = np.zeros(self.size)
+            self.up_bounds = np.zeros(self.size)
+            for i, v in enumerate(self.values):
+                if isinstance(v, FloatVar):
+                    self.lo_bounds[i] = v.low_bound
+                    self.up_bounds[i] = v.up_bound
+                else:
+                    self.lo_bounds[i] = v.value
+                    self.up_bounds[i] = v.value
+
+            self.to_convert = False
+
+        elif all(hasattr(v, "to_continuous") for v in self.values):
+            # logger.warning(
+            #     f"""
+            # Be carefull, for {self.__class__.__name__}  with
+            # mixed variables, the Searchspace wil be approximated by the unit
+            # hypercube. Upper and lower bounds will be between [0,1],
+            # the `to_continuous` conversion method must take this into account.
+            # For example, Minmax converter can be used.
+            # """
+            # )
+
+            assert hasattr(
+                self, "to_continuous"
+            ), f"""
+            When {self.__class__.__name__} as mixed variables,
+            a `to_continuous` method must be implemented.
+            Use the `to_continuous` kwargs when defining the :ref:`Searchspace`
+            """
+            lo = np.zeros(self.size)
+            up = np.zeros(self.size)
+            for i, v in enumerate(self.values):
+                if isinstance(v, FloatVar):
+                    lo[i] = v.low_bound
+                    up[i] = v.up_bound
+                else:
+                    lo[i] = v.value
+                    up[i] = v.value
+            self.lo_bounds = np.array(
+                self.to_continuous.convert(lo, sub_values=True)
+            )
+            self.up_bounds = np.array(
+                self.to_continuous.convert(up, sub_values=True)
+            )
+            self.to_convert = True
+
+        else:
+            raise ValueError(
+                f"""
+            For {self.__class__.__name__}, all variables
+            must be `FloatVar`, or all variables must have a `to_continuous`
+            method added at the initialization of the variable.
+            Got {self.values}.
+            ex:\n>>> FloatVar("test",-5,5,to_continuous=...).
+            """
+            )
+
+        up_m_lo = self.up_bounds - self.lo_bounds
+        self.longest = np.argmax(up_m_lo)
+        self.width = up_m_lo[self.longest]
+        self.center = (self.lo_bounds + self.up_bounds) * 0.5
+
+        if self.level == 0:
+            if self.to_convert:
+                self.score = self.loss(
+                    self.to_continuous.reverse([self.center], sub_values=True)
+                )[0]
+            else:
+                self.score = self.loss([self.center])[0]
+
+            self.length = 1.0
+        else:
+            self.length = None
+
+        self.set_i = np.where(up_m_lo == up_m_lo[self.longest])[0]
+
+        assert max_calls > 3, logger.error(
+            f"{max_calls} must be greater than 3"
+        )
+        self.max_calls = max_calls
+
+        self.stage = 0
+        self.sigma = sigma
+
+    def create_children(self):
+
+        section_length = self.width / 3
+        dim = 0
+        points = np.empty((0, self.size), dtype=float)
+        # While there is dimensions of equal length or remaining calls to loss
+        while (
+            dim < len(self.set_i)
+            and self.loss.calls + dim * 2 <= self.max_calls
+        ):
+            new_p = np.repeat([self.center], 2, axis=0)
+            new_p[0][self.set_i[dim]] -= section_length
+            new_p[1][self.set_i[dim]] += section_length
+            points = np.append(points, new_p, axis=0)
+            dim += 1
+
+        if len(points) > 0:
+            if self.to_convert:
+                scores = self.loss(
+                    self.to_continuous.reverse(points, sub_values=True)
+                )
+            else:
+                scores = self.loss(points)
+
+            scores = np.reshape(scores, (-1, 2))
+            scores_dim = scores.min(axis=1)
+            argsort = np.argsort(scores_dim)
+
+            current_section = self
+            for stage, arg in enumerate(argsort):
+
+                lo = np.copy(current_section.lo_bounds)
+                up = np.copy(current_section.up_bounds)
+                up[self.set_i[arg]] = lo[self.set_i[arg]] + section_length
+                up = np.minimum(up, self._god.up_bounds)
+                children = []
+                # Build sections
+                for i in range(3):
+
+                    if self.to_convert:
+
+                        h = current_section.subspace(
+                            current_section.to_continuous.reverse(
+                                lo, sub_values=True
+                            ),
+                            current_section.to_continuous.reverse(
+                                up, sub_values=True
+                            ),
+                            max_calls=self.max_calls,
+                            force_convert=self.force_convert,
+                            sigma=self.sigma,
+                        )
+                    else:
+
+                        h = current_section.subspace(
+                            lo,
+                            up,
+                            max_calls=self.max_calls,
+                            force_convert=self.force_convert,
+                            sigma=self.sigma,
+                        )
+
+                    if not h.is_constant:
+                        h.father = self
+                        h.stage = stage
+                        h.length = self.sigma(h)
+                        h.level = int(
+                            (
+                                np.log(
+                                    self._god.up_bounds[h.longest]
+                                    - self._god.lo_bounds[h.longest]
+                                )
+                                - np.log(h.width)
+                            )
+                            / np.log(3)
+                        )
+                        children.append(h)
+
+                    lo[self.set_i[arg]] += section_length
+                    up[self.set_i[arg]] += section_length
+
+                if children:
+                    children[0].score, children[2].score = scores[arg]
+                    self.children.append(children[0])
+                    self.children.append(children[2])
+
+                    children[1].score = self.score
+                    current_section = children[1]
+
+            if current_section != self:
+                self.children.append(current_section)
+
+    def __repr__(self):
+        if type(self.father) == str:
+            id = "root"
+        else:
+            id = str(self.father.id)
+
+        return (
+            super(Direct, self).__repr__()
+            + "\n"
+            + "ID: "
+            + str(self.id)
+            + " son of "
+            + f"{id}"
+            + "\n"
+            + "BOUNDS: "
+            + str(self.lo_bounds)
+            + "|"
+            + str(self.up_bounds)
+            + "\n"
+        )
+
+
+class Soo(Fractal):
+
+    """Section
+
+    Performs a n-Section of the search space. 3-Section: DIRECT, 2-Section: BIRECT
+
+    Attributes
+    ----------
+
+    dim : int
+        Number of dimensions
+
+    Methods
+    -------
+
+    create_children(self)
+        Method which defines how to build children Hyper-rectangles based on the current Hyper-rectangle.
+
+
+    See Also
+    --------
+    LossFunc : Defines what a loss function is
+    Tree_search : Defines how to explore and exploit a fractal partition tree.
+    SearchSpace : Initial search space used to build fractal.
+    Fractal : Parent class. Basic object to define what a fractal is.
+    Hypercube : Another hypervolume, with different properties
+    """
+
+    def __init__(
+        self,
+        values,
+        loss,
+        max_calls,
+        heuristic="prout",
+        section=3,
+        force_convert=False,
+        **kwargs,
+    ):
+
+        """__init__(lo_bounds, up_bounds, father="root", level=0, id=0, children=[], score=None, n=2)
+
+        Parameters
+        ----------
+        lo_bounds : list[float]
+            Contains the lower bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
+
+        up_bounds : list[float]
+            Contains the upper bounds for each dimension of the fractal. Each fractal is bounded by its circumscribed hypercube.
+
+        father : Fractal, default='root'
+            Reference to the parent of the current fractal.
+
+        level : int, default=0
+            Current level of the fractal in the partition tree. See Tree_search.
+
+        id : int, default=0
+            Identifier of a fractal. Combined to the id of itf parents, the id is unique.
+
+        children : list[Fractal], default=[]
+            References to all children of the current fractal. If no child is given, children will be built by the method create_children during the tree building.
+
+        score : {float, int}, default=None
+            Heuristic value associated to the fractal after an exploration.  If no score is given, it will be built after the execution of an exploration strategy inside the fractal.
+
+        """
+
+        super(Soo, self).__init__(values, loss, **kwargs)
+
+        assert (
+            section > 1
+        ), f"""
+        Cannot divide a hypercube into {section} parts. Section must be >1
+        """
+        self.section = section
+
+        self.force_convert = force_convert
+
+        count_constant = 0
+
+        continuous = True
+        for v in self.values:
+            if isinstance(v, Constant):
+                count_constant += 1
+                if not isinstance(v.value, float):
+                    continuous = False
+            elif not isinstance(v, FloatVar):
+                continuous = False
+
+        if count_constant == len(self.values):
+            self.is_constant = True
+        else:
+            self.is_constant = False
+
+        if continuous and not self.force_convert:
+            self.lo_bounds = np.zeros(self.size)
+            self.up_bounds = np.zeros(self.size)
+            for i, v in enumerate(self.values):
+                if isinstance(v, FloatVar):
+                    self.lo_bounds[i] = v.low_bound
+                    self.up_bounds[i] = v.up_bound
+                else:
+                    self.lo_bounds[i] = v.value
+                    self.up_bounds[i] = v.value
+
+            self.to_convert = False
+
+        elif all(hasattr(v, "to_continuous") for v in self.values):
+            # logger.warning(
+            #     f"""
+            # Be carefull, for {self.__class__.__name__}  with
+            # mixed variables, the Searchspace wil be approximated by the unit
+            # hypercube. Upper and lower bounds will be between [0,1],
+            # the `to_continuous` conversion method must take this into account.
+            # For example, Minmax converter can be used.
+            # """
+            # )
+
+            assert hasattr(
+                self, "to_continuous"
+            ), f"""
+            When {self.__class__.__name__} as mixed variables,
+            a `to_continuous` method must be implemented.
+            Use the `to_continuous` kwargs when defining the :ref:`Searchspace`
+            """
+            lo = np.zeros(self.size)
+            up = np.zeros(self.size)
+            for i, v in enumerate(self.values):
+                if isinstance(v, FloatVar):
+                    lo[i] = v.low_bound
+                    up[i] = v.up_bound
+                else:
+                    lo[i] = v.value
+                    up[i] = v.value
+            self.lo_bounds = np.array(
+                self.to_continuous.convert(lo, sub_values=True)
+            )
+            self.up_bounds = np.array(
+                self.to_continuous.convert(up, sub_values=True)
+            )
+            self.to_convert = True
+
+        else:
+            raise ValueError(
+                f"""
+            For {self.__class__.__name__}, all variables
+            must be `FloatVar`, or all variables must have a `to_continuous`
+            method added at the initialization of the variable.
+            Got {self.values}.
+            ex:\n>>> FloatVar("test",-5,5,to_continuous=...).
+            """
+            )
+
+        up_m_lo = self.up_bounds - self.lo_bounds
+        self.longest = np.argmax(up_m_lo)
+        self.width = up_m_lo[self.longest]
+        self.center = (self.lo_bounds + self.up_bounds) * 0.5
+
+        if self.level == 0:
+            if self.to_convert:
+                self.score = self.loss(
+                    self.to_continuous.reverse([self.center], sub_values=True)
+                )[0]
+            else:
+                self.score = self.loss([self.center])[0]
+
+        assert max_calls > 3, logger.error(
+            f"{max_calls} must be greater than 3"
+        )
+        self.max_calls = max_calls
+
+    def create_children(self):
+
+        new_val = self.width / self.section
+
+        lo = np.copy(self.lo_bounds)
+        up = np.copy(self.up_bounds)
+        up[self.longest] = lo[self.longest] + new_val
+        up = np.minimum(up, self._god.up_bounds)
+
+        children = []
+        i = 0
+        while i < self.section and self.loss.calls < self.max_calls:
+            i += 1
+            if self.to_convert:
+                h = self.subspace(
+                    self.to_continuous.reverse(lo, sub_values=True),
+                    self.to_continuous.reverse(up, sub_values=True),
+                    max_calls=self.max_calls,
+                    section=self.section,
+                    force_convert=self.force_convert,
+                )
+            else:
+                h = self.subspace(
+                    lo,
+                    up,
+                    max_calls=self.max_calls,
+                    section=self.section,
+                    force_convert=self.force_convert,
+                )
+
+            if not h.is_constant:
+                children.append(h)
+
+            lo[self.longest] += new_val
+            up[self.longest] += new_val
+
+        if self.section % 2 == 0:
+            centers = [child.center for child in children]
+            if self.to_convert:
+                scores = self.loss(
+                    self.to_continuous.reverse(centers, sub_values=True)
+                )
+            else:
+                scores = self.loss(centers)
+
+            for child, s in zip(children, scores):
+                child.score = s
+        else:
+            mid = self.section // 2
+            centers = [
+                child.center for i, child in enumerate(children) if i != mid
+            ]
+            if self.to_convert:
+                scores = self.loss(
+                    self.to_continuous.reverse(centers, sub_values=True)
+                )
+            else:
+                scores = self.loss(centers)
+
+            p = 0
+            for idx, child in enumerate(children):
+                if idx == mid:
+                    p = 1
+                    child.score = self.score
+                else:
+                    child.score = scores[idx - p]
+
+        self.children = children
+
+    def __repr__(self):
+        if type(self.father) == str:
+            id = "root"
+        else:
+            id = str(self.father.id)
+
+        return (
+            "ID: "
+            + str(self.id)
+            + " son of "
+            + id
+            + " at level "
+            + str(self.level)
+            + "\n"
+            + "BOUNDS: "
+            + str(self.lo_bounds)
+            + "|"
+            + str(self.up_bounds)
+            + "\n"
+        )
