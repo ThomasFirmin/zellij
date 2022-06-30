@@ -1,17 +1,21 @@
 import numpy as np
 
-
 class Node(object):
     def __init__(self, operation, outputs):
         self.operation = operation  # Pytorch layer
         self.outputs = outputs  # list(Node) ou [None] si output
 
     def __str__(self):
-        out = f"{self.operation} -> {[c.operation for c in self.outputs if c != None]}\n"
+        from zellij.core.variables import logger
+        out = f"{self.operation} -> "
+        try:
+            out += f"{[c.operation for c in self.outputs if c != None]}\n"
+        except RecursionError as e:
+            print(e)
+            print(f"Node: {self.operation}, with outputs: {self.outputs}")
         for c in self.outputs:
-            if c != None:
+            if c is not None:
                 out += c.__str__()
-
         return out
 
     def __repr__(self):
@@ -84,14 +88,10 @@ class DAGraph(object):
                         i = 0
                         found = False
                         while i < len(new_nodes) and not found:
-                            try:
-                                if old_n.is_eq(new_nodes[i]):
-                                    new_outputs.append(new_nodes[i])
-                                    found = True
-                            except IndexError:
-                                print(i, " || ", new_nodes)
-                                raise IndexError
-                            i -=1
+                            if old_n.is_eq(new_nodes[i]):
+                                new_outputs.append(new_nodes[i])
+                                found = True
+                            i +=1
                     new_nodes = [Node(n.operation, new_outputs)] + new_nodes
                     old_nodes.remove(n)
         for n in new_nodes:

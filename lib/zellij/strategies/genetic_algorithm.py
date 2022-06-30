@@ -352,9 +352,9 @@ class Genetic_algorithm(Metaheuristic):
                 self.search_space.loss.outputs_path, "ga_population.csv"
             )
             with open(self.ga_save, "a") as f:
-                f.write(
+                """f.write(
                     ",".join(e for e in self.search_space.labels) + ",loss\n"
-                )
+                )"""
                 for ind, cout in zip(pop, fits):
                     f.write(
                         ",".join(str(e) for e in ind[0])
@@ -446,7 +446,7 @@ class Genetic_algorithm(Metaheuristic):
             fits = [ind.fitness.values[0] for ind in pop]
 
             # Save new population
-            if self.search_space.loss.save:
+            """if self.search_space.loss.save:
                 with open(self.ga_save, "a") as f:
                     for ind, cout in zip(pop, fits):
                         f.write(
@@ -454,7 +454,7 @@ class Genetic_algorithm(Metaheuristic):
                             + ","
                             + str(cout)
                             + "\n"
-                        )
+                        )"""
 
             for ind, cout in zip(pop, fits):
                 self.pop_historic.append(ind[0])
