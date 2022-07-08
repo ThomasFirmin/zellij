@@ -796,7 +796,7 @@ class SerialLoss(LossFunc):
                 logger.error(
                     "Model/loss function does not have a method called `save`"
                 )
-                exit()
+                # exit()
 
 
 # Wrap different loss functions

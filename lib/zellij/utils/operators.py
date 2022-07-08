@@ -222,8 +222,10 @@ class DAGTwoPoint(Crossover):
             child2 += subset_1
             if max(len(child1), len(child2)) <= self.size:
                 crossed = True
-
-
+        for n in child1:
+            n.outputs = list(set(n.outputs))
+        for n in child2:
+            n.outputs = list(set(n.outputs))
         child1 = DAGraph(child1)
         child2 = DAGraph(child2)
 
