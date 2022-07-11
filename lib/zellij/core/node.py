@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class Node(object):
     def __init__(self, operation, outputs):
         self.operation = operation  # Pytorch layer
@@ -8,11 +9,7 @@ class Node(object):
     def __str__(self):
         from zellij.core.variables import logger
         out = f"{self.operation} -> "
-        try:
-            out += f"{[c.operation for c in self.outputs if c != None]}\n"
-        except RecursionError as e:
-            print(e)
-            print(f"Node: {self.operation}, with outputs: {self.outputs}")
+        out += f"{[c.operation for c in self.outputs if c != None]}\n"
         for c in self.outputs:
             if c is not None:
                 out += c.__str__()
@@ -43,22 +40,68 @@ class Node(object):
         return False
 
 
-def remove_node_from_list(l, node):
-    removed = False
+def remove_node_from_list(l, nodes):
+    new_l = l[:]
+    flagged = [False for _ in range(len(nodes))]
     for n in l:
-        if n.is_eq(node):
-            l.remove(n)
-            removed = True
-    if not removed:
-        print("Node not found in outputs")
-    return l
+        for idx in range(len(nodes)):
+            if n.is_eq(nodes[idx]) and not flagged[idx]:
+                new_l.remove(nodes[idx])
+                flagged[idx] = True
+    return new_l
+
+
+def order_nodes(nodes, leaf):
+    if len(nodes) > 0:
+        flagged = [False for _ in range(len(nodes))]
+        nodes.append(nodes.pop(nodes.index(leaf)))
+        flagged[-1] = True
+        while sum(flagged) < len(flagged):
+            last_idx = [i for i, x in enumerate(flagged) if not x][-1]
+            node = nodes[last_idx]
+            outputs_indexes = []
+            for out in node.outputs:
+                outputs_indexes.append(nodes.index(out))
+            if last_idx < min(outputs_indexes):
+                flagged[last_idx] = True
+            else:
+                nodes.remove(node)
+                nodes.insert(min(outputs_indexes), node)
+                flagged.remove(flagged[last_idx])
+                flagged.insert(min(outputs_indexes), False)
+    return nodes
+
+def select_random_subdag(g):
+    subdag = []
+    if len(g.nodes) > 2:
+        while len(subdag) == 0:
+            subdag = []
+            current_node = g.root
+            # Select a random path from root to leaf
+            while len(current_node.outputs) != 0:
+                idx = np.random.randint(len(current_node.outputs))
+                current_node = current_node.outputs[idx]
+                subdag.append(current_node)
+
+            # If leaf is in path remove it
+            if len(subdag[-1].outputs) == 0:
+                subdag.pop()
+
+            # If path is not empty
+            if len(subdag) > 0:
+                index_1_1 = np.random.randint(len(subdag))
+                if index_1_1 + 1 < len(subdag):
+                    index_1_2 = np.random.randint(index_1_1, len(subdag))
+                else:
+                    index_1_2 = index_1_1
+                subdag = subdag[index_1_1:index_1_2 + 1]
+    return subdag
 
 
 class DAGraph(object):
     def __init__(self, nodes):
         self.leaf = self.set_leaf(nodes)
-        nodes.append(nodes.pop(nodes.index(self.leaf)))
-        self.nodes = nodes
+        self.nodes = order_nodes(nodes, self.leaf)
         self.root = nodes[0]
 
     def set_leaf(self, nodes):
@@ -73,9 +116,8 @@ class DAGraph(object):
     def __repr__(self):
         nodes_reprs = ""
         for n in self.nodes:
-            nodes_reprs += n.operation.__repr__()  + f" -> {[c.operation for c in n.outputs if c != None]}\n"
+            nodes_reprs += n.operation.__repr__() + f" -> {[c.operation for c in n.outputs if c != None]}\n"
         return nodes_reprs
-
 
     def copy(self):
         new_nodes = [Node(self.leaf.operation, [])]
@@ -95,10 +137,11 @@ class DAGraph(object):
                                 new_outputs.append(new_nodes[i])
                                 found = True
                                 new_not_found[i] = False
-                            i +=1
+                            i += 1
                     new_nodes = [Node(n.operation, new_outputs)] + new_nodes
                     old_nodes[k] = "Flagged"
             old_nodes = list(filter(("Flagged").__ne__, old_nodes))
         for n in new_nodes:
             n.outputs = list(set(n.outputs))
-        return DAGraph(new_nodes)
+        dag = DAGraph(new_nodes)
+        return dag

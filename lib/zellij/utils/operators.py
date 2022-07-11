@@ -9,7 +9,7 @@
 import random
 
 from zellij.core.addons import Mutator, Crossover, Selector
-from zellij.core.node import remove_node_from_list, DAGraph
+from zellij.core.node import remove_node_from_list, DAGraph, select_random_subdag
 from zellij.core.search_space import Searchspace
 from zellij.core.variables import Constant
 import numpy as np
@@ -159,76 +159,111 @@ class DAGTwoPoint(Crossover):
         while not crossed:
             graph1 = g1.copy()
             graph2 = g2.copy()
-            subset_1 = []
-            subset_2 = []
 
-            # Select a connected path from root to output
-            current_node = graph1.root
-            while len(current_node.outputs) != 0:
-                idx = np.random.randint(len(current_node.outputs))
-                current_node = current_node.outputs[idx]
-                subset_1.append(current_node)
+            sub_dag_1 = select_random_subdag(graph1)
+            sub_dag_2 = select_random_subdag(graph2)
 
-            current_node = graph2.root
-            while len(current_node.outputs) != 0:
-                idx = np.random.randint(len(current_node.outputs))
-                current_node = current_node.outputs[idx]
-                subset_2.append(current_node)
+            child1 = [n for n in graph1.nodes if n not in sub_dag_1]
+            child2 = [n for n in graph2.nodes if n not in sub_dag_2]
 
-            index_1_1 = np.random.randint(len(subset_1))
-            if index_1_1 + 1 < len(subset_1):
-                index_1_2 = np.random.randint(index_1_1 + 1, len(subset_1))
-            else:
-                index_1_2 = index_1_1
-
-            index_2_1 = np.random.randint(len(subset_2))
-            if index_2_1 + 1 < len(subset_2):
-                index_2_2 = np.random.randint(index_2_1 + 1, len(subset_2))
-            else:
-                index_2_2 = index_2_1
-            subset_1 = subset_1[index_1_1:index_1_2 + 1]
-            subset_2 = subset_2[index_2_1:index_2_2 + 1]
-
-            child1 = [n for n in graph1.nodes if n not in subset_1]
-            child2 = [n for n in graph2.nodes if n not in subset_2]
-
-            subset_1[-1].outputs, subset_2[-1].outputs = subset_2[-1].outputs, subset_1[-1].outputs
-            orphan_nodes_1 = []
-            orphan_nodes_2 = []
-            if len(subset_1) > 1:
-                for i in range(len(subset_1) - 1, 0, -1):
-                    orphan_nodes_1 += remove_node_from_list(subset_1[i - 1].outputs, subset_1[i])
-                    subset_1[i - 1].outputs = [subset_1[i]]
-            orphan_nodes_1 = list(dict.fromkeys(orphan_nodes_1))
-            if len(subset_2) > 1:
-                for i in range(len(subset_2) - 1, 0, -1):
-                    orphan_nodes_2 += remove_node_from_list(subset_2[i - 1].outputs, subset_2[i])
-                    subset_2[i - 1].outputs = [subset_2[i]]
-            orphan_nodes_2 = list(dict.fromkeys(orphan_nodes_2))
-
-            for i in range(len(child1)):
-                if child1[i].is_in_outputs(subset_1[0]):
-                    child1[i].outputs = remove_node_from_list(child1[i].outputs, subset_1[0]) + [
-                        subset_2[0]] + orphan_nodes_1
-                if child1[i].is_in_outputs(subset_1[-1]):
-                    child1[i].outputs = remove_node_from_list(child1[i].outputs, subset_1[-1]) + [subset_2[-1]]
-            child1 += subset_2
-            for i in range(len(child2)):
-                if child2[i].is_in_outputs(subset_2[0]):
-                    child2[i].outputs = remove_node_from_list(child2[i].outputs, subset_2[0]) + [
-                        subset_1[0]] + orphan_nodes_2
-                if child2[i].is_in_outputs(subset_2[-1]):
-                    child2[i].outputs = remove_node_from_list(child2[i].outputs, subset_2[-1]) + [subset_1[-1]]
-            child2 += subset_1
-            if max(len(child1), len(child2)) <= self.size:
+            # Case of 2 empty dags: g1 and g2 are root -> leaf -> []
+            if len(sub_dag_1) == 0 and len(sub_dag_2) == 0:
                 crossed = True
+
+            # g2 is root -> leaf -> []
+            elif len(sub_dag_1) > 0 and len(sub_dag_2) == 0:
+                # Orphans 1: all nodes which were in outputs of sub dag nodes
+                orphan_nodes_1 = []
+                for n in sub_dag_1:
+                    orphans = remove_node_from_list(n.outputs, sub_dag_1)
+                    orphan_nodes_1 += orphans
+                    n.outputs = list(set(n.outputs) - set(orphans))
+                # Remove duplicate orphans
+                orphan_nodes_1 = list(set(orphan_nodes_1))
+                # Add root subdag 1 to root dag 2 output
+                child2[0].outputs.append(sub_dag_1[0])
+                # Add leaf dag 2 to leaf subdag 1 output
+                sub_dag_1[-1].outputs.append(child2[-1])
+                # Add nodes from subdag 1 to dag 2
+                child2 += sub_dag_1
+                # For all node in dag 1, if node from subdag 1 in outputs replace them by orphans
+                for n in child1:
+                    outputs = remove_node_from_list(n.outputs, sub_dag_1)
+                    if len(list(set(n.outputs) - set(outputs))) > 0:
+                        n.outputs = outputs
+                        if  n not in orphan_nodes_1 : # condition to prevent cycles
+                            n.outputs = list(set(outputs).union(set(orphan_nodes_1)))
+                if max(len(child1), len(child2)) <= self.size:
+                    crossed = True
+
+            elif len(sub_dag_1) == 0 and len(sub_dag_2) > 0:
+                orphan_nodes_2 = []
+                for n in sub_dag_2:
+                    orphans = remove_node_from_list(n.outputs, sub_dag_2)
+                    orphan_nodes_2 += orphans
+                    n.outputs = list(set(n.outputs) - set(orphans))
+                # Remove duplicate orphans
+                orphan_nodes_2 = list(set(orphan_nodes_2))
+                # Add root subdag 2 to root dag 1 output
+                child1[0].outputs.append(sub_dag_2[0])
+                # Add leaf dag 1 to leaf subdag 2 output
+                sub_dag_2[-1].outputs.append(child1[-1])
+                # Add nodes from subdag 2 to dag 1
+                child1 += sub_dag_2
+                # For all node in dag 2, if node from subdag 2 in outputs replace them by orphans
+                for n in child2:
+                    outputs = remove_node_from_list(n.outputs, sub_dag_2)
+                    if len(list(set(n.outputs) - set(outputs))) > 0:
+                        n.outputs = outputs
+                        if n not in orphan_nodes_2:  # condition to prevent cycles
+                            n.outputs = list(set(outputs).union(set(orphan_nodes_2)))
+                if max(len(child1), len(child2)) <= self.size:
+                    crossed = True
+
+            else:
+                orphan_nodes_1 = []
+                for n in sub_dag_1:
+                    orphans = remove_node_from_list(n.outputs, sub_dag_1)
+                    orphan_nodes_1 += orphans
+                    n.outputs = list(set(n.outputs) - set(orphans))
+                orphan_nodes_1 = list(set(orphan_nodes_1))
+                orphan_nodes_2 = []
+                for n in sub_dag_2:
+                    orphans = remove_node_from_list(n.outputs, sub_dag_2)
+                    orphan_nodes_2 += orphans
+                    n.outputs = list(set(n.outputs) - set(orphans))
+                orphan_nodes_2 = list(set(orphan_nodes_2))
+                # For all node in dag 1, if node from subdag 1 in outputs replace them by subdag 2 root
+                for n in child1:
+                    outputs = remove_node_from_list(n.outputs, sub_dag_1)
+                    if len(list(set(n.outputs) - set(outputs))) > 0:
+                        n.outputs = outputs
+                        if  n not in orphan_nodes_1 : # condition to prevent cycles
+                            n.outputs.append(sub_dag_2[0])
+                # For all node in dag 1, if node from subdag 1 in outputs replace them by subdag 2 root
+                for n in child2:
+                    outputs = remove_node_from_list(n.outputs, sub_dag_2)
+                    if len(list(set(n.outputs) - set(outputs))) > 0:
+                        n.outputs = outputs
+                        if  n not in orphan_nodes_2 : # condition to prevent cycles
+                            n.outputs.append(sub_dag_1[0])
+                # Add dag 2 orphans to subdag 1 leaf
+                sub_dag_1[-1].outputs += orphan_nodes_2
+                # Add dag 1 orphans to subdag 2 leaf
+                sub_dag_2[-1].outputs += orphan_nodes_1
+                # Add nodes from subdag 2 to dag 1
+                child1 += sub_dag_2
+                # Add nodes from subdag 1 to dag 2
+                child2 += sub_dag_1
+                if max(len(child1), len(child2)) <= self.size:
+                    crossed = True
+
         for n in child1:
             n.outputs = list(set(n.outputs))
         for n in child2:
             n.outputs = list(set(n.outputs))
         child1 = DAGraph(child1)
         child2 = DAGraph(child2)
-
         return child1, child2
 
     @Mutator.target.setter
