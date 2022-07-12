@@ -42,12 +42,11 @@ class Node(object):
 
 def remove_node_from_list(l, nodes):
     new_l = l[:]
-    flagged = [False for _ in range(len(nodes))]
-    for n in l:
-        for idx in range(len(nodes)):
-            if n.is_eq(nodes[idx]) and not flagged[idx]:
-                new_l.remove(nodes[idx])
-                flagged[idx] = True
+    for n1 in nodes:
+        for n2 in new_l:
+            if n1.is_eq(n2):
+                new_l.remove(n2)
+                break
     return new_l
 
 
@@ -56,19 +55,24 @@ def order_nodes(nodes, leaf):
         flagged = [False for _ in range(len(nodes))]
         nodes.append(nodes.pop(nodes.index(leaf)))
         flagged[-1] = True
-        while sum(flagged) < len(flagged):
+        changes = 0
+        while sum(flagged) < len(flagged) and changes < len(flagged)**2:
             last_idx = [i for i, x in enumerate(flagged) if not x][-1]
             node = nodes[last_idx]
             outputs_indexes = []
             for out in node.outputs:
                 outputs_indexes.append(nodes.index(out))
-            if last_idx < min(outputs_indexes):
+            min_out = min(outputs_indexes)
+            if last_idx < min_out:
                 flagged[last_idx] = True
             else:
                 nodes.remove(node)
                 nodes.insert(min(outputs_indexes), node)
                 flagged.remove(flagged[last_idx])
                 flagged.insert(min(outputs_indexes), False)
+            changes +=1
+        if sum(flagged) < len(flagged):
+            raise RecursionError
     return nodes
 
 def select_random_subdag(g):
@@ -103,6 +107,7 @@ class DAGraph(object):
         self.leaf = self.set_leaf(nodes)
         self.nodes = order_nodes(nodes, self.leaf)
         self.root = nodes[0]
+        self.check_orphans()
 
     def set_leaf(self, nodes):
         i = 0
@@ -145,3 +150,15 @@ class DAGraph(object):
             n.outputs = list(set(n.outputs))
         dag = DAGraph(new_nodes)
         return dag
+
+    def check_orphans(self):
+        for i in range(1, len(self.nodes)):
+            related = self.nodes[i] in self.root.outputs
+            j = 1
+            while not related and j < i:
+                related = self.nodes[i] in self.nodes[j].outputs
+                j+=1
+            if not related:
+                raise Exception("Graph has orphans: node {} in {}".format(self.nodes[i], self.nodes))
+
+

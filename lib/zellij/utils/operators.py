@@ -172,6 +172,7 @@ class DAGTwoPoint(Crossover):
 
             # g2 is root -> leaf -> []
             elif len(sub_dag_1) > 0 and len(sub_dag_2) == 0:
+                max_idx_1 = graph1.nodes.index(sub_dag_1[0])
                 # Orphans 1: all nodes which were in outputs of sub dag nodes
                 orphan_nodes_1 = []
                 for n in sub_dag_1:
@@ -191,12 +192,13 @@ class DAGTwoPoint(Crossover):
                     outputs = remove_node_from_list(n.outputs, sub_dag_1)
                     if len(list(set(n.outputs) - set(outputs))) > 0:
                         n.outputs = outputs
-                        if  n not in orphan_nodes_1 : # condition to prevent cycles
+                        if graph1.nodes.index(n) < max_idx_1: # condition to prevent cycles
                             n.outputs = list(set(outputs).union(set(orphan_nodes_1)))
                 if max(len(child1), len(child2)) <= self.size:
                     crossed = True
 
             elif len(sub_dag_1) == 0 and len(sub_dag_2) > 0:
+                max_idx_2 = graph2.nodes.index(sub_dag_2[0])
                 orphan_nodes_2 = []
                 for n in sub_dag_2:
                     orphans = remove_node_from_list(n.outputs, sub_dag_2)
@@ -215,12 +217,15 @@ class DAGTwoPoint(Crossover):
                     outputs = remove_node_from_list(n.outputs, sub_dag_2)
                     if len(list(set(n.outputs) - set(outputs))) > 0:
                         n.outputs = outputs
-                        if n not in orphan_nodes_2:  # condition to prevent cycles
+                        if graph2.nodes.index(n) < max_idx_2:  # condition to prevent cycles
                             n.outputs = list(set(outputs).union(set(orphan_nodes_2)))
                 if max(len(child1), len(child2)) <= self.size:
                     crossed = True
 
             else:
+                max_idx_1 = graph1.nodes.index(sub_dag_1[0])
+                max_idx_2 = graph2.nodes.index(sub_dag_2[0])
+
                 orphan_nodes_1 = []
                 for n in sub_dag_1:
                     orphans = remove_node_from_list(n.outputs, sub_dag_1)
@@ -233,24 +238,31 @@ class DAGTwoPoint(Crossover):
                     orphan_nodes_2 += orphans
                     n.outputs = list(set(n.outputs) - set(orphans))
                 orphan_nodes_2 = list(set(orphan_nodes_2))
+                # Add dag 2 orphans to subdag 1 leaf
+                sub_dag_1[-1].outputs += orphan_nodes_2
+                # Add dag 1 orphans to subdag 2 leaf
+                sub_dag_2[-1].outputs += orphan_nodes_1
                 # For all node in dag 1, if node from subdag 1 in outputs replace them by subdag 2 root
                 for n in child1:
                     outputs = remove_node_from_list(n.outputs, sub_dag_1)
                     if len(list(set(n.outputs) - set(outputs))) > 0:
                         n.outputs = outputs
-                        if  n not in orphan_nodes_1 : # condition to prevent cycles
+                        if graph1.nodes.index(n) < max_idx_1: # conditions to prevent cycles
                             n.outputs.append(sub_dag_2[0])
+                        else:
+                            if len(outputs) == 0:
+                                n.outputs.append(child1[-1])
                 # For all node in dag 1, if node from subdag 1 in outputs replace them by subdag 2 root
                 for n in child2:
                     outputs = remove_node_from_list(n.outputs, sub_dag_2)
                     if len(list(set(n.outputs) - set(outputs))) > 0:
                         n.outputs = outputs
-                        if  n not in orphan_nodes_2 : # condition to prevent cycles
+                        if graph2.nodes.index(n) < max_idx_2: # condition to prevent cycles
                             n.outputs.append(sub_dag_1[0])
-                # Add dag 2 orphans to subdag 1 leaf
-                sub_dag_1[-1].outputs += orphan_nodes_2
-                # Add dag 1 orphans to subdag 2 leaf
-                sub_dag_2[-1].outputs += orphan_nodes_1
+                        else:
+                            if len(outputs) == 0:
+                                n.outputs.append(child2[-1])
+
                 # Add nodes from subdag 2 to dag 1
                 child1 += sub_dag_2
                 # Add nodes from subdag 1 to dag 2
