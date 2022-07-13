@@ -1,152 +1,257 @@
-from zellij.core.addons import Neighborhood
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-06T12:07:22+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-20T17:51:14+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# @Copyright: Copyright (C) 2022 Thomas Firmin
+
+
+from zellij.core.addons import VarNeighborhood, Neighborhood
+from zellij.core.variables import (
+    FloatVar,
+    IntVar,
+    CatVar,
+    Constant,
+    ArrayVar,
+)
 import numpy as np
 import logging
+import copy
 
 logger = logging.getLogger("zellij.neighborhoods")
 
 
+class ArrayInterval(VarNeighborhood):
+    def __init__(self, variable=None, neighborhood=None):
+        super(ArrayInterval, self).__init__(variable)
+        self.neighborhood = neighborhood
+
+    def __call__(self, value, size=1):
+        variables = np.random.choice(self.target.values, size=size)
+        res = []
+
+        for v in variables:
+            inter = copy.deepcopy(value)
+            inter[v._idx] = v.neighbor(value[v._idx])
+            res.append(inter)
+
+        return res
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        if neighborhood:
+            for var, neig in zip(self.target.values, neighborhood):
+                var.neighborhood = neig
+
+        self._neighborhood = None
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+
+        assert isinstance(variable, ArrayVar) or variable == None, logger.error(
+            f"Target object must be an `ArrayVar` for {self.__class__.__name__},\
+             got {variable}"
+        )
+
+        self._target = variable
+
+        if variable != None:
+            assert all(
+                hasattr(v, "neighbor") for v in self.target.values
+            ), logger.error(
+                f"To use `ArrayInterval`, values in `ArrayVar` must have a `neighbor` method. Use `neighbor` kwarg when defining a variable"
+            )
+
+
+class BlockInterval(VarNeighborhood):
+    def __call__(self, value, size=1):
+        raise NotImplementedError(
+            f"{self.__class__.__name__}\
+        neighborhood is not yet implemented"
+        )
+
+
+class DynamicBlockInterval(VarNeighborhood):
+    def __call__(self, value, size=1):
+        raise NotImplementedError(
+            f"{self.__class__.__name__}\
+        neighborhood is not yet implemented"
+        )
+
+
+class FloatInterval(VarNeighborhood):
+    def __call__(self, value, size=1):
+        upper = np.min([value + self.neighborhood, self.target.up_bound])
+        lower = np.max([value - self.neighborhood, self.target.low_bound])
+
+        if size > 1:
+            res = []
+            for _ in range(size):
+                v = np.random.uniform(lower, upper)
+                while v == value:
+                    v = np.random.uniform(lower, upper)
+                res.append(float(v))
+            return res
+        else:
+            v = np.random.uniform(lower, upper)
+            while v == value:
+                v = np.random.uniform(lower, upper)
+
+            return v
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood):
+        assert isinstance(neighborhood, int) or isinstance(
+            neighborhood, float
+        ), logger.error(
+            f"`neighborhood` must be a float or an int, for `FloatInterval`,\
+            got{neighborhood}"
+        )
+
+        self._neighborhood = neighborhood
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+
+        assert isinstance(variable, FloatVar) or variable == None, logger.error(
+            f"Target object must be a `FloatVar` for {self.__class__.__name__},\
+             got {variable}"
+        )
+        self._target = variable
+
+
+class IntInterval(VarNeighborhood):
+    def __call__(self, value, size=1):
+
+        upper = np.min([value + self.neighborhood, self.target.up_bound])
+        lower = np.max([value - self.neighborhood, self.target.low_bound])
+
+        if size > 1:
+            res = []
+            for _ in range(size):
+                v = np.random.randint(lower, upper)
+                while v == value:
+                    v = np.random.randint(lower, upper)
+                res.append(int(v))
+            return res
+        else:
+            v = np.random.randint(lower, upper)
+            while v == value:
+                v = np.random.randint(lower, upper)
+
+            return v
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood):
+        assert isinstance(neighborhood, int) or isinstance(
+            neighborhood, float
+        ), logger.error(
+            f"`neighborhood` must be an int, for `IntInterval`,\
+            got{neighborhood}"
+        )
+
+        self._neighborhood = neighborhood
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+
+        assert isinstance(variable, IntVar) or variable == None, logger.error(
+            f"Target object must be a `IntInterval` for {self.__class__.__name__},\
+             got {variable}"
+        )
+        self._target = variable
+
+
+class CatInterval(VarNeighborhood):
+    def __init__(self, variable=None, neighborhood=None):
+        super(CatInterval, self).__init__(variable)
+        self.neighborhood = neighborhood
+
+    def __call__(self, value, size=1):
+        if size > 1:
+            res = []
+            for _ in range(size):
+                v = self.target.random()
+                while v == value:
+                    v = self.target.random()
+                res.append(v)
+            return res
+        else:
+            v = self.target.random()
+            while v == value:
+                v = self.target.random()
+            return v
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        if neighborhood != None:
+            logger.warning(
+                f"`neighborhood`= {neighborhood} is useless for \
+            {self.__class__.__name__}, it will be replaced by None"
+            )
+
+        self._neighborhood = None
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+
+        assert isinstance(variable, CatVar) or variable == None, logger.error(
+            f"Target object must be a `CatInterval` for {self.__class__.__name__},\
+             got {variable}"
+        )
+        self._target = variable
+
+
+class ConstantInterval(VarNeighborhood):
+    def __init__(self, variable=None, neighborhood=None):
+        super(ConstantInterval, self).__init__(variable)
+        self.neighborhood = neighborhood
+
+    def __call__(self, value, size=1):
+        logger.warning("Calling `neighbor` of a constant is useless")
+        return self.target.value
+
+    @VarNeighborhood.neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        if neighborhood != None:
+            logger.warning(
+                f"`neighborhood`= {neighborhood} is useless for \
+            {self.__class__.__name__}, it will be replaced by None"
+            )
+
+        self._neighborhood = None
+
+    @VarNeighborhood.target.setter
+    def target(self, variable):
+
+        assert isinstance(variable, Constant) or variable == None, logger.error(
+            f"Target object must be a `ConstantInterval` for {self.__class__.__name__}\
+            , got {variable}"
+        )
+        self._target = variable
+
+
 class Intervals(Neighborhood):
-    def __init__(self, search_space, neighborhood):
+    def __init__(self, search_space=None, neighborhood=None):
         super(Intervals, self).__init__(search_space, neighborhood)
 
     @Neighborhood.neighborhood.setter
     def neighborhood(self, neighborhood):
-        assert (
-            isinstance(neighborhood, list) and len(neighborhood) > 0
-        ), logger.error(
-            "neighborhood must be of the form [float|int|-1, ...],\
-            float: type='R', int: type='D', -1: type='C' or 'K'"
-        )
+        if neighborhood:
+            for var, neig in zip(self.target.values, neighborhood):
+                var.neighbor.neighborhood = neig
 
-        for n, t in zip(neighborhood, self.search_space.types):
-            if t == "R":
-                assert isinstance(n, float) or isinstance(n, int), logger.error(
-                    f"neighborhood of type 'R'\
-                    must be a float or an int, got {n}"
-                )
+        self._neighborhood = None
 
-            elif t == "D":
-                assert isinstance(n, int), logger.error(
-                    f"neighborhood of type 'R'\
-                     must be an int, got {n}"
-                )
-
-            else:
-                assert n == -1, logger.error(
-                    f"neighborhood of type 'C' or 'K'\
-                     must be equal to -1, got {n}"
-                )
-
-        self._neighborhood = neighborhood
-
-    def _get_real_neighbor(self, x, i):
-
-        """_get_real_neighbor(x, i)
-
-        Draw a neighbor of a Real attribute from the search space,\
-        using uniform distribution. According to its lower and upper bounds
-
-        Parameters
-        ----------
-
-        x : float
-            Initial value
-        i : int
-            Dimension index
-
-        Returns
-        -------
-
-        v : float
-            Random neighbor of x
-
-        """
-
-        upper = np.min(
-            [x + self.neighborhood[i], self.search_space.values[i][1]]
-        )
-        lower = np.max(
-            [x - self.neighborhood[i], self.search_space.values[i][0]]
-        )
-        v = np.random.uniform(lower, upper)
-
-        while v == x:
-            v = np.random.uniform(lower, upper)
-
-        return float(v)
-
-    def _get_discrete_neighbor(self, x, i):
-
-        """_get_discrete_neighbor(x, i)
-
-        Draw a neighbor of a Discrete attribute from the search space, using\
-        discrete uniform distribution. According to its lower and upper bounds
-
-        Parameters
-        ----------
-
-        x : float
-            Initial value
-        i : int
-            Dimension index
-
-        Returns
-        -------
-
-        v : int
-            Random neighbor of x
-
-        """
-
-        upper = (
-            int(
-                np.min(
-                    [x + self.neighborhood[i], self.search_space.values[i][1]]
-                )
+    @Neighborhood.target.setter
+    def target(self, object):
+        self._target = object
+        if object:
+            assert hasattr(self.target.values, "neighbor"), logger.error(
+                f"To use `Intervals`, values in Searchspace must have a `neighbor` method. Use `neighbor` kwarg when defining a variable"
             )
-            + 1
-        )
-        lower = int(
-            np.max([x - self.neighborhood[i], self.search_space.values[i][0]])
-        )
-        v = np.random.randint(lower, upper)
-
-        while v == x:
-            v = np.random.randint(lower, upper)
-
-        return int(v)
-
-    def _get_categorical_neighbor(self, x, i):
-
-        """_get_categorical_neighbor(self, x, i)
-
-        Draw a neighbor of a Categorical attribute from the search space,\
-        using discrete uniform distribution. According to all its possible value
-
-        Parameters
-        ----------
-
-        x : float
-            Initial value
-        i : int
-            Dimension index
-
-        Returns
-        -------
-
-        v : float
-            Random neighbor of x
-
-        """
-
-        idx = np.random.randint(len(self.search_space.values[i]))
-
-        while self.search_space.values[i][idx] == x:
-            idx = np.random.randint(len(self.search_space.values[i]))
-
-        v = self.search_space.values[i][idx]
-
-        return v
 
     def get_neighbor(self, point, size=1):
 
@@ -158,7 +263,7 @@ class Intervals(Neighborhood):
         Parameters
         ----------
 
-        point : list[{int, float, str}, {int, float, str}...]
+        point : list
             Initial point.
         size : int, default=1
             Draw <size> neighbors of <point>.
@@ -166,33 +271,18 @@ class Intervals(Neighborhood):
         Returns
         -------
 
-        points : list[list[{int, float, str}]]
+        out : list
             List of neighbors of <point>.
 
         """
+        attribute = self.target.random_attribute(size=size, exclude=Constant)
 
         points = []
 
-        for _ in range(size):
-            attribute = self.search_space.random_attribute()
-            index = self.search_space.labels.index(attribute)
-            neighbor = point[:]
+        for att in attribute:
 
-            if self.search_space.types[index] == "R":
-                neighbor[index] = self._get_real_neighbor(point[index], index)
-
-            elif self.search_space.types[index] == "D":
-
-                neighbor[index] = self._get_discrete_neighbor(
-                    point[index], index
-                )
-
-            elif self.search_space.types[index] == "C":
-
-                neighbor[index] = self._get_categorical_neighbor(
-                    point[index], index
-                )
-
-            points.append(neighbor[:])
+            inter = copy.deepcopy(point)
+            inter[att._idx] = att.neighbor(point[att._idx])
+            points.append(inter)
 
         return points
