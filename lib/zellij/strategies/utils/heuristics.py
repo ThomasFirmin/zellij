@@ -2,133 +2,311 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:46+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-09T15:53:24+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 import numpy as np
+from abc import ABC, abstractmethod
 
 
-def minimum(H, *arg, **kwargs):
-    """best(H, *arg, **kwargs)
+class Heuristic(ABC):
+    def __init__(self):
+        pass
 
-    Parameters
-    ----------
-    H : Fractal
-        Fractal on which to compute the heuristic value.
-
-    Returns
-    -------
-    _ : float
-        Minimum score found inside the fractal
-    """
-
-    return H.min_score
+    @abstractmethod
+    def __call__(self, search_space, indexes):
+        pass
 
 
-def median(H, *args, **kwargs):
-    """median(H, *args, **kwargs)
-
-    Parameters
-    ----------
-    H : Fractal
-        Fractal on which to compute the heuristic value.
+class Min(Heuristic):
+    """Min
 
     Returns
     -------
-    _ : float
-        Median of all scores computed inside the fractal
+    out : float
+        Minimal score found inside the fractal
     """
 
-    return np.median(H.all_scores)
+    def __call__(self, search_space, indexes):
+        """Short summary.
+
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        indexes : {int,slice}
+            Indexes of the scores, saved in `loss.all_scores`
+            used when computing heuristic.
+
+        Returns
+        -------
+        out : float
+            Minimal score found.
+
+        """
+        return np.min(search_space.loss.all_scores[indexes])
 
 
-def mean(H, *args, **kwargs):
-    """mean(H,best_ind,best_sc)
-
-    Parameters
-    ----------
-    H : Fractal
-        Fractal on which to compute the heuristic value.
+class Median(Heuristic):
+    """Median
 
     Returns
     -------
-    _ : float
-        Mean score of all scores computed inside the fractal
+    out : float
+        Median score found inside the fractal
     """
 
-    return np.mean(H.all_scores)
+    def __call__(self, loss, indexes):
+        """Short summary.
+
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        indexes : {int,slice}
+            Indexes of the scores, saved in `loss.all_scores`
+            used when computing heuristic.
+
+        Returns
+        -------
+        out : float
+            Median score found.
+
+        """
+        return np.median(search_space.loss.all_scores[indexes])
 
 
-def std(H, *args, **kwargs):
-
-    """_std(H, *args, **kwargs)
-
-    Parameters
-    ----------
-    H : Fractal
-        Fractal on which to compute the heuristic value.
+class Mean(Heuristic):
+    """Mean
 
     Returns
     -------
-    _ : float
-        Standard deviation of all scores computed inside the fractal
+    out : float
+        Mean score found inside the fractal
     """
 
-    return np.std(H.all_scores)
+    def __call__(self, search_space, indexes):
+        """Short summary.
+
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        indexes : {int,slice}
+            Indexes of the scores, saved in `loss.all_scores`
+            used when computing heuristic.
+
+        Returns
+        -------
+        out : float
+            Mean score found.
+
+        """
+        return np.mean(loss.all_scores[indexes])
 
 
-def dttcb(H, *args, **kwargs):
-
-    """dttcb(H,best_ind,best_sc)
-
-    Parameters
-    ----------
-    H : Fractal
-        Fractal on which to compute the heuristic value.
+class Std(Heuristic):
+    """Std
 
     Returns
     -------
-    _ : float
-        Distance to the best found solution so far to the best found solution computed inside the fractal
+    out : float
+        Std score found inside the fractal
     """
 
-    best_ind = args[0]
+    def __call__(self, search_space, indexes):
+        """Short summary.
 
-    return np.min(
-        np.array(H.all_scores)
-        / np.linalg.norm(np.array(H.solutions) - np.array(best_ind), axis=1)
-    )
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        indexes : {int,slice}
+            Indexes of the scores, saved in `loss.all_scores`
+            used when computing heuristic.
+
+        Returns
+        -------
+        out : float
+            Std score found.
+
+        """
+        return np.std(search_space.loss.all_scores[indexes])
 
 
-def belief(H, gamma=0.5, *args, **kwargs):
-
-    """belief(H,best_ind,best_sc)
-
-    Parameters
-    ----------
-    H : Fractal
-        Fractal on which to compute the heuristic value.
-
-    gamma : float, default=0.5
-        Influences the contribution of the father's best score and the mean of all scores inside the fractal.
-        Higher gamma means higher contribution of the fractal's father.
+class Distance_to_the_best(Heuristic):
+    """Distance_to_the_best
 
     Returns
     -------
-    _ : float
-        Belief computed according to the influences of the father's score and the mean of all computed solutions inside the fractal
+    out : float
+        Distance_to_the_best score found inside the fractal
     """
 
-    best_sc = args[1]
+    def __call__(self, search_space, indexes):
+        """Short summary.
 
-    if type(H.father.father) == str:
-        H.father.score = 0
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        indexes : {int,slice}
+            Indexes of the scores, saved in `loss.all_scores`
+            used when computing heuristic.
 
-    ratio = np.array(H.all_scores) / best_sc
-    return -(
-        gamma * H.father.score
-        + (1 - gamma) * np.mean(ratio * np.exp(1 - ratio))
-    )
+        Returns
+        -------
+        out : float
+            Distance_to_the_best score found.
+
+        """
+        if search_space.to_convert:
+            best_ind = search_space.convert.to_continuous(
+                search_space.loss.best_sol, sub_values=True
+            )
+
+            return -np.max(
+                np.array(search_space.loss.all_scores[indexes])
+                / (
+                    np.linalg.norm(
+                        np.array(
+                            search_space.convert.to_continuous(
+                                search_space.loss.all_solutions[indexes],
+                                sub_values=True,
+                            )
+                        )
+                        - np.array(best_ind),
+                        axis=1,
+                    )
+                    + 1e-20
+                )
+            )
+        else:
+            best_ind = search_space.loss.best_sol
+            res = -np.max(
+                np.array(search_space.loss.all_scores[indexes])
+                / (
+                    np.linalg.norm(
+                        np.array(search_space.loss.all_solutions[indexes])
+                        - np.array(best_ind),
+                        axis=1,
+                    )
+                    + 1e-20
+                )
+            )
+            return res
+
+
+class Distance_to_the_best_corrected(Heuristic):
+    """Distance_to_the_best
+
+    Returns
+    -------
+    out : float
+        Distance_to_the_best score found inside the fractal
+    """
+
+    def __call__(self, search_space, indexes):
+        """Short summary.
+
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        indexes : {int,slice}
+            Indexes of the scores, saved in `loss.all_scores`
+            used when computing heuristic.
+
+        Returns
+        -------
+        out : float
+            Distance_to_the_best score found.
+
+        """
+        if search_space.to_convert:
+            best_ind = search_space.convert.to_continuous(
+                search_space.loss.best_sol, sub_values=True
+            )
+
+            return np.min(
+                (
+                    np.array(search_space.loss.all_scores[indexes])
+                    - search_space.loss.best_score
+                )
+                / (
+                    np.linalg.norm(
+                        np.array(
+                            search_space.convert.to_continuous(
+                                search_space.loss.all_solutions[indexes],
+                                sub_values=True,
+                            )
+                        )
+                        - np.array(best_ind),
+                        axis=1,
+                    )
+                    + 1e-20
+                )
+            )
+        else:
+            best_ind = search_space.loss.best_sol
+            res = np.min(
+                (
+                    np.array(search_space.loss.all_scores[indexes])
+                    - search_space.loss.best_score
+                )
+                / (
+                    np.linalg.norm(
+                        np.array(search_space.loss.all_solutions[indexes])
+                        - np.array(best_ind),
+                        axis=1,
+                    )
+                    + 1e-20
+                )
+            )
+            return res
+
+
+class Belief(Heuristic):
+    """Belief
+
+    Returns
+    -------
+    out : float
+        Belief score found inside the fractal
+    """
+
+    def __init__(self, gamma=0.5):
+        super(Belief, self).__init__()
+        self.gamma = gamma
+
+    def __call__(self, search_space, indexes):
+        """Short summary.
+
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        indexes : {int,slice}
+            Indexes of the scores, saved in `loss.all_scores`
+            used when computing heuristic.
+
+        Returns
+        -------
+        out : float
+            Belief score found.
+
+        """
+        best_sc = search_space.loss.best_score
+
+        if type(search_space.father.father) == str:
+            H.father.score = 0
+
+        ratio = np.array(search_space.loss.all_scores[indexes]) / best_sc
+        # Negate because minimization problem and maximize Belief
+        return -(
+            self.gamma * search_space.father.score
+            + (1 - self.gamma) * np.mean(ratio * np.exp(1 - ratio))
+        )

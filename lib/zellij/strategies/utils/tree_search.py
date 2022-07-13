@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:53+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-06-22T15:33:58+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -11,6 +11,9 @@
 import numpy as np
 import abc
 import copy
+
+from collections import defaultdict
+from itertools import groupby
 
 
 class Tree_search(object):
@@ -64,8 +67,14 @@ class Tree_search(object):
         # PARAMETERS #
         ##############
 
-        self.open = open
+        if isinstance(open, list):
+            self.open = open
+        else:
+            self.open = [open]
+
         self.close = []
+
+        assert max_depth > 0, f"Level must be > 0, got {max_depth}"
         self.max_depth = max_depth
 
     @abc.abstractmethod
@@ -476,7 +485,6 @@ class Beam_search(Tree_search):
         ##############
 
         self.reverse = reverse
-        self.open = open
         self.Q = Q
         self.beam_length = beam_length
 
@@ -510,7 +518,6 @@ class Beam_search(Tree_search):
 
             for _ in range(idx_min):
                 self.open.pop(0)
-
             return True, self.close[-idx_min:]
 
         else:
@@ -594,7 +601,6 @@ class Diverse_best_first_search(Tree_search):
         # PARAMETERS #
         ##############
 
-        self.open = open
         self.reverse = reverse
         self.Q = Q
         self.P = P
@@ -759,7 +765,7 @@ class Cyclic_best_first_search(Tree_search):
         self.L[0] = True
         self.i = 0
         self.contour = [[] for i in range(self.max_depth + 1)]
-        self.contour[0] = open
+        self.contour[0] = self.open
 
         self.best_scores = float("inf")
         self.first_complete = False
@@ -771,12 +777,12 @@ class Cyclic_best_first_search(Tree_search):
         if not self.first_complete:
             self.next_frontier.append(c)
 
-            if c.level == self.max_depth:
+            if c.level == self.max_depth - 1:
                 self.first_complete = True
-                self.best_score = c.min_score
+                self.best_score = c.score
         else:
-            if c.min_score < self.best_score:
-                self.best_score = c.min_score
+            if c.score < self.best_score:
+                self.best_score = c.score
                 self.next_frontier.append(c)
 
     def get_next(self):
@@ -963,6 +969,11 @@ class Epsilon_greedy_search(Tree_search):
             return False, -1
 
 
+##########
+# DIRECT #
+##########
+
+
 class Potentially_Optimal_Rectangle(Tree_search):
 
     """Potentially_Optimal_Rectangle
@@ -1001,7 +1012,7 @@ class Potentially_Optimal_Rectangle(Tree_search):
     Cyclic_best_first_search : Hybrid between DFS and BestFS
     """
 
-    def __init__(self, open, max_depth, error=1e-4):
+    def __init__(self, open, max_depth=600, error=1e-4, maxdiv=3000):
         """__init__(self, open, max_depth, Q=1, reverse=False, error=1e-4)
 
         Parameters
@@ -1029,6 +1040,578 @@ class Potentially_Optimal_Rectangle(Tree_search):
         ##############
 
         self.error = error
+        self.maxdiv = maxdiv
+
+        #############
+        # VARIABLES #
+        #############
+        self.maxi1 = np.full(self.maxdiv, -float("inf"), dtype=float)
+        self.mini2 = np.full(self.maxdiv, float("inf"), dtype=float)
+
+        self.next_frontier = []
+        min = [c.score for c in self.open]
+        self.best_score = np.min(min)
+
+    def add(self, c):
+
+        self.next_frontier.append(c)
+        self.best_score = c.loss.best_score
+
+    def get_next(self):
+
+        if len(self.next_frontier) > 0:
+            self.open += sorted(
+                self.next_frontier, key=lambda x: (-x.length, x.score)
+            )
+            self.open = sorted(self.open, key=lambda x: (-x.length, x.score))[
+                : self.maxdiv
+            ]
+            self.next_frontier = []
+
+        if len(self.open):
+            self.maxi1.fill(-float("inf"))
+            self.mini2.fill(float("inf"))
+
+            groups = groupby(self.open, lambda x: x.length)
+            idx = self.optimal(groups)
+            if idx:
+                for i in reversed(idx):
+                    self.close.append(self.open.pop(i))
+
+                return True, self.close[-len(idx) :]
+            else:
+                self.close.append(self.open.pop(0))
+                return True, self.close[-1:]
+        else:
+            return False, -1
+
+    def optimal(self, groups):
+        # Potentially optimal index
+        potoptidx = []
+
+        group_size = 0
+        for key, value in groups:
+            subgroup = list(value)
+            current_score = subgroup[0].score
+            idx = 0
+            while (
+                idx < len(subgroup)
+                and np.abs(subgroup[idx].score - current_score) <= 1e-13
+            ):
+                current_score = subgroup[idx].score
+                selected = subgroup[idx]
+                current_idx = group_size + idx
+                for jdx in range(current_idx + 1, len(self.open)):
+                    c = self.open[jdx]
+
+                    if c.length < selected.length:
+
+                        denom = selected.length - c.length
+                        num = selected.score - c.score
+                        if denom != 0:
+                            low_k = (num) / (denom)
+                        else:
+                            low_k = -float("inf")
+
+                        if low_k > self.maxi1[current_idx]:
+                            self.maxi1[current_idx] = low_k
+                        elif low_k < self.mini2[jdx]:
+                            self.mini2[jdx] = low_k
+
+                    elif c.length > selected.length:
+
+                        denom = c.length - selected.length
+                        num = c.score - selected.score
+                        if denom != 0:
+                            up_k = (num) / (denom)
+                        else:
+                            up_k = float("inf")
+
+                        if up_k < self.mini2[current_idx]:
+                            self.mini2[current_idx] = up_k
+                        elif up_k > self.maxi1[jdx]:
+                            self.maxi1[jdx] = up_k
+
+                if self.mini2[current_idx] > 0 and (
+                    self.maxi1[current_idx] <= self.mini2[current_idx]
+                ):
+                    if self.best_score != 0:
+                        num = self.best_score - selected.score
+                        denum = np.abs(self.best_score)
+                        scnd_part = (
+                            selected.length / denum * self.mini2[current_idx]
+                        )
+
+                        if self.error <= num / denum + scnd_part:
+                            potoptidx.append(current_idx)
+                    else:
+                        scnd_part = selected.length * self.mini2[current_idx]
+
+                        if selected.score <= scnd_part:
+                            potoptidx.append(current_idx)
+
+                idx += 1
+            group_size += len(subgroup)
+        return potoptidx
+
+
+class Locally_biased_POR(Tree_search):
+
+    """Locally_biased_POR
+
+    Potentially Optimal Rectangle algorithm (POR), is a the selection strategy comming from DIRECT.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Best_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Beam_search : Memory efficient tree search algorithm based on BestFS
+    Cyclic_best_first_search : Hybrid between DFS and BestFS
+    """
+
+    def __init__(self, open, max_depth=600, error=1e-4, maxdiv=3000):
+        """__init__(self, open, max_depth, Q=1, reverse=False, error=1e-4)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Best_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        error : float, default=1e-4
+            Small value which determines when an evaluation should be considered as good as the best solution found so far.
+
+        """
+        super().__init__(open, max_depth)
+
+        ##############
+        # PARAMETERS #
+        ##############
+
+        self.error = error
+        self.maxdiv = maxdiv
+
+        #############
+        # VARIABLES #
+        #############
+        self.maxi1 = np.full(self.maxdiv, -float("inf"), dtype=float)
+        self.mini2 = np.full(self.maxdiv, float("inf"), dtype=float)
+
+        self.next_frontier = []
+        min = [c.score for c in self.open]
+        self.best_score = np.min(min)
+
+    def add(self, c):
+
+        self.next_frontier.append(c)
+        self.best_score = c.loss.best_score
+
+    def get_next(self):
+
+        if len(self.next_frontier) > 0:
+            self.open += sorted(
+                self.next_frontier, key=lambda x: (-x.length, x.score)
+            )
+            self.open = sorted(self.open, key=lambda x: (-x.length, x.score))[
+                : self.maxdiv
+            ]
+            self.next_frontier = []
+
+        if len(self.open):
+            self.maxi1.fill(-float("inf"))
+            self.mini2.fill(float("inf"))
+
+            groups = groupby(self.open, lambda x: x.length)
+            idx = self.optimal(groups)
+            if idx:
+                for i in reversed(idx):
+                    self.close.append(self.open.pop(i))
+
+                return True, self.close[-len(idx) :]
+            else:
+                self.close.append(self.open.pop(0))
+                return True, self.close[-1:]
+        else:
+            return False, -1
+
+    def optimal(self, groups):
+        # Potentially optimal index
+        potoptidx = defaultdict(None)
+
+        group_size = 0
+        for key, value in groups:
+            subgroup = list(value)
+            current_score = subgroup[0].score
+            idx = 0
+            while (
+                idx < len(subgroup)
+                and np.abs(subgroup[idx].score - current_score) <= 1e-13
+            ):
+                current_score = subgroup[idx].score
+                selected = subgroup[idx]
+                current_idx = group_size + idx
+                for jdx in range(current_idx + 1, len(self.open)):
+                    c = self.open[jdx]
+
+                    if c.length < selected.length:
+
+                        denom = selected.length - c.length
+                        num = selected.score - c.score
+                        if denom != 0:
+                            low_k = (num) / (denom)
+                        else:
+                            low_k = -float("inf")
+
+                        if low_k > self.maxi1[current_idx]:
+                            self.maxi1[current_idx] = low_k
+                        elif low_k < self.mini2[jdx]:
+                            self.mini2[jdx] = low_k
+
+                    elif c.length > selected.length:
+
+                        denom = c.length - selected.length
+                        num = c.score - selected.score
+                        if denom != 0:
+                            up_k = (num) / (denom)
+                        else:
+                            up_k = float("inf")
+
+                        if up_k < self.mini2[current_idx]:
+                            self.mini2[current_idx] = up_k
+                        elif up_k > self.maxi1[jdx]:
+                            self.maxi1[jdx] = up_k
+
+                if not (selected.length in potoptidx):
+                    if self.mini2[current_idx] > 0 and (
+                        self.maxi1[current_idx] <= self.mini2[current_idx]
+                    ):
+                        if self.best_score != 0:
+                            num = self.best_score - selected.score
+                            denum = np.abs(self.best_score)
+                            scnd_part = (
+                                selected.length
+                                / denum
+                                * self.mini2[current_idx]
+                            )
+
+                            if self.error <= num / denum + scnd_part:
+                                potoptidx[selected.length] = current_idx
+                        else:
+                            scnd_part = (
+                                selected.length * self.mini2[current_idx]
+                            )
+
+                            if selected.score <= scnd_part:
+                                potoptidx[selected.length] = current_idx
+
+                idx += 1
+            group_size += len(subgroup)
+        return list(potoptidx.values())
+
+
+class Adaptive_POR(Tree_search):
+
+    """Potentially_Optimal_Rectangle
+
+    Potentially Optimal Rectangle algorithm (POR), is a the selection strategy comming from DIRECT.
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Best_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Beam_search : Memory efficient tree search algorithm based on BestFS
+    Cyclic_best_first_search : Hybrid between DFS and BestFS
+    """
+
+    def __init__(
+        self, open, max_depth=600, error=1e-2, maxdiv=3000, patience=5
+    ):
+        """__init__(self, open, max_depth, Q=1, reverse=False, error=1e-4)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Best_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        error : float, default=1e-4
+            Small value which determines when an evaluation should be considered as good as the best solution found so far.
+
+        """
+        super().__init__(open, max_depth)
+
+        ##############
+        # PARAMETERS #
+        ##############
+
+        self.max_error = error
+        self.maxdiv = maxdiv
+        self.patience = patience
+        #############
+        # VARIABLES #
+        #############
+        self.maxi1 = np.full(self.maxdiv, -float("inf"), dtype=float)
+        self.mini2 = np.full(self.maxdiv, float("inf"), dtype=float)
+
+        self.next_frontier = []
+        min = [c.score for c in self.open]
+        self.best_score = np.min(min)
+        self.new_best_score = float("inf")
+
+        self.stagnation = 0
+        self.error = self.max_error
+
+    def add(self, c):
+
+        self.next_frontier.append(c)
+        if c.loss.best_score < self.new_best_score:
+            self.new_best_score = c.loss.best_score
+
+    def get_next(self):
+
+        if len(self.next_frontier) > 0:
+            self.open += sorted(
+                self.next_frontier, key=lambda x: (-x.length, x.score)
+            )
+            self.open = sorted(self.open, key=lambda x: (-x.length, x.score))[
+                : self.maxdiv
+            ]
+            self.next_frontier = []
+
+        if self.best_score - self.new_best_score >= 1e-4 * np.abs(
+            np.median(self.open[0].loss.all_scores) - self.best_score
+        ):
+            self.best_score = self.new_best_score
+            self.new_best_score = float("inf")
+            self.stagnation = 0
+        else:
+            self.stagnation += 1
+
+        if self.stagnation == self.patience:
+            if self.error == 0.0:
+                self.error = self.max_error
+            else:
+                self.error = 0.0
+
+        if len(self.open) > 1:
+            self.maxi1.fill(-float("inf"))
+            self.mini2.fill(float("inf"))
+
+            groups = groupby(self.open, lambda x: x.length)
+            idx = self.optimal(groups)
+            if idx:
+                for i in reversed(idx):
+                    self.close.append(self.open.pop(i))
+
+                return True, self.close[-len(idx) :]
+
+        elif len(self.open) == 1:
+            self.close.append(self.open.pop(0))
+            return True, self.close[-1:]
+
+        else:
+            return False, -1
+
+    def optimal(self, groups):
+        # Potentially optimal index
+        potoptidx = []
+
+        group_size = 0
+        for key, value in groups:
+            subgroup = list(value)
+            current_score = subgroup[0].score
+            idx = 0
+            while (
+                idx < len(subgroup)
+                and np.abs(subgroup[idx].score - current_score) <= 1e-13
+            ):
+                current_score = subgroup[idx].score
+                selected = subgroup[idx]
+                current_idx = group_size + idx
+                for jdx in range(current_idx + 1, len(self.open)):
+                    c = self.open[jdx]
+
+                    if c.length < selected.length:
+
+                        denom = selected.length - c.length
+                        num = selected.score - c.score
+                        if denom != 0:
+                            low_k = (num) / (denom)
+                        else:
+                            low_k = -float("inf")
+
+                        if low_k > self.maxi1[current_idx]:
+                            self.maxi1[current_idx] = low_k
+                        elif low_k < self.mini2[jdx]:
+                            self.mini2[jdx] = low_k
+
+                    elif c.length > selected.length:
+
+                        denom = c.length - selected.length
+                        num = c.score - selected.score
+                        if denom != 0:
+                            up_k = (num) / (denom)
+                        else:
+                            up_k = float("inf")
+
+                        if up_k < self.mini2[current_idx]:
+                            self.mini2[current_idx] = up_k
+                        elif up_k > self.maxi1[jdx]:
+                            self.maxi1[jdx] = up_k
+
+                if self.mini2[current_idx] > 0 and (
+                    self.maxi1[current_idx] <= self.mini2[current_idx]
+                ):
+                    if self.best_score != 0:
+                        num = self.best_score - selected.score
+                        denum = np.abs(self.best_score)
+                        scnd_part = (
+                            selected.length / denum * self.mini2[current_idx]
+                        )
+
+                        if self.error <= num / denum + scnd_part:
+                            potoptidx.append(current_idx)
+                    else:
+                        scnd_part = selected.length * self.mini2[current_idx]
+
+                        if selected.score <= scnd_part:
+                            potoptidx.append(current_idx)
+
+                idx += 1
+            group_size += len(subgroup)
+        return potoptidx
+
+
+#######
+# SOO #
+#######
+
+
+class Soo_tree_search(Tree_search):
+    """Soo_tree_search
+
+    Attributes
+    ----------
+
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
+
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Depth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Breadth_first_search : Tree search Breadth based startegy
+    Cyclic_best_first_search : Hybrid between DFS and BestFS
+    """
+
+    def __init__(self, open, max_depth, Q=1, reverse=False):
+        """__init__(open, max_depth, Q=1, reverse=False)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Depth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        """
+        super().__init__(open, max_depth)
+
+        ##############
+        # PARAMETERS #
+        ##############
+
+        self.reverse = reverse
+        self.Q = Q
 
         #############
         # VARIABLES #
@@ -1036,61 +1619,150 @@ class Potentially_Optimal_Rectangle(Tree_search):
 
         self.next_frontier = []
 
-        self.best_score = float("inf")
-
-        self.build = np.vectorize(
-            lambda x: (x.min_score, np.linalg.norm(x.center - x.lo_bounds))
-        )
-
     def add(self, c):
 
         self.next_frontier.append(c)
 
-        if c.min_score < self.best_score:
-            self.best_score = c.min_score
-
     def get_next(self):
 
         if len(self.next_frontier) > 0:
-            idx = self.optimal()
-
-            for i, j in enumerate(idx):
-                self.open.append(self.next_frontier.pop(j - i))
+            self.open = sorted(
+                self.next_frontier
+                + sorted(
+                    self.open,
+                    reverse=self.reverse,
+                    key=lambda x: (x.level, x.score),
+                ),
+                reverse=self.reverse,
+                key=lambda x: (x.level, x.score),
+            )[:]
+            self.next_frontier = []
 
         if len(self.open) > 0:
 
-            idx_min = len(self.open)
+            current_level = self.open[0].level
+            self.close.append(self.open.pop(0))
+            idx_min = 1
 
-            for _ in range(idx_min):
-                self.close.append(self.open.pop(0))
+            idx = 0
+            size = len(self.open)
+
+            while idx < size:
+
+                node = self.open[idx]
+                if node.level != current_level:
+                    current_level = node.level
+                    self.close.append(self.open.pop(idx))
+                    idx -= 1
+                    size -= 1
+                    idx_min += 1
+
+                idx += 1
 
             return True, self.close[-idx_min:]
 
         else:
             return False, -1
 
-    def optimal(self):
 
-        res = []
+#######
+# FDA #
+#######
 
-        a, d = self.build(self.next_frontier)
 
-        p1 = a.reshape((len(a), 1)) - a
-        p2 = d.reshape((len(d), 1)) - d
-        K = p1 / p2
+class Move_up(Tree_search):
+    """Move_up
 
-        K2 = (a - self.best_score + self.error * np.abs(self.best_score)) / d
+    Attributes
+    ----------
 
-        for i in range(len(a)):
-            U = K[i][p2[i] < 0]
-            if len(U) == 0:
-                res.append(i)
-            else:
-                minU = np.nanmin(U)
-                if minU > 0:
-                    L = K[i][p2[i] >= 0]
-                    maxL = np.maximum(np.nanmax(L), K2[i])
-                    if maxL > 0 and maxL <= minU:
-                        res.append(i)
+    open : list[Fractal]
+        Initial Open list containing not explored nodes from the fractal rooted tree.
 
-        return res
+    max_depth : int
+        maximum depth of the fractal rooted tree.
+
+    Q : int, default=1
+        Q-Depth_first_search, at each get_next, tries to return Q nodes.
+
+    reverse : boolean, default=False
+        if False do a descending sort the open list, else do an ascending sort
+
+    Methods
+    -------
+    add(self,c)
+        Add a node c to the fractal tree
+
+    get_next(self)
+        Get the next node to evaluate
+
+    See Also
+    --------
+    Fractal : Abstract class defining what a fractal is.
+    FDA : Fractal Decomposition Algorithm
+    Tree_search : Base class
+    Breadth_first_search : Tree search Breadth based startegy
+    Cyclic_best_first_search : Hybrid between DFS and BestFS
+    """
+
+    def __init__(self, open, max_depth, Q=1, reverse=False):
+        """__init__(open, max_depth, Q=1, reverse=False)
+
+        Parameters
+        ----------
+        open : list[Fractal]
+            Initial Open list containing not explored nodes from the fractal rooted tree.
+
+        max_depth : int
+            maximum depth of the fractal rooted tree.
+
+        Q : int, default=1
+            Q-Depth_first_search, at each get_next, tries to return Q nodes.
+
+        reverse : boolean, default=False
+            if False do a descending sort the open list, else do an ascending sort
+
+        """
+        super().__init__(open, max_depth)
+
+        ##############
+        # PARAMETERS #
+        ##############
+
+        self.reverse = reverse
+        self.Q = Q
+
+        #############
+        # VARIABLES #
+        #############
+
+        self.next_frontier = []
+
+    def add(self, c):
+
+        self.next_frontier.append(c)
+
+    def get_next(self):
+
+        if len(self.next_frontier) > 0:
+            self.open = sorted(
+                self.next_frontier
+                + sorted(
+                    self.open,
+                    reverse=self.reverse,
+                    key=lambda x: (-x.level, x.score),
+                ),
+                reverse=self.reverse,
+                key=lambda x: (-x.level, x.score),
+            )[:]
+            self.next_frontier = []
+
+        if len(self.open) > 0:
+
+            for _ in range(self.Q):
+                self.close.append(self.open.pop(0))
+
+            return True, self.close[-self.Q :]
+
+        else:
+            return False, -1

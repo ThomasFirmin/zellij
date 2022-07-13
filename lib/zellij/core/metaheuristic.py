@@ -2,8 +2,8 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:16+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-05-31T10:56:45+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
 
@@ -29,15 +29,11 @@ class Metaheuristic(object):
 
     Attributes
     ----------
-    loss_func : LossFunc
-        Loss function to optimize. must be of type :math:`f(x)=y` or :math:`f(x)=results,model`
-        See :ref:`lf` for more information.
-
     search_space : Searchspace
         :ref:`sp` object containing bounds of all decision variables.
 
     f_calls : int
-        Maximum number of calls to loss_func.
+        Maximum number of calls to search.space_space.loss.
 
     save : boolean, optional
         If True save results into a file
@@ -54,13 +50,11 @@ class Metaheuristic(object):
     :ref:`sp` : Defines what a search space is in Zellij.
     """
 
-    def __init__(self, loss_func, search_space, f_calls, verbose=True):
+    def __init__(self, search_space, f_calls, verbose=True):
 
         ##############
         # PARAMETERS #
         ##############
-
-        self.loss_func = loss_func
         self.search_space = search_space
         self.f_calls = f_calls
 
@@ -69,11 +63,6 @@ class Metaheuristic(object):
         #############
         # VARIABLES #
         #############
-
-        # Modify labels in loss func according to SearchSpace labels
-        self.loss_func.labels = self.search_space.labels
-        # Index of the historic in loss function.
-        self.lf_idx = len(self.loss_func.all_scores)
 
         if self.verbose:
             self.manager = enlighten.get_manager()
@@ -111,7 +100,7 @@ class Metaheuristic(object):
                     self.calls_pb_pending,
                 ) = pb.calls_counter(self.manager, self.f_calls)
 
-                self.loss_func.manager = self.manager
+                self.search_space.loss.manager = self.manager
 
             else:
                 self.main_pb = False
@@ -206,12 +195,25 @@ class Metaheuristic(object):
 
             all_data = pd.read_table(all, sep=",", decimal=".")
             all_scores = all_data["loss"].to_numpy()
-        else:
-            all_data = self.loss_func.all_solutions
-            all_scores = np.array(self.loss_func.all_scores)
 
-        self.search_space.show(
-            all_data, all_scores, save, self.loss_func.plots_path
-        )
+            self.search_space.show(
+                all_data,
+                all_scores,
+                save,
+                self.search_space.loss.plots_path,
+            )
 
-        return all_data, all_scores
+            return all_data, all_scores
+
+        elif self.search_space.loss.historic:
+            all_data = self.search_space.loss.all_solutions
+            all_scores = np.array(self.search_space.loss.all_scores)
+
+            self.search_space.show(
+                all_data,
+                all_scores,
+                save,
+                self.search_space.loss.plots_path,
+            )
+
+            return all_data, all_scores
