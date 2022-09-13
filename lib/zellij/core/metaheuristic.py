@@ -192,8 +192,8 @@ class Metaheuristic(object):
 
         if filepath:
             all = os.path.join(filepath, "outputs", "all_evaluations.csv")
-
-            all_data = pd.read_table(all, sep=",", decimal=".")
+            sep = self.search_space.loss.sep
+            all_data = pd.read_table(all, sep=sep, decimal=".")
             all_scores = all_data["loss"].to_numpy()
 
             self.search_space.show(

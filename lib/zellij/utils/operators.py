@@ -9,8 +9,8 @@
 import random
 
 from zellij.core.addons import Mutator, Crossover, Selector
-from zellij.core.node import remove_node_from_list, DAGraph, select_random_subdag
-from zellij.core.search_space import Searchspace
+from zellij.core.node import remove_node_from_list, DAGraph, select_random_subdag, AdjMatrix, fill_adj_matrix
+from zellij.core.search_space import Searchspace, logger
 from zellij.core.variables import Constant
 import numpy as np
 from deap import tools
@@ -150,6 +150,9 @@ class DAGTwoPoint(Crossover):
         for i in range(cxpoint1, cxpoint2):
             if isinstance(ind1[i], DAGraph):
                 ind1[i], ind2[i] = self.dag_crossover(ind1[i], ind2[i])
+            if isinstance(ind1[i], AdjMatrix):
+                ind1[i], ind2[i] = self.adj_matrix_crossover(ind1[i], ind2[i])
+
         return ind1, ind2
 
     def dag_crossover(self, g1, g2):
@@ -270,13 +273,113 @@ class DAGTwoPoint(Crossover):
                 if max(len(child1), len(child2)) <= self.size:
                     crossed = True
 
-        for n in child1:
-            n.outputs = list(set(n.outputs))
-        for n in child2:
-            n.outputs = list(set(n.outputs))
-        child1 = DAGraph(child1)
-        child2 = DAGraph(child2)
+            for n in child1:
+                n.outputs = list(set(n.outputs))
+            for n in child2:
+                n.outputs = list(set(n.outputs))
+            child1 = DAGraph(child1)
+            child2 = DAGraph(child2)
         return child1, child2
+
+    def adj_matrix_crossover(self, p1, p2):
+        crossed = False
+        while not crossed:
+            op1 = p1.operations
+            op2 = p2.operations
+            m1 = p1.matrix
+            m2 = p2.matrix
+
+            s1 = list(set(np.random.choice(range(1, len(op1)), size=len(op1) - 1)))
+            s2 = list(set(np.random.choice(range(1, len(op2)), size=len(op2) - 1)))
+            s1.sort()
+            s2.sort()
+
+            # remove subsets
+            it = 0
+            for i1 in s1:
+                m1 = np.delete(m1, i1 - it, axis=0)
+                m1 = np.delete(m1, i1 - it, axis=1)
+                it+=1
+            it = 0
+            for i2 in s2:
+                m2 = np.delete(m2, i2 - it, axis=0)
+                m2 = np.delete(m2, i2 - it, axis=1)
+                it+=1
+
+            # Select index new nodes
+            old_s1 = np.array(list(set(range(len(op1))) - set(s1)))
+            old_s2 = np.array(list(set(range(len(op2))) - set(s2)))
+            new_s1 = [np.argmin(np.abs(old_s2 - s1[0]))]
+            if new_s1[0] == old_s2[new_s1[0]]:
+                new_s1[0] += 1
+            for i1 in range(1, len(s1)):
+                new_s1.append(min(s1[i1] - s1[i1-1] + new_s1[i1-1], len(old_s2) + len(new_s1)))
+            new_s2 = [np.argmin(np.abs(old_s1 - s2[0]))]
+            if new_s2[0] == old_s1[new_s2[0]]:
+                new_s2[0] += 1
+            for i2 in range(1, len(s2)):
+                new_s2.append(min(s2[i2] - s2[i2 - 1] + new_s2[i2-1], len(old_s1) + len(new_s2)))
+            m1_shape_before = m1.shape
+            m2_shape_before = m2.shape
+            m1 = np.insert(m1, np.clip(new_s2, 0, m1.shape[0]), 0, axis=0)
+            m1 = np.insert(m1, np.clip(new_s2, 0, m1.shape[1]), 0, axis=1)
+            m2 = np.insert(m2, np.clip(new_s1, 0, m2.shape[0]), 0, axis=0)
+            m2 = np.insert(m2, np.clip(new_s1, 0, m2.shape[1]), 0, axis=1)
+            m1_shape_after = m1.shape
+            m2_shape_after = m2.shape
+            for i in range(len(s1)):
+                diff = new_s1[i] - s1[i]
+                if diff >= 0:
+                    length = min(m2.shape[0] - diff, p1.matrix.shape[0])
+                    try:
+                        m2[diff:diff+length, new_s1[i]] = p1.matrix[:length, s1[i]]
+                        m2[new_s1[i], diff:diff+length] = p1.matrix[s1[i], :length]
+                    except IndexError as e:
+                        logger.error(f"Diff = {diff}, failed with {e}, with m2 = {m2}, p1.matrix = {p1.matrix}, i = {i}, "
+                                     f"new_s1[i] = {new_s1[i]}, s1[i] = {s1[i]}, m2 shape before: {m2_shape_before}, "
+                                     f"m2 shape after: {m2_shape_after}, new_s1= {new_s1}, s1 = {s1}, old_s1 = {old_s1}")
+                if diff < 0:
+                    length = min(m2.shape[0], p1.matrix.shape[0]+diff)
+                    try:
+                        m2[:length, new_s1[i]] = p1.matrix[-diff:-diff+length, s1[i]]
+                        m2[new_s1[i], :length] = p1.matrix[s1[i], -diff:-diff+length]
+                    except IndexError as e:
+                        logger.error(f"Diff = {diff}, failed with {e}, with m2 = {m2}, p1.matrix = {p1.matrix}, i = {i}, "
+                                     f"new_s1[i] = {new_s1[i]}, s1[i] = {s1[i]}, m2 shape before: {m2_shape_before}, "
+                                     f"m2 shape after: {m2_shape_after}, new_s1= {new_s1}, s1 = {s1}")
+            for i in range(len(s2)):
+                diff = new_s2[i] - s2[i]
+                if diff >= 0:
+                    length = min(m1.shape[0] - diff, p2.matrix.shape[0])
+                    try:
+                        m1[diff:diff+length, new_s2[i]] = p2.matrix[:length, s2[i]]
+                        m1[new_s2[i], diff:diff+length] = p2.matrix[s2[i], :length]
+                    except IndexError as e:
+                        logger.error(f"Diff = {diff}, failed with {e}, with m1 = {m1}, p2.matrix = {p2.matrix}, i = {i}, "
+                                     f"new_s2[i] = {new_s2[i]}, s2[i] = {s2[i]}, m1 shape before: {m1_shape_before}, "
+                                     f"m1 shape after: {m1_shape_after}, new_s2= {new_s2}, s2 = {s2}")
+                if diff < 0:
+                    length = min(m1.shape[0], p2.matrix.shape[0]+diff)
+                    try:
+                        m1[:length, new_s2[i]] = p2.matrix[-diff:-diff + length, s2[i]]
+                        m1[new_s2[i], :length] = p2.matrix[s2[i], -diff:-diff + length]
+                    except IndexError as e:
+                        logger.error(f"Diff = {diff}, failed with {e}, with m1 = {m1}, p2.matrix = {p2.matrix}, i = {i}, "
+                                     f"new_s2[i] = {new_s2[i]}, s2[i] = {s2[i]}, m1 shape before: {m1_shape_before}, "
+                                     f"m1 shape after: {m1_shape_after}, new_s2= {new_s2}, s2 = {s2}")
+            m1 = np.triu(m1, k=1)
+            m1 = fill_adj_matrix(m1)
+            m2 = np.triu(m2, k=1)
+            m2 = fill_adj_matrix(m2)
+            op1 = [op1[i] for i in range(len(op1)) if i not in s1]
+            op2 = [op2[i] for i in range(len(op2)) if i not in s2]
+            for i in range(len(new_s1)):
+                op2 = op2[:new_s1[i]] + [p1.operations[s1[i]]] + op2[new_s1[i]:]
+            for i in range(len(new_s2)):
+                op1 = op1[:new_s2[i]] + [p2.operations[s2[i]]] + op1[new_s2[i]:]
+            if max(len(op1), len(op2)) <= self.size:
+                crossed = True
+        return AdjMatrix(op1, m1), AdjMatrix(op2, m2)
 
     @Mutator.target.setter
     def target(self, search_space):

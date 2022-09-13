@@ -44,7 +44,7 @@ def remove_node_from_list(l, nodes):
     new_l = l[:]
     for n1 in nodes:
         for n2 in new_l:
-            if n1.is_eq(n2):
+            if n1 == n2:
                 new_l.remove(n2)
                 break
     return new_l
@@ -56,7 +56,7 @@ def order_nodes(nodes, leaf):
         nodes.append(nodes.pop(nodes.index(leaf)))
         flagged[-1] = True
         changes = 0
-        while sum(flagged) < len(flagged) and changes < len(flagged)**2:
+        while sum(flagged) < len(flagged) and changes < len(flagged) ** 2:
             last_idx = [i for i, x in enumerate(flagged) if not x][-1]
             node = nodes[last_idx]
             outputs_indexes = []
@@ -70,10 +70,11 @@ def order_nodes(nodes, leaf):
                 nodes.insert(min(outputs_indexes), node)
                 flagged.remove(flagged[last_idx])
                 flagged.insert(min(outputs_indexes), False)
-            changes +=1
+            changes += 1
         if sum(flagged) < len(flagged):
             raise RecursionError
     return nodes
+
 
 def select_random_subdag(g):
     subdag = []
@@ -157,8 +158,65 @@ class DAGraph(object):
             j = 1
             while not related and j < i:
                 related = self.nodes[i] in self.nodes[j].outputs
-                j+=1
+                j += 1
             if not related:
-                raise Exception("Graph has orphans: node {} in {}".format(self.nodes[i], self.nodes))
+                raise OrphanError(self.nodes[i], self.nodes)
 
 
+class OrphanError(Exception):
+    def __init__(self, node, nodes):
+        self.message = "Orphan error: Graph has orphans: node {} in {}".format(node.operation, [n for n in nodes])
+
+    def __str__(self):
+        return self.message
+
+
+class AdjMatrix(object):
+    def __init__(self, operations, matrix):
+        self.matrix = matrix
+        self.operations = operations
+        self.assert_adj_matrix()
+
+    def assert_adj_matrix(self):
+        assert isinstance(self.operations, list), f"""Operations should be a list, got {self.operations} instead."""
+        assert isinstance(self.matrix, np.ndarray) and (self.matrix.shape[0] == self.matrix.shape[1]), f"""Matrix should be a 
+        squared array. got {self.matrix} instead."""
+        assert self.matrix.shape[0] == len(
+            self.operations), f"""Matrix and operations should have the same dimension got {self.matrix.shape[0]} 
+                and {len(self.operations)} instead. """
+        assert np.sum(np.triu(self.matrix, k=1) != self.matrix) == 0, f"""The adjacency matrix should be upper-triangular with 0s on the
+        diagonal. Got {self.matrix}. """
+        for i in range(self.matrix.shape[0] - 1):
+            assert sum(self.matrix[i]) > 0, f"""Node {i} does not have any child."""
+        for j in range(1, self.matrix.shape[1]):
+            assert sum(self.matrix[:, j]) > 0, f"""Node {j} does not have any parent."""
+        if self.operations[0][0] != "Input":
+            logger.error(self.operations)
+
+    def copy(self):
+        new_op = self.operations.copy()
+        new_matrix = self.matrix.copy()
+        return AdjMatrix(new_op, new_matrix)
+
+    def __str__(self):
+        matrix_str = f"NODES: {self.operations.__str__()} | MATRIX:{self.matrix.tolist().__str__()}"
+        return matrix_str
+
+    def __repr__(self):
+        matrix_repr = f"NODES: {self.operations.__repr__()} | MATRIX:{self.matrix.tolist().__repr__()}"
+        return matrix_repr
+
+
+
+def fill_adj_matrix(matrix):
+    for i in range(matrix.shape[0] - 1):
+        new_row = matrix[i, i + 1:]
+        while sum(new_row) == 0:
+            new_row = np.random.choice(2, new_row.shape[0])
+        matrix[i, i + 1:] = new_row
+    for j in range(1, matrix.shape[1]):
+        new_col = matrix[:j, j]
+        while sum(new_col) == 0:
+            new_col = np.random.choice(2, new_col.shape[0])
+        matrix[:j, j] = new_col
+    return matrix

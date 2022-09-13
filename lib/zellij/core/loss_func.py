@@ -65,7 +65,7 @@ class LossFunc(object):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, historic=True, save=False, verbose=True):
+    def __init__(self, model, historic=True, save=False, verbose=True, labels=None, separator=','):
 
         """__init__(model, save=False)
 
@@ -102,8 +102,11 @@ class LossFunc(object):
         self.calls = 0
         # Must be private, à voir
         self.new_best = False
-
-        self.labels = []
+        if labels is None:
+            self.labels = []
+        else:
+            self.labels=labels
+        self.sep = separator
 
         if isinstance(self.save, str):
             self.folder_name = self.save
@@ -155,7 +158,7 @@ class LossFunc(object):
         """ _save_model()
 
         Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form :math:`f(x) = (y, model)`\
-         `y` are the results of the evaluation of `x` by `f`. `model` is optional, if you want to save the best model found (e.g. a neural network)\
+        `y` are the results of the evaluation of `x` by `f`. `model` is optional, if you want to save the best model found (e.g. a neural network)\
          you can return the model. However the model must have a "save" method with a filename. (e.g. model.save(filename)).
 
         """
@@ -225,7 +228,7 @@ class LossFunc(object):
 
         # Additionnal header for the outputs file
         if len(args) > 0:
-            suffix = "," + ",".join(str(e) for e in args)
+            suffix = self.sep + self.sep.join(str(e) for e in args)
         else:
             suffix = ""
 
@@ -242,7 +245,7 @@ class LossFunc(object):
 
         with open(self.loss_file, "w") as f:
             f.write(
-                ",".join(str(e) for e in self.labels) + ",loss" + suffix + "\n"
+                self.sep.join(str(e) for e in self.labels) + self.sep + "loss" + suffix + "\n"
             )
 
         logger.info(
@@ -274,13 +277,13 @@ class LossFunc(object):
 
         # Determine if additionnal contents must be added to the save
         if len(kwargs) > 0:
-            suffix = "," + ",".join(str(e) for e in kwargs.values())
+            suffix = self.sep + self.sep.join(str(e) for e in kwargs.values())
         else:
             suffix = ""
 
         # Save a solution and additionnal contents
         with open(self.loss_file, "a+") as f:
-            f.write(",".join(str(e) for e in x) + "," + str(y) + suffix + "\n")
+            f.write(self.sep.join(str(e) for e in x) + self.sep + str(y) + suffix + "\n")
 
     # Save best found solution
     def _save_best(self, x, y):
@@ -453,7 +456,7 @@ class MPILoss(LossFunc):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, historic=True, save=False, verbose=True):
+    def __init__(self, model, historic=True, save=False, verbose=True, labels=None, separator=','):
 
         """__init__(model, historic=True, save=False, verbose=True)
 
@@ -461,7 +464,7 @@ class MPILoss(LossFunc):
 
         """
 
-        super().__init__(model, historic, save, verbose)
+        super().__init__(model, historic, save, verbose, labels, separator)
 
         #################
         # MPI VARIABLES #
@@ -649,7 +652,7 @@ class MPILoss(LossFunc):
                         os.system(f"rm -rf {worker_path}")
                         trained_model.save(worker_path)
                     else:
-                        logger.error(
+                        logger.debug(
                             "Model/loss function does not have a method called `save`"
                         )
 
@@ -725,7 +728,7 @@ class SerialLoss(LossFunc):
     MPILoss : Distributed version of LossFunc
     """
 
-    def __init__(self, model, historic=True, save=False, verbose=True):
+    def __init__(self, model, historic=True, save=False, verbose=True, labels=None, separator=','):
 
         """__init__(model, historic=True, save=False, verbose=True)
 
@@ -733,7 +736,7 @@ class SerialLoss(LossFunc):
 
         """
 
-        super().__init__(model, historic, save, verbose)
+        super().__init__(model, historic, save, verbose, labels, separator)
 
     def __call__(self, X, **kwargs):
 
@@ -793,14 +796,14 @@ class SerialLoss(LossFunc):
                 os.system(f"rm -rf {save_path}")
                 trained_model.save(save_path)
             else:
-                logger.error(
+                logger.debug(
                     "Model/loss function does not have a method called `save`"
                 )
                 # exit()
 
 
 # Wrap different loss functions
-def Loss(model=None, historic=True, save=False, verbose=True, MPI=False):
+def Loss(model=None, historic=True, save=False, verbose=True, MPI=False, labels=None, separator=','):
     """Loss(model=None, save=False, verbose=True, MPI=False)
 
     Wrap a function of type :math:`f(x)=y`. See `LossFunc` for more info.
@@ -846,8 +849,8 @@ def Loss(model=None, historic=True, save=False, verbose=True, MPI=False):
     else:
         def wrapper(model):
             if MPI:
-                return MPILoss(model, historic, save, verbose)
+                return MPILoss(model, historic, save, verbose, labels, separator)
             else:
-                return SerialLoss(model, historic, save, verbose)
+                return SerialLoss(model, historic, save, verbose, labels, separator)
 
         return wrapper

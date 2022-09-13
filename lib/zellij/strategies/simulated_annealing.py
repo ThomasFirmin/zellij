@@ -312,28 +312,30 @@ class Simulated_annealing(Metaheuristic):
                             self.search_space.loss.outputs_path, "sa_best.csv"
                         )
                         with open(self.sa_save, "w") as f:
+                            sep = self.search_space.loss.sep
                             f.write(
-                                ",".join(e for e in self.search_space.labels)
-                                + ",loss,temperature,probability\n"
+                                sep.join(e for e in self.search_space.loss.labels)
+                                + f"{sep}loss{sep}temperature{sep}probability\n"
                             )
                             f.write(
-                                ",".join(str(e) for e in self.X0)
-                                + ","
+                                sep.join(str(e) for e in self.X0)
+                                + sep
                                 + str(self.Y0)
-                                + ","
+                                + sep
                                 + str(self.cooling.T0)
-                                + ",0\n"
+                                + sep + "0\n"
                             )
                             self.file_created = True
 
                     with open(self.sa_save, "a") as f:
+                        sep = self.search_space.loss.sep
                         f.write(
-                            ",".join(str(e) for e in X)
-                            + ","
+                            sep.join(str(e) for e in X)
+                            + sep
                             + str(cout_X)
-                            + ","
+                            + sep
                             + str(self.record_temp[-1])
-                            + ","
+                            + sep
                             + str(self.record_proba[-1])
                             + "\n"
                         )
@@ -380,7 +382,7 @@ class Simulated_annealing(Metaheuristic):
         if filepath:
 
             path_sa = os.path.join(filepath, "outputs", "sa_best.csv")
-            data_sa = pd.read_table(path_sa, sep=",", decimal=".")
+            data_sa = pd.read_table(path_sa, sep=self.search_space.loss.sep, decimal=".")
             sa_scores = data_sa["loss"].to_numpy()
 
             temperature = data_sa["temperature"].to_numpy()

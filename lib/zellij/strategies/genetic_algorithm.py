@@ -29,7 +29,7 @@ class Genetic_algorithm(Metaheuristic):
     """Genetic_algorithm
 
     Genetic_algorithm (GA) implements a steady state genetic algorithm. It can be used for exploration and exploitation.
-    Indeed when the population has converged, GA can ,thanks to the mutation and crossover operators, perform an intensification phase arround best solutions.
+    Indeed when the population has converged, GA can ,thanks to the mutation and crossover operators, perform an intensification phase around best solutions.
     It can work with a mixed search space, by adapting its operator.
 
     **Will be modified soon:**
@@ -124,6 +124,7 @@ class Genetic_algorithm(Metaheuristic):
         elitism=0.5,
         filename="",
         verbose=True,
+        ind_init=None
     ):
 
         """__init__(search_space, f_calls, pop_size = 10, generation = 1000, verbose=True)
@@ -189,6 +190,7 @@ class Genetic_algorithm(Metaheuristic):
         # Population save
         self.filename = filename
         self.ga_save = ""
+        self.init_individual = ind_init
 
     # Define what an individual is
     def define_individual(self, sp):
@@ -209,7 +211,10 @@ class Genetic_algorithm(Metaheuristic):
         Initialize an individual to DEAP.
 
         """
-        return icls([content.to_list()])
+        if icls is None:
+            return creator.Individual([content.to_list()])
+        else:
+            return creator.Individual(icls([content.to_list()]))
 
     # Initialize a population extracted from a file
     def initPopulation(self, pcls, ind_init, filename):
@@ -218,7 +223,8 @@ class Genetic_algorithm(Metaheuristic):
         Initialize a population of individual, from a file, to DEAP.
 
         """
-        data = pd.read_csv(filename, sep=",", usecols=self.search_space.size)
+        sep = self.search_space.loss.sep
+        data = pd.read_csv(filename, sep=sep, usecols=self.search_space.loss.labels)
         contents = data.tail(self.pop_size)
 
         return pcls(ind_init(c) for index, c in contents.iterrows())
@@ -268,9 +274,8 @@ class Genetic_algorithm(Metaheuristic):
 
         # Start from a saved population
         if self.filename:
-
             toolbox.register(
-                "individual_guess", self.initIndividual, creator.Individual
+                "individual_guess", self.initIndividual, self.init_individual
             )
             toolbox.register(
                 "population_guess",
@@ -282,6 +287,7 @@ class Genetic_algorithm(Metaheuristic):
 
             logger.info("Creation of the initial population...")
             pop = toolbox.population_guess()
+
 
         # Start from a random population
         else:
@@ -312,6 +318,8 @@ class Genetic_algorithm(Metaheuristic):
             # Build the populationze
             pop = toolbox.population(n=self.pop_size)
 
+        g = 0
+        toolbox.register("generation", lambda: g)
         # Create operators
         self.search_space.mutation._build(toolbox)
         self.search_space.selection._build(toolbox)
@@ -352,13 +360,14 @@ class Genetic_algorithm(Metaheuristic):
                 self.search_space.loss.outputs_path, "ga_population.csv"
             )
             with open(self.ga_save, "a") as f:
-                """f.write(
-                    ",".join(e for e in self.search_space.labels) + ",loss\n"
-                )"""
+                sep = self.search_space.loss.sep
+                f.write(
+                    sep.join(e for e in self.search_space.loss.labels) + sep + "loss\n"
+                )
                 for ind, cout in zip(pop, fits):
                     f.write(
-                        ",".join(str(e) for e in ind[0])
-                        + ","
+                        sep.join(str(e) for e in ind[0])
+                        + sep
                         + str(cout)
                         + "\n"
                     )
@@ -370,7 +379,6 @@ class Genetic_algorithm(Metaheuristic):
         logger.info("Initial population evaluated")
 
         logger.info("Evolution starting...")
-        g = 0
         while (
             g < self.generation and self.search_space.loss.calls < self.f_calls
         ):
@@ -446,15 +454,16 @@ class Genetic_algorithm(Metaheuristic):
             fits = [ind.fitness.values[0] for ind in pop]
 
             # Save new population
-            """if self.search_space.loss.save:
+            if self.search_space.loss.save:
+                sep = self.search_space.loss.sep
                 with open(self.ga_save, "a") as f:
                     for ind, cout in zip(pop, fits):
                         f.write(
-                            ",".join(str(e) for e in ind[0])
-                            + ","
+                            sep.join(str(e) for e in ind[0])
+                            + sep
                             + str(cout)
                             + "\n"
-                        )"""
+                        )
 
             for ind, cout in zip(pop, fits):
                 self.pop_historic.append(ind[0])
@@ -500,8 +509,9 @@ class Genetic_algorithm(Metaheuristic):
         all_data, all_scores = super().show(filepath, save)
 
         if filepath:
+            sep = self.search_space.loss.sep
             gapth = os.path.join(filepath, "outputs", "ga_population.csv")
-            data = pd.read_table(gapth, sep=",", decimal=".")
+            data = pd.read_table(gapth, sep=sep, decimal=".")
             scores = data["loss"].to_numpy()
         else:
             data = self.pop_historic
