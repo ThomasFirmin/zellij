@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-21T11:48:54+02:00
+# @Last modified time: 2022-10-03T23:04:17+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 from abc import ABC, abstractmethod
@@ -15,6 +14,23 @@ logger = logging.getLogger("zellij.addons")
 
 
 class Addon(ABC):
+    """Addon
+
+    An `Addon` in Zellij, is an additionnal feature that can be added to a `target` object.
+    See `VarAddon` for addon targeting `Variables` or `SearchspaceAddon` targeting :ref:`sp`.
+
+    Parameters
+    ----------
+    object : object
+        Object targeted by the addons
+
+    Attributes
+    ----------
+    target : object
+        Object targeted by the addons
+
+    """
+
     def __init__(self, object=None):
         self.target = object
 
@@ -47,9 +63,9 @@ class VarAddon(Addon):
         self._target = variable
 
 
-class SearchSpaceAddon(Addon):
+class SearchspaceAddon(Addon):
     def __init__(self, search_space=None):
-        super(SearchSpaceAddon, self).__init__(search_space)
+        super(SearchspaceAddon, self).__init__(search_space)
 
     @property
     def target(self):
@@ -68,7 +84,7 @@ class SearchSpaceAddon(Addon):
         self._target = search_space
 
 
-class Neighborhood(SearchSpaceAddon):
+class Neighborhood(SearchspaceAddon):
     def __init__(self, neighborhood, search_space=None):
         super(Neighborhood, self).__init__(search_space)
         self.neighborhood = neighborhood
@@ -96,7 +112,7 @@ class VarNeighborhood(VarAddon):
         pass
 
 
-class Converter(SearchSpaceAddon):
+class Converter(SearchspaceAddon):
     def __init__(self, search_space=None):
         super(Converter, self).__init__(search_space)
 
@@ -122,7 +138,7 @@ class VarConverter(VarAddon):
         pass
 
 
-class Operator(SearchSpaceAddon):
+class Operator(SearchspaceAddon):
     def __init__(self, search_space=None):
         super(Operator, self).__init__(search_space)
 
@@ -131,22 +147,22 @@ class Operator(SearchSpaceAddon):
         pass
 
 
-class Mutator(SearchSpaceAddon):
+class Mutator(SearchspaceAddon):
     def __init__(self, search_space=None):
         super(Mutator, self).__init__(search_space)
 
 
-class Crossover(SearchSpaceAddon):
+class Crossover(SearchspaceAddon):
     def __init__(self, search_space=None):
         super(Crossover, self).__init__(search_space)
 
 
-class Selector(SearchSpaceAddon):
+class Selector(SearchspaceAddon):
     def __init__(self, search_space=None):
         super(Selector, self).__init__(search_space)
 
 
-class Distance(SearchSpaceAddon):
+class Distance(SearchspaceAddon):
     def __init__(self, search_space=None, weights=None):
         super(Distance, self).__init__(search_space)
         self.weights = None
