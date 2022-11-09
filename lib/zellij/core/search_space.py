@@ -3,15 +3,14 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-19T11:55:08+02:00
+# @Last modified time: 2022-10-07T16:58:11+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 from zellij.core.variables import Variable, ArrayVar, FloatVar, IntVar
 from zellij.core.loss_func import LossFunc
 from zellij.utils.distances import Distance, Mixed, Euclidean
-from zellij.core.addons import SearchSpaceAddon
+from zellij.core.addons import SearchspaceAddon
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -34,19 +33,14 @@ class Searchspace(ABC):
     Attributes
     ----------
 
-    values : ArrayVar
-        Determines the bounds of the search space. For `HpoSearchspace` the
-        `values` must be an `ArrayVar`. The :ref:`sp` will then manipulate
-        this array.  Be carefull, in HPO paradigm, not all algorithms will
-        manager `ArrayVar` composed of `Block` or other `ArrayVar`
+    values : Variable
+        Determines the decision space. See `MixedSearchspace`, `ContinuousSearchspace`,
+        `DiscreteSearchspace` for more info.
 
     loss : LossFunc
         Callable of type `LossFunc`. See :ref:`lf` for more information.
         `loss` will be used by the :ref:`sp` object and by optimization
-        algorithms.
 
-    size : list
-        Number of dimensions
 
     Methods
     -------
@@ -81,19 +75,17 @@ class Searchspace(ABC):
         ----------
 
         values : ArrayVar
-            Determines the bounds of the search space. For `HpoSearchspace` the
-            `values` must be an `ArrayVar`. The :ref:`sp` will then manipulate
-            this array.  Be carefull, in HPO paradigm, not all algorithms will
-            manager `ArrayVar` composed of `Block` or other `ArrayVar`
+            Determines the decision space. See `MixedSearchspace`, `ContinuousSearchspace`,
+            `DiscreteSearchspace` for more info.
 
         loss : LossFunc
             Callable of type `LossFunc`. See :ref:`lf` for more information.
             `loss` will be used by the :ref:`sp` object and by optimization
             algorithms.
 
-        kwargs : dict
+        **kwargs : dict
             Kwargs are the different addons one want to add to a `Variable`.
-            Known addons are:
+            Common addons are:
             * to_discrete : Converter
                 * Will be called when converting to discrete is needed.
             * to_continuous : Converter
@@ -102,6 +94,7 @@ class Searchspace(ABC):
                 * Will be called when a neighborhood is needed.
             * distance: Distance, default, Mixed
                 * Will be called when computing a distance is needed
+            * And other operators linked to the optimization algorithms (crossover, mutation,...)
         """
 
         assert isinstance(loss, LossFunc), logger.error(
@@ -127,7 +120,7 @@ class Searchspace(ABC):
 
     def _add_addons(self, **kwargs):
         for k in kwargs:
-            assert isinstance(kwargs[k], SearchSpaceAddon), logger.error(
+            assert isinstance(kwargs[k], SearchspaceAddon), logger.error(
                 f"Kwargs must be of type `VarAddon`, got {k}:{kwargs[k]}"
             )
 
@@ -471,7 +464,68 @@ class Searchspace(ABC):
         pass
 
 
-class HpoSearchspace(Searchspace):
+class MixedSearchspace(Searchspace):
+
+    """MixedSearchspace
+
+    `MixedSearchspace` is a search space made for HyperParameter Optimization (HPO).
+    The decision space can be made of various `Variable` types.
+
+    Attributes
+    ----------
+
+    values : ArrayVar
+        Determines the bounds of the search space.
+        For `ContinuousSearchspace` the `values` must be an `ArrayVar`
+        of `FloatVar`, `IntVar`, `CatVar`.
+        The :ref:`sp` will then manipulate this array.
+
+    loss : LossFunc
+        Callable of type `LossFunc`. See :ref:`lf` for more information.
+        `loss` will be used by the :ref:`sp` object and by optimization
+
+
+    Methods
+    -------
+    random_attribute(self,size=1,replace=True, exclude=None)
+        Draw random features from the search space.
+        Return the selected `Variable`
+
+    random_point(self,size=1)
+        Return random points from the search space
+
+    subspace(self,lo_bounds,up_bounds)
+        Build a sub space according to the actual Searchspace using two vectors
+        containing lower and upper bounds of the subspace.
+
+    show(self,X,Y)
+        Show solutions X associated to their values Y,
+        according to the Searchspace
+
+    See Also
+    --------
+    LossFunc : Parent class for a loss function.
+
+    Examples
+    --------
+    >>> from zellij.core.variables import ArrayVar, IntVar, FloatVar, CatVar
+    >>> from zellij.utils.distances import Mixed
+    >>> from zellij.core.loss_func import Loss
+    >>> from zellij.utils.benchmark import himmelblau
+    >>> from zellij.core.search_space import MixedSearchspace
+    >>> a = ArrayVar(IntVar("int_1", 0,8),
+    >>>              IntVar("int_2", 4,45),
+    >>>              FloatVar("float_1", 2,12),
+    >>>              CatVar("cat_1", ["Hello", 87, 2.56]))
+    >>> lf = Loss()(himmelblau)
+    >>> sp = MixedSearchspace(a,lf, distance=Mixed())
+    >>> p1,p2 = sp.random_point(), sp.random_point()
+    >>> print(p1)
+    [5, 34, 4.8808143412719485, 87]
+    >>> print(p2)
+    [3, 42, 2.8196595134477738, 'Hello']
+
+    """
 
     # Initialize the search space
     def __init__(self, values, loss, **kwargs):
@@ -482,19 +536,19 @@ class HpoSearchspace(Searchspace):
         ----------
 
         values : ArrayVar
-            Determines the bounds of the search space. For `HpoSearchspace` the
-            `values` must be an `ArrayVar`. The :ref:`sp` will then manipulate
-            this array.  Be carefull, in HPO paradigm, not all algorithms will
-            manager `ArrayVar` composed of `Block` or other `ArrayVar`
+            Determines the bounds of the search space.
+            For `ContinuousSearchspace` the `values` must be an `ArrayVar`
+            of `FloatVar`, `IntVar`, `CatVar`.
+            The :ref:`sp` will then manipulate this array.
 
         loss : LossFunc
             Callable of type `LossFunc`. See :ref:`lf` for more information.
             `loss` will be used by the :ref:`sp` object and by optimization
             algorithms.
 
-        kwargs : dict
+        **kwargs : dict
             Kwargs are the different addons one want to add to a `Variable`.
-            Known addons are:
+            Common addons are:
             * to_discrete : Converter
                 * Will be called when converting to discrete is needed.
             * to_continuous : Converter
@@ -503,6 +557,7 @@ class HpoSearchspace(Searchspace):
                 * Will be called when a neighborhood is needed.
             * distance: Distance, default, Mixed
                 * Will be called when computing a distance is needed
+            * And other operators linked to the optimization algorithms (crossover, mutation,...)
 
 
         """
@@ -516,14 +571,74 @@ class HpoSearchspace(Searchspace):
         )
 
         self.distance = kwargs.pop("distance", Mixed())
-        super(HpoSearchspace, self).__init__(values, loss, **kwargs)
+        super(MixedSearchspace, self).__init__(values, loss, **kwargs)
         assert isinstance(self.distance, Distance), logger.error(
             f"Kwargs `distance` must be of type `Distance`, got {self.distance}"
         )
         self.distance.target = self
 
+        self.loss.labels = [v.label for v in self.values]
+
 
 class ContinuousSearchspace(Searchspace):
+
+    """ContinuousSearchspace
+
+    `ContinuousSearchspace` is a search space made for continuous optimization.
+    The decision space is made of `FloatVar`.
+
+    Attributes
+    ----------
+
+    values : ArrayVar
+        Determines the bounds of the search space.
+        For `ContinuousSearchspace` the `values` must be an `ArrayVar`
+        of `FloatVar`.
+        The :ref:`sp` will then manipulate this array.
+
+    loss : LossFunc
+        Callable of type `LossFunc`. See :ref:`lf` for more information.
+        `loss` will be used by the :ref:`sp` object and by optimization
+
+
+    Methods
+    -------
+    random_attribute(self,size=1,replace=True, exclude=None)
+        Draw random features from the search space.
+        Return the selected `Variable`
+
+    random_point(self,size=1)
+        Return random points from the search space
+
+    subspace(self,lo_bounds,up_bounds)
+        Build a sub space according to the actual Searchspace using two vectors
+        containing lower and upper bounds of the subspace.
+
+    show(self,X,Y)
+        Show solutions X associated to their values Y,
+        according to the Searchspace
+
+    See Also
+    --------
+    LossFunc : Parent class for a loss function.
+
+    Examples
+    --------
+    >>> from zellij.core.variables import ArrayVar, FloatVar
+    >>> from zellij.core.loss_func import Loss
+    >>> from zellij.utils.benchmark import himmelblau
+    >>> from zellij.core.search_space import ContinuousSearchspace
+    >>> lf = Loss()(himmelblau)
+    >>> a = ArrayVar(FloatVar("float_1", 0,1),
+    ...              FloatVar("float_2", 0,1))
+    >>> sp = ContinuousSearchspace(a,lf)
+    >>> p1,p2 = sp.random_point(), sp.random_point()
+    >>> print(p1)
+    [0.8922761649920034, 0.12709277668616326]
+    >>> print(p2)
+    [0.7730279148456985, 0.14715728189857524]
+
+    """
 
     # Initialize the search space
     def __init__(self, values, loss, **kwargs):
@@ -544,9 +659,9 @@ class ContinuousSearchspace(Searchspace):
             `loss` will be used by the :ref:`sp` object and by optimization
             algorithms.
 
-        kwargs : dict
+        **kwargs : dict
             Kwargs are the different addons one want to add to a `Variable`.
-            Known addons are:
+            Common addons are:
             * to_discrete : Converter
                 * Will be called when converting to discrete is needed.
             * to_continuous : Converter
@@ -555,6 +670,7 @@ class ContinuousSearchspace(Searchspace):
                 * Will be called when a neighborhood is needed.
             * distance: Distance, default, Mixed
                 * Will be called when computing a distance is needed
+            * And other operators linked to the optimization algorithms (crossover, mutation,...)
 
         """
 
@@ -579,6 +695,64 @@ class ContinuousSearchspace(Searchspace):
 
 class DiscreteSearchspace(Searchspace):
 
+    """DiscreteSearchspace
+
+    `DiscreteSearchspace` is a search space made for continuous optimization.
+    The decision space is made of `IntVar`.
+
+    Attributes
+    ----------
+
+    values : ArrayVar
+        Determines the bounds of the search space.
+        For `DiscreteSearchspace` the `values` must be an `ArrayVar`
+        of `IntVar`.
+        The :ref:`sp` will then manipulate this array.
+
+    loss : LossFunc
+        Callable of type `LossFunc`. See :ref:`lf` for more information.
+        `loss` will be used by the :ref:`sp` object and by optimization
+
+
+    Methods
+    -------
+    random_attribute(self,size=1,replace=True, exclude=None)
+        Draw random features from the search space.
+        Return the selected `Variable`
+
+    random_point(self,size=1)
+        Return random points from the search space
+
+    subspace(self,lo_bounds,up_bounds)
+        Build a sub space according to the actual Searchspace using two vectors
+        containing lower and upper bounds of the subspace.
+
+    show(self,X,Y)
+        Show solutions X associated to their values Y,
+        according to the Searchspace
+
+    See Also
+    --------
+    LossFunc : Parent class for a loss function.
+
+    Examples
+    --------
+    >>> from zellij.core.variables import ArrayVar, IntVar
+    >>> from zellij.core.loss_func import Loss
+    >>> from zellij.utils.benchmark import himmelblau
+    >>> from zellij.core.search_space import DiscreteSearchspace
+    >>> a = ArrayVar(IntVar("int_1", 0,8),
+    >>>              IntVar("int_2", 4,45))
+    >>> lf = Loss()(himmelblau)
+    >>> sp = DiscreteSearchspace(a,lf)
+    >>> p1,p2 = sp.random_point(), sp.random_point()
+    >>> print(p1)
+    [5, 34]
+    >>> print(p2)
+    [3, 42]
+
+    """
+
     # Initialize the search space
     def __init__(self, values, loss, **kwargs):
 
@@ -598,9 +772,9 @@ class DiscreteSearchspace(Searchspace):
             `loss` will be used by the :ref:`sp` object and by optimization
             algorithms.
 
-        kwargs : dict
+        **kwargs : dict
             Kwargs are the different addons one want to add to a `Variable`.
-            Known addons are:
+            Common addons are:
             * to_discrete : Converter
                 * Will be called when converting to discrete is needed.
             * to_continuous : Converter
@@ -609,6 +783,7 @@ class DiscreteSearchspace(Searchspace):
                 * Will be called when a neighborhood is needed.
             * distance: Distance, default, Mixed
                 * Will be called when computing a distance is needed
+            * And other operators linked to the optimization algorithms (crossover, mutation,...)
 
         """
 
