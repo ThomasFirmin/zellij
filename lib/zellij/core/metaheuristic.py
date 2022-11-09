@@ -3,10 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-05-31T10:56:45+02:00
+# @Last modified time: 2022-11-09T10:55:33+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
-
 
 import zellij.utils.progress_bar as pb
 from abc import abstractmethod

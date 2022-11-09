@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-13T13:56:55+02:00
+# @Last modified time: 2022-10-03T22:38:12+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 from zellij.core.metaheuristic import Metaheuristic

@@ -3,10 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-22T12:37:10+02:00
+# @Last modified time: 2022-10-03T22:37:25+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
-
 import numpy as np
 from abc import ABC, abstractmethod
 
