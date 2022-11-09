@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-13T15:58:44+02:00
+# @Last modified time: 2022-11-08T14:26:53+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 from zellij.core.addons import VarConverter, Converter
@@ -21,10 +20,10 @@ logger.setLevel(logging.INFO)
 
 
 class DoNothing(VarConverter):
-    def convert(self, value):
+    def convert(self, value, *args, **kwargs):
         return value
 
-    def reverse(self, value):
+    def reverse(self, value, *args, **kwargs):
         return value
 
 
@@ -186,7 +185,9 @@ class CatMinmax(VarConverter):
         return self.target.features.index(value) / len(self.target.features)
 
     def reverse(self, value):
-        return self.target.features[int(value * len(self.target.features))]
+        return self.target.features[
+            int(np.floor(value * (len(self.target.features) - 1)))
+        ]
 
 
 class ConstantMinmax(VarConverter):
@@ -205,12 +206,16 @@ class ConstantMinmax(VarConverter):
 class ArrayBinning(VarConverter):
     def __init__(self, variable=None):
         super(ArrayBinning, self).__init__(variable)
-
-        assert all(
-            hasattr(v, "to_discrete") for v in self.target.values
-        ), logger.error(
-            f"To use `ArrayBinning`, values in `ArrayVar` must have a `to_discrete` method. Use `to_discrete` kwarg when defining a variable"
-        )
+        if variable:
+            assert all(
+                hasattr(v, "to_discrete") for v in self.target.values
+            ), logger.error(
+                f"""
+                To use `ArrayMinmax`, values in `ArrayVar` must have a
+                `to_discrete` method.
+                Use `to_discrete` kwarg when defining a variable
+                 """
+            )
 
     def convert(self, value, K):
 
@@ -361,7 +366,7 @@ class Continuous(Converter):
         super(Continuous, self).__init__(search_space)
         if search_space:
             assert hasattr(self.target.values, "to_continuous"), logger.error(
-                f"To use `Intervals`, values in Searchspace must have a `to_continuous` method. Use `neighbor` kwarg when defining a variable"
+                f"To use `to_continuous`, values in Searchspace must have a `to_continuous` method. Use `to_continuous` kwarg when defining a variable"
             )
 
     # Convert a point to continuous
@@ -450,22 +455,14 @@ class Continuous(Converter):
 
 
 class Discrete(Converter):
-    def __init__(self, search_space, K):
+    def __init__(self, search_space=None, K=10):
         super(Discrete, self).__init__(search_space)
-        assert hasattr(self.target.values, "to_continuous"), logger.error(
-            f"To use `Intervals`, values in Searchspace must have a `to_discrete` method. Use `neighbor` kwarg when defining a variable"
-        )
-
-        # if a list is given
-        if isinstance(K, list):
-            assert len(K) == len(search_space.size), logger.error(
-                f"length of `K`(number of bins) must be equal to\
-                `ArrayVar` length, got {K}=={search_space.size}"
+        if search_space:
+            assert hasattr(self.target.values, "to_discrete"), logger.error(
+                f"To use `Discrete`, values in Searchspace must have a `to_discrete` method. Use `to_discrete` kwarg when defining a variable"
             )
 
-            self.K = K
-        else:
-            self.K = [K] * search_space.size
+        self.K = K
 
     # Convert a point to continuous
     def convert(self, points, sub_values=False):
@@ -491,12 +488,12 @@ class Discrete(Converter):
         """
 
         # Use bounds from the original space if this object is a subspace.
-        if sub_values and self.search_space._god.values != None:
-            val = self.search_space._god.values
+        if sub_values and self.target._god.values != None:
+            val = self.target._god.values
 
         # Use initial bounds to convert
         else:
-            val = self.search_space.values
+            val = self.target.values
 
         res = []
 
@@ -530,12 +527,12 @@ class Discrete(Converter):
         """
 
         # Use bounds from the original space if this object is a subspace.
-        if sub_values and self.search_space._god.values != None:
-            val = self.search_space._god.values
+        if sub_values and self.target._god.values != None:
+            val = self.target._god.values
 
         # Use initial bounds to convert
         else:
-            val = self.search_space.values
+            val = self.target.values
 
         res = []
 
