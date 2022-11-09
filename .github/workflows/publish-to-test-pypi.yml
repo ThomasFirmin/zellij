@@ -1,3 +1,13 @@
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-05T16:05:34+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-10-03T22:44:28+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+
+
+
 name: Zellij to PyPI and TestPyPI
 on:
   push:
