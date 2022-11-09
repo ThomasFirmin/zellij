@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-20T22:31:05+02:00
+# @Last modified time: 2022-11-08T16:31:09+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 import numpy as np
@@ -279,11 +278,13 @@ class Hypercube(Fractal):
 
         else:
             raise ValueError(
-                f"""For {self.__class__.__name__}, all variables
+                f"""
+            For {self.__class__.__name__}, all variables
             must be `FloatVar`, or all variables must have a `to_continuous`
             method added at the initialization of the variable.
             Got {self.values}.
-            ex:\n>>> FloatVar("test",-5,5,to_continuous=...)."""
+            ex:\n>>> FloatVar("test",-5,5,to_continuous=...).
+            """
             )
 
     def create_children(self):
@@ -2343,17 +2344,4 @@ class Soo(Fractal):
         else:
             id = str(self.father.id)
 
-        return (
-            "ID: "
-            + str(self.id)
-            + " son of "
-            + id
-            + " at level "
-            + str(self.level)
-            + "\n"
-            + "BOUNDS: "
-            + str(self.lo_bounds)
-            + "|"
-            + str(self.up_bounds)
-            + "\n"
-        )
+        return f"ID:{self.id} son of {id} at level {self.level}\n"
