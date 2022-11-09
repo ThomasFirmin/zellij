@@ -36,6 +36,7 @@ class Objective(ABC):
 
     def __init__(self, target=0):
         self.target = target
+        self.index_built = False
 
     @abstractmethod
     def __call__(self, outputs):
@@ -106,8 +107,19 @@ class Objective(ABC):
 
         return rd
 
+    def _build_index(self, outputs):
+        if not self.index_built:
+            if isinstance(self.target, int):
+                for i, t in enumerate(self.target):
+                    if isinstance(t, int):
+                        self.target = list(outputs.keys)[self.target]
+            self.index_built = True
 
-def Minimizer(Objective):
+    def reset(self):
+        self.index_built = False
+
+
+class Minimizer(Objective):
     """Minimizer
 
     Minimizer allows to minimize the given target.
@@ -154,15 +166,14 @@ def Minimizer(Objective):
 
     def __call__(self, outputs):
         clean = self._cleaner(outputs)
-        if isinstance(self.target, str):
-            clean["objective"] = outputs[self.target]
-        elif isinstance(self.target, int):
-            clean["objective"] = outputs[f"r{self.target}"]
+        self._build_index(clean)
+
+        clean["objective"] = outputs[self.target]
 
         return clean
 
 
-def Maximizer(Objective):
+class Maximizer(Objective):
     """Maximizer
 
     Maximizer allows to maximize the given target.
@@ -209,16 +220,14 @@ def Maximizer(Objective):
 
     def __call__(self, outputs):
         clean = self._cleaner(outputs)
-        if isinstance(self.target, str):
-            clean["objective"] = -outputs[self.target]
-        elif isinstance(self.target, int):
-            index = list(outputs.keys)[self.target]
-            clean["objective"] = -outputs[index]
+        self._build_index(clean)
+
+        clean["objective"] = -outputs[self.target]
 
         return clean
 
 
-def Lambda(Objective):
+class Lambda(Objective):
     """Lambda
 
     Lambda allows to transform the given target.
@@ -247,13 +256,8 @@ def Lambda(Objective):
         if isinstance(self.target, str):
             self.target = [self.target]
         elif isinstance(self.target, int):
-            index = list(outputs.keys)[self.target]
-            self.target = [index]
-        elif isinstance(self.target, list):
-            for i, t in enumerate(self.target):
-                if isinstance(t, int):
-                    index = list(outputs.keys)[self.target]
-                    self.target[i] = index
+            self.target = [self.target]
+
         if function.__code__.co_argcount != len(target):
             raise AssertionError(
                 logger.error(
@@ -298,8 +302,18 @@ def Lambda(Objective):
             new_x = [X[-i] for i in index[-Q:]]
             return new_x, Y[-Q:]
 
+    def _build_index(self, outputs):
+        if not self.index_built:
+            if isinstance(self.target, list):
+                for i, t in enumerate(self.target):
+                    if isinstance(t, int):
+                        self.target[i] = list(outputs.keys)[self.target]
+            self.index_built = True
+
     def __call__(self, outputs):
         clean = self._cleaner(outputs)
+        self._build_index(clean)
+
         parameter = [outputs[t] for t in self.target]
         for t in self.target:
             clean["objective"] = self.function(*parameter)
