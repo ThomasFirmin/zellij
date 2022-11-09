@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-05-31T12:35:41+02:00
+# @Last modified time: 2022-10-03T22:38:54+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 from zellij.core.addons import Distance
@@ -32,7 +31,7 @@ class Euclidean(Distance):
     >>> from zellij.core.search_space import ContinuousSearchspace
     >>> lf = Loss()(himmelblau)
     >>> a = ArrayVar(FloatVar("float_1", 0,1),
-    ...              FloatVar("float_1", 0,1))
+    ...              FloatVar("float_2", 0,1))
     >>> sp = ContinuousSearchspace(a,lf, distance=Euclidean())
     >>> p1,p2 = sp.random_point(), sp.random_point()
     >>> print(p1)
@@ -67,7 +66,7 @@ class Manhattan(Distance):
     >>> from zellij.core.search_space import ContinuousSearchspace
     >>> lf = Loss()(himmelblau)
     >>> a = ArrayVar(FloatVar("float_1", 0,1),
-    ...              FloatVar("float_1", 0,1))
+    ...              FloatVar("float_2", 0,1))
     >>> sp = ContinuousSearchspace(a,lf, distance=Manhattan())
     >>> p1,p2 = sp.random_point(), sp.random_point()
     >>> print(p1)
@@ -110,13 +109,13 @@ class Mixed(Distance):
     >>> from zellij.utils.distances import Mixed
     >>> from zellij.core.loss_func import Loss
     >>> from zellij.utils.benchmark import himmelblau
-    >>> from zellij.core.search_space import HpoSearchspace
+    >>> from zellij.core.search_space import MixedSearchspace
     >>> a = ArrayVar(IntVar("int_1", 0,8),
     >>>              IntVar("int_2", 4,45),
     >>>              FloatVar("float_1", 2,12),
     >>>              CatVar("cat_1", ["Hello", 87, 2.56]))
     >>> lf = Loss()(himmelblau)
-    >>> sp = HpoSearchspace(a,lf, distance=Mixed())
+    >>> sp = MixedSearchspace(a,lf, distance=Mixed())
     >>> p1,p2 = sp.random_point(), sp.random_point()
     >>> print(p1)
     [5, 34, 4.8808143412719485, 87]
@@ -155,14 +154,14 @@ class Mixed(Distance):
 
     @Distance.target.setter
     def target(self, object):
-        from zellij.core.search_space import HpoSearchspace
+        from zellij.core.search_space import MixedSearchspace
 
         self._target = object
 
         assert (
-            isinstance(self._target, HpoSearchspace) or object == None
+            isinstance(self._target, MixedSearchspace) or object == None
         ), logger.error(
-            f"Target must be of type `HpoSearchspace`, got {object}"
+            f"Target must be of type `MixedSearchspace`, got {object}"
         )
         if self._target:
             if self.weights:
