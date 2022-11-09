@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-09T15:12:31+02:00
+# @Last modified time: 2022-11-09T12:40:37+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 from zellij.core.metaheuristic import Metaheuristic
@@ -19,6 +18,7 @@ from botorch.optim import optimize_acqf
 from botorch.acquisition.analytic import ExpectedImprovement
 from botorch import fit_gpytorch_model
 from zellij.core.search_space import ContinuousSearchspace
+from zellij.core.variables import CatVar
 import time
 
 import logging
@@ -113,7 +113,7 @@ class Bayesian_optimization(Metaheuristic):
         acquisition=ExpectedImprovement,
         initial_size=10,
         sampler=None,
-        gpu=True,
+        gpu=False,
         **kwargs,
     ):
         """Short summary.
@@ -170,12 +170,17 @@ class Bayesian_optimization(Metaheuristic):
         #############
         # VARIABLES #
         #############
-        self.device = torch.device(
-            "cuda" if torch.cuda.is_available() else "cpu"
-        )
+        if gpu:
+            self.device = torch.device(
+                "cuda" if torch.cuda.is_available() else "cpu"
+            )
+        else:
+            self.device = "cpu"
+
         self.dtype = torch.double
 
         if isinstance(self.search_space, ContinuousSearchspace):
+
             self.bounds = torch.tensor(
                 [
                     [v.low_bound for v in self.search_space.values],
@@ -202,7 +207,7 @@ class Bayesian_optimization(Metaheuristic):
             )
         )
 
-    def _generate_initial_data(self, sp):
+    def _generate_initial_data(self):
         # generate training data
         train_x = torch.rand(
             self.initial_size,
@@ -210,10 +215,14 @@ class Bayesian_optimization(Metaheuristic):
             device=self.device,
             dtype=self.dtype,
         )
-        res = sp.loss(sp.to_continuous.reverse(train_x.numpy()), algorithm="BO")
-        train_obj = -torch.tensor(res).unsqueeze(-1)  # add output dimension
+        res = self.search_space.loss(
+            self.search_space.to_continuous.reverse(train_x.cpu().numpy()),
+            algorithm="BO",
+            acquisition=0,
+        )
+        train_obj = torch.tensor(res).unsqueeze(-1)  # add output dimension
 
-        return train_x, train_obj, -sp.loss.best_score
+        return train_x, train_obj
 
     def _initialize_model(self, train_x, train_obj, state_dict=None):
 
@@ -243,7 +252,7 @@ class Bayesian_optimization(Metaheuristic):
         and a noisy observation."""
 
         # optimize
-        candidates, _ = optimize_acqf(
+        candidates, acqf = optimize_acqf(
             acq_function=acq_func,
             bounds=self.bounds,
             q=self.kwargs.get("q", 1),
@@ -259,13 +268,16 @@ class Bayesian_optimization(Metaheuristic):
         self.pending_pb(len(new_x))
 
         if isinstance(self.search_space, ContinuousSearchspace):
-            res = self.search_space.loss(new_x.numpy(), algorithm="BO")
+            res = self.search_space.loss(
+                new_x.cpu().numpy(), algorithm="BO", acquisition=acqf.item()
+            )
         else:
             res = self.search_space.loss(
-                self.search_space.to_continuous.reverse(new_x.numpy()),
+                self.search_space.to_continuous.reverse(new_x.cpu().numpy()),
                 algorithm="BO",
+                acquisition=acqf.item(),
             )
-        new_obj = -torch.tensor(res).unsqueeze(-1)  # add output dimension
+        new_obj = torch.tensor(res).unsqueeze(-1)  # add output dimension
 
         # progress bar
         self.update_main_pb(
@@ -311,11 +323,7 @@ class Bayesian_optimization(Metaheuristic):
         self.best_idx = [0]
 
         # call helper functions to generate initial training data and initialize model
-        (
-            train_x,
-            train_obj,
-            best_observed_value,
-        ) = self._generate_initial_data(sp)
+        train_x, train_obj = self._generate_initial_data()
 
         # progress bar
         self.pending_pb(self.initial_size)
