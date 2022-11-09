@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-21T00:06:38+02:00
+# @Last modified time: 2022-10-03T22:38:46+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 import numpy as np
 from abc import ABC, abstractmethod
@@ -493,7 +492,7 @@ class Levy(Benchmark):
                 (y[:-1] - 1) ** 2 * (1 + 10 * np.sin(np.pi * y[:-1] + 1) ** 2)
             )
             + (y[-1] - 1) ** 2 * (1 + np.sin(2 * np.pi * y[-1]) ** 2)
-            + +self.bias
+            + self.bias
         )
 
 
@@ -786,6 +785,7 @@ class Expanded_rosenbrock_griewangk(Benchmark):
             + lasttemp ** 2 / 4000
             - np.cos(lasttemp)
             + 1.0
+            + self.bias
         )
 
 
@@ -1330,7 +1330,7 @@ class CF9F1_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
 
 
 class CF9F3_25(Benchmark):
@@ -1383,7 +1383,7 @@ class CF9F3_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
 
 
 class CF9F4_25(Benchmark):
@@ -1436,7 +1436,7 @@ class CF9F4_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
 
 
 class CF10F7_25(Benchmark):
@@ -1489,7 +1489,7 @@ class CF10F7_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
 
 
 class CF9F1_75(Benchmark):
@@ -1542,7 +1542,7 @@ class CF9F1_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
 
 
 class CF9F3_75(Benchmark):
@@ -1595,7 +1595,7 @@ class CF9F3_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
 
 
 class CF9F4_75(Benchmark):
@@ -1648,7 +1648,7 @@ class CF9F4_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
 
 
 class CF10F7_75(Benchmark):
@@ -1701,4 +1701,4 @@ class CF10F7_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2)
+        return self.g1(z1) + self.g2(z2) + self.bias
