@@ -3,9 +3,8 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-06-09T15:53:24+02:00
+# @Last modified time: 2022-11-09T14:32:42+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 import numpy as np
@@ -302,7 +301,7 @@ class Belief(Heuristic):
         best_sc = search_space.loss.best_score
 
         if type(search_space.father.father) == str:
-            H.father.score = 0
+            search_space.father.score = 0
 
         ratio = np.array(search_space.loss.all_scores[indexes]) / best_sc
         # Negate because minimization problem and maximize Belief
