@@ -1,10 +1,18 @@
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-10-03T22:41:21+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+
+
 import unittest
 from unittest.mock import Mock
 from zellij.utils.tree_search import *
 
 
 class TestTreeSearch(unittest.TestCase):
-
     def setUp(self):
 
         self.element = Mock()
@@ -34,45 +42,66 @@ class TestTreeSearch(unittest.TestCase):
     def test_tree_search_algorithms(self):
 
         for t in tree_search_algorithm.values():
-            ts = t([self.element],10)
+            ts = t([self.element], 10)
 
-            self.assertTrue(len(ts.open)==1,\
-            f"Error on length of open list for object creation,\nFor {ts.__class__.__name__}")
+            self.assertTrue(
+                len(ts.open) == 1,
+                f"Error on length of open list for object creation,\nFor {ts.__class__.__name__}",
+            )
 
-            go,h = ts.get_next()
+            go, h = ts.get_next()
 
-            self.assertEqual(h,[self.element],\
-            f"Error when get next for initialisation,\nFor {ts.__class__.__name__}")
-            self.assertTrue(go,\
-            f"Error on continue for initialisation,\nFor {ts.__class__.__name__}")
-            self.assertTrue(len(ts.open)==0,\
-            f"Error on length of open list for initialisation,\nFor {ts.__class__.__name__}")
-
+            self.assertEqual(
+                h,
+                [self.element],
+                f"Error when get next for initialisation,\nFor {ts.__class__.__name__}",
+            )
+            self.assertTrue(
+                go,
+                f"Error on continue for initialisation,\nFor {ts.__class__.__name__}",
+            )
+            self.assertTrue(
+                len(ts.open) == 0,
+                f"Error on length of open list for initialisation,\nFor {ts.__class__.__name__}",
+            )
 
             ts.add(self.child1)
             ts.add(self.child2)
             ts.add(self.child3)
 
-            self.assertTrue(len(ts.next_frontier)==3,\
-            f"Error on length of open list when adding children,\nFor {ts.__class__.__name__}")
+            self.assertTrue(
+                len(ts.next_frontier) == 3,
+                f"Error on length of open list when adding children,\nFor {ts.__class__.__name__}",
+            )
 
-            go,h = ts.get_next()
-            self.assertIn(h,[[self.child1],[self.child2],[self.child3]],\
-            f"Error when get next for children,\nFor {ts.__class__.__name__}")
-            self.assertTrue(go,\
-            f"Error on continue for children,\nFor {ts.__class__.__name__}")
+            go, h = ts.get_next()
+            self.assertIn(
+                h,
+                [[self.child1], [self.child2], [self.child3]],
+                f"Error when get next for children,\nFor {ts.__class__.__name__}",
+            )
+            self.assertTrue(
+                go,
+                f"Error on continue for children,\nFor {ts.__class__.__name__}",
+            )
 
-            go,h = ts.get_next()
-            self.assertIn(h,[[self.child1],[self.child2],[self.child3]])
-            self.assertTrue(go,\
-            f"Error on continue for children,\nFor {ts.__class__.__name__}")
+            go, h = ts.get_next()
+            self.assertIn(h, [[self.child1], [self.child2], [self.child3]])
+            self.assertTrue(
+                go,
+                f"Error on continue for children,\nFor {ts.__class__.__name__}",
+            )
 
-            go,h = ts.get_next()
-            self.assertIn(h,[[self.child1],[self.child2],[self.child3]])
-            self.assertTrue(go,\
-            f"Error on continue for children,\nFor {ts.__class__.__name__}")
+            go, h = ts.get_next()
+            self.assertIn(h, [[self.child1], [self.child2], [self.child3]])
+            self.assertTrue(
+                go,
+                f"Error on continue for children,\nFor {ts.__class__.__name__}",
+            )
 
-            go,h = ts.get_next()
-            self.assertEqual(h,-1)
-            self.assertFalse(go,\
-            f"Error on ending for children,\nFor {ts.__class__.__name__}")
+            go, h = ts.get_next()
+            self.assertEqual(h, -1)
+            self.assertFalse(
+                go,
+                f"Error on ending for children,\nFor {ts.__class__.__name__}",
+            )

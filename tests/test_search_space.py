@@ -1,3 +1,12 @@
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-03T15:41:48+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-10-03T22:41:19+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+
+
 import unittest
 from zellij.utils.search_space import *
 
@@ -35,7 +44,9 @@ class TestSearchSpace(unittest.TestCase):
             self.fail("Assertion not raised for wrong types creation")
 
         with self.assertRaises(AssertionError):
-            sp = Searchspace(label, type, [["l"], [-5, 5], [-5, 5], [-5, -5]], neighborhood)
+            sp = Searchspace(
+                label, type, [["l"], [-5, 5], [-5, 5], [-5, -5]], neighborhood
+            )
             self.fail("Assertion not raised for wrong values creation")
 
         with self.assertRaises(AssertionError):
@@ -44,11 +55,15 @@ class TestSearchSpace(unittest.TestCase):
 
         with self.assertRaises(AssertionError):
             sp = Searchspace(label, type, values, 5)
-            self.fail("Assertion not raised for wrong neighborhood value creation")
+            self.fail(
+                "Assertion not raised for wrong neighborhood value creation"
+            )
 
         sp = Searchspace(label, type, values)
 
-        self.assertEqual(sp.neighborhood, [1.0, 1, -1, -1], "Wrong neighborhood creation")
+        self.assertEqual(
+            sp.neighborhood, [1.0, 1, -1, -1], "Wrong neighborhood creation"
+        )
 
     def setUp(self):
         labels = ["a", "b", "c", "d"]
@@ -59,40 +74,70 @@ class TestSearchSpace(unittest.TestCase):
         self.sp = Searchspace(labels, types, values, neighborhood)
 
     def test_random_attribute(self):
-        self.assertIn(self.sp.random_attribute(), self.sp.label, "Wrong Random attribute with size=1, replace=True, exclude=None")
+        self.assertIn(
+            self.sp.random_attribute(),
+            self.sp.label,
+            "Wrong Random attribute with size=1, replace=True, exclude=None",
+        )
 
-        self.assertIn(self.sp.random_attribute(exclude="a"), self.sp.label[1:], "Wrong Random attribute with exclusion")
+        self.assertIn(
+            self.sp.random_attribute(exclude="a"),
+            self.sp.label[1:],
+            "Wrong Random attribute with exclusion",
+        )
 
         with self.assertRaises(ValueError):
             self.sp.random_attribute(size=10, replace=False, exclude="a")
 
     def test_random_value(self):
         self.assertTrue(
-            isinstance(self.sp.random_value("a")[0], float) and (-5 <= self.sp.random_value("a")[0] <= 5), "Wrong Random real value with size=1, replace=True, exclude=None"
+            isinstance(self.sp.random_value("a")[0], float)
+            and (-5 <= self.sp.random_value("a")[0] <= 5),
+            "Wrong Random real value with size=1, replace=True, exclude=None",
         )
 
         self.assertTrue(
-            isinstance(self.sp.random_value("b")[0], int) and (-5 <= self.sp.random_value("b")[0] <= 5), "Wrong Random int value with size=1, replace=True, exclude=None"
+            isinstance(self.sp.random_value("b")[0], int)
+            and (-5 <= self.sp.random_value("b")[0] <= 5),
+            "Wrong Random int value with size=1, replace=True, exclude=None",
         )
 
-        self.assertIn(self.sp.random_value("c")[0], self.sp.values[2], "Wrong Random categorical value with size=1, replace=True, exclude=None")
+        self.assertIn(
+            self.sp.random_value("c")[0],
+            self.sp.values[2],
+            "Wrong Random categorical value with size=1, replace=True, exclude=None",
+        )
 
-        self.assertIn(self.sp.random_value("c", exclude="v1")[0], self.sp.values[2][1:], "Wrong Random attribute with exclusion")
+        self.assertIn(
+            self.sp.random_value("c", exclude="v1")[0],
+            self.sp.values[2][1:],
+            "Wrong Random attribute with exclusion",
+        )
 
         with self.assertRaises(ValueError):
             self.sp.random_value("c", size=10, replace=False, exclude="v1")
 
     def test_get_real_neighbor(self):
         neighbor = self.sp._get_real_neighbor(4, 0)
-        self.assertTrue(isinstance(neighbor, float) and -5 <= neighbor <= 5 and neighbor != 4, "Wrong real neighbor generation")
+        self.assertTrue(
+            isinstance(neighbor, float)
+            and -5 <= neighbor <= 5
+            and neighbor != 4,
+            "Wrong real neighbor generation",
+        )
 
     def test_get_discrete_neighbor(self):
         neighbor = self.sp._get_discrete_neighbor(4, 1)
-        self.assertTrue(isinstance(neighbor, int) and -5 <= neighbor <= 5 and neighbor != 4, "Wrong discrete neighbor generation")
+        self.assertTrue(
+            isinstance(neighbor, int) and -5 <= neighbor <= 5 and neighbor != 4,
+            "Wrong discrete neighbor generation",
+        )
 
     def test_get_categorical_neighbor(self):
         neighbor = self.sp._get_categorical_neighbor("v2", 2)
-        self.assertTrue(neighbor in ["v1", "v3"], "Wrong categorical neighbor generation")
+        self.assertTrue(
+            neighbor in ["v1", "v3"], "Wrong categorical neighbor generation"
+        )
 
     def test_get_neighbor(self):
 
@@ -150,56 +195,130 @@ class TestSearchSpace(unittest.TestCase):
     def test_convert(self):
 
         converted = self.sp.convert_to_continuous([[4, 4, "v2", 2]])[0]
-        reconverted = self.sp.convert_to_continuous([converted], reverse=True)[0]
+        reconverted = self.sp.convert_to_continuous([converted], reverse=True)[
+            0
+        ]
 
-        self.assertEqual(converted, [0.9, 0.9, 0.3333333333333333, 1], "Wrong convertion to continuous")
-        self.assertEqual(reconverted, [4, 4, "v2", 2], "Wrong convertion to mixed")
+        self.assertEqual(
+            converted,
+            [0.9, 0.9, 0.3333333333333333, 1],
+            "Wrong convertion to continuous",
+        )
+        self.assertEqual(
+            reconverted, [4, 4, "v2", 2], "Wrong convertion to mixed"
+        )
 
         converted = self.sp.convert_to_continuous([[5, 5, "v3", 2]])[0]
-        reconverted = self.sp.convert_to_continuous([converted], reverse=True)[0]
+        reconverted = self.sp.convert_to_continuous([converted], reverse=True)[
+            0
+        ]
 
-        self.assertEqual(converted, [1, 1, 0.6666666666666666, 1], "Wrong convertion to continuous of the upper bounds")
-        self.assertEqual(reconverted, [5, 5, "v3", 2], "Wrong convertion to mixed of the upper bounds")
+        self.assertEqual(
+            converted,
+            [1, 1, 0.6666666666666666, 1],
+            "Wrong convertion to continuous of the upper bounds",
+        )
+        self.assertEqual(
+            reconverted,
+            [5, 5, "v3", 2],
+            "Wrong convertion to mixed of the upper bounds",
+        )
 
         converted = self.sp.convert_to_continuous([[-5, -5, "v1", 2]])[0]
-        reconverted = self.sp.convert_to_continuous([converted], reverse=True)[0]
+        reconverted = self.sp.convert_to_continuous([converted], reverse=True)[
+            0
+        ]
 
-        self.assertEqual(converted, [0, 0, 0, 1], "Wrong convertion to continuous of the lower bounds")
-        self.assertEqual(reconverted, [-5, -5, "v1", 2], "Wrong convertion to mixed of the lower bounds")
+        self.assertEqual(
+            converted,
+            [0, 0, 0, 1],
+            "Wrong convertion to continuous of the lower bounds",
+        )
+        self.assertEqual(
+            reconverted,
+            [-5, -5, "v1", 2],
+            "Wrong convertion to mixed of the lower bounds",
+        )
 
     def test_general_convert(self):
         spc = self.sp.general_convert()
 
-        self.assertEqual(spc.label, self.sp.label, "Wrong general convertion for labels")
-        self.assertTrue(all(x == "R" for x in spc.types), "Wrong general convertion for types")
-        self.assertTrue(all(x == [0, 1] for x in spc.values), "Wrong general convertion for values")
+        self.assertEqual(
+            spc.label, self.sp.label, "Wrong general convertion for labels"
+        )
+        self.assertTrue(
+            all(x == "R" for x in spc.types),
+            "Wrong general convertion for types",
+        )
+        self.assertTrue(
+            all(x == [0, 1] for x in spc.values),
+            "Wrong general convertion for values",
+        )
 
-        self.assertEqual(spc.neighborhood, [0.05, 0.1, 1, 1], "Wrong general convertion of the neighborhood")
+        self.assertEqual(
+            spc.neighborhood,
+            [0.05, 0.1, 1, 1],
+            "Wrong general convertion of the neighborhood",
+        )
 
     def test_subspace(self):
         lo = [-2, 2, "v2", 1]
         up = [2, 2, "v3", 3]
         spc = self.sp.subspace(lo, up)
 
-        self.assertEqual(spc.values, [[-2.0, 2.0], 2, ["v2", "v3"], 2], "Wrong subspacing for values")
-        self.assertEqual(spc.types, ["R", "K", "C", "K"], "Wrong subspacing for types")
-        self.assertEqual(spc.neighborhood, [0.2, -1, -1, -1], "Wrong subspacing for neighborhood")
+        self.assertEqual(
+            spc.values,
+            [[-2.0, 2.0], 2, ["v2", "v3"], 2],
+            "Wrong subspacing for values",
+        )
+        self.assertEqual(
+            spc.types, ["R", "K", "C", "K"], "Wrong subspacing for types"
+        )
+        self.assertEqual(
+            spc.neighborhood,
+            [0.2, -1, -1, -1],
+            "Wrong subspacing for neighborhood",
+        )
 
         lo = [-5, -5, "v3", 1]
         up = [-4.99, -4, "v1", 1]
         spc = self.sp.subspace(lo, up)
 
-        self.assertEqual(spc.values, [[-5.0, -4.99], [-5, -4], ["v1", "v2", "v3"], 2], "Wrong subspacing for lower bounds - values")
-        self.assertEqual(spc.types, ["R", "D", "C", "K"], "Wrong subspacing for lower bounds - types")
-        self.assertEqual(spc.neighborhood, [0.0004999999999999894, 1, -1, -1], "Wrong subspacing for lower bounds - neighborhood")
+        self.assertEqual(
+            spc.values,
+            [[-5.0, -4.99], [-5, -4], ["v1", "v2", "v3"], 2],
+            "Wrong subspacing for lower bounds - values",
+        )
+        self.assertEqual(
+            spc.types,
+            ["R", "D", "C", "K"],
+            "Wrong subspacing for lower bounds - types",
+        )
+        self.assertEqual(
+            spc.neighborhood,
+            [0.0004999999999999894, 1, -1, -1],
+            "Wrong subspacing for lower bounds - neighborhood",
+        )
 
         lo = [4.99, 4, "v1", 1]
         up = [5, 5, "v1", 1]
         spc = self.sp.subspace(lo, up)
 
-        self.assertEqual(spc.values, [[4.99, 5.0], [4, 5], "v1", 2], "Wrong subspacing for upper bounds")
-        self.assertEqual(spc.types, ["R", "D", "K", "K"], "Wrong subspacing for upper bounds - types")
-        self.assertEqual(spc.neighborhood, [0.0004999999999999894, 1, -1, -1], "Wrong subspacing for upper bounds - neighborhood")
+        self.assertEqual(
+            spc.values,
+            [[4.99, 5.0], [4, 5], "v1", 2],
+            "Wrong subspacing for upper bounds",
+        )
+        self.assertEqual(
+            spc.types,
+            ["R", "D", "K", "K"],
+            "Wrong subspacing for upper bounds - types",
+        )
+        self.assertEqual(
+            spc.neighborhood,
+            [0.0004999999999999894, 1, -1, -1],
+            "Wrong subspacing for upper bounds - neighborhood",
+        )
 
 
 if __name__ == "__main__":
