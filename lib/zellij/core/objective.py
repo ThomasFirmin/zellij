@@ -101,7 +101,7 @@ class Objective(ABC):
         if isinstance(outputs, int) or isinstance(outputs, float):
             rd["objective"] = None
         elif isinstance(outputs, dict):
-            rd = results
+            rd = outputs
         elif isinstance(outputs, list):
             rd = {f"r{i}": j for i, j in enumerate(outputs)}
 
