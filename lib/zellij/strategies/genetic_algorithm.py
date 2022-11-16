@@ -27,12 +27,7 @@ class Genetic_algorithm(Metaheuristic):
 
     """Genetic_algorithm
 
-    Genetic_algorithm (GA) implements a steady state genetic algorithm. It can be used for exploration and exploitation.
-    Indeed when the population has converged, GA can ,thanks to the mutation and crossover operators, perform an intensification phase arround best solutions.
-    It can work with a mixed search space, by adapting its operator.
-
-    **Will be modified soon:**
-    Used operators are: One-point crossover and Tournament selection of size 3.
+    Genetic_algorithm (GA) implements a steady state genetic algorithm.
 
     Here the mutation operator is the neighborhood defined in the :ref:`sp` object.
     Available crossover operator are those compatible with a mixed individual (

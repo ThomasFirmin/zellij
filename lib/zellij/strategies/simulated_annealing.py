@@ -24,12 +24,9 @@ class Simulated_annealing(Metaheuristic):
 
     """Simulated_annealing
 
-    Simulated_annealing (SA) is an exploitation strategy allowing to do hill climbing by starting from\
-    an initial solution and iteratively moving to next one,\
-     better than the previous one, or slightly worse to escape from local optima.
+    Simulated_annealing (SA) is a hill climbing exploitation algorithm.
 
-    It uses a :ref:`cooling` which partially drives the acceptance probability. This is the probability\
-    to accept a worse solution according to the temperature, the best solution found so far and the actual solution.
+    It uses a :ref:`cooling` which partially drives the acceptance probability.
 
     Attributes
     ----------

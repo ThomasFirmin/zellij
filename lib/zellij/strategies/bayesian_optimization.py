@@ -31,10 +31,10 @@ class Bayesian_optimization(Metaheuristic):
 
     Bayesian optimization (BO) is a surrogate based optimization method which
     interpolates the actual loss function with a surrogate model, here it is a
-    gaussian process. By sampling into this surrogate using a metaheuristic,
+    gaussian process. By sampling into this surrogate,
     BO determines promising points, which are worth to evaluate with the actual
     loss function. Once done, the gaussian process is updated using results
-    obtained by evaluating those encouraging solutions with the loss function.
+    obtained by evaluating these promising solutions with the loss function.
 
     It is based on `BoTorch <https://botorch.org/>`_ and `GPyTorch <https://gpytorch.ai/>`_.
 

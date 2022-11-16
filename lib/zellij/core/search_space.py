@@ -41,31 +41,9 @@ class Searchspace(ABC):
         Callable of type `LossFunc`. See :ref:`lf` for more information.
         `loss` will be used by the :ref:`sp` object and by optimization
 
-
-    Methods
-    -------
-    random_attribute(self,size=1,replace=True, exclude=None)
-        Draw random features from the search space.
-        Return the selected `Variable`
-
-    random_point(self,size=1)
-        Return random points from the search space
-
-    subspace(self,lo_bounds,up_bounds)
-        Build a sub space according to the actual Searchspace using two vectors
-        containing lower and upper bounds of the subspace.
-
-    show(self,X,Y)
-        Show solutions X associated to their values Y,
-        according to the Searchspace
-
     See Also
     --------
     LossFunc : Parent class for a loss function.
-
-    Examples
-    --------
-
     """
 
     def __init__(self, values, loss, **kwargs):
@@ -150,7 +128,7 @@ class Searchspace(ABC):
         exclude : Variable or list[Variable] or type or list[type] or int or list[int], default=None
             Exclude one or several `Variable` to be drawn.
             Can also exclude types.For example one can exclude all Constant type.
-            Can also exclude variables according to their index is `values`.
+            Can also exclude variables according to their index or value.
 
         Returns
         -------

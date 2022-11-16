@@ -14,8 +14,28 @@ class AbstractObserver(ABC):
 
 
 class Observer(AbstractMonitor):
-    """
+    """Observer
+
     Records state variables of interest.
+    There is no historic, when the targeted attribute is change it overwrites
+    its record.
+
+    Parameters
+    ----------
+    target : Object
+        Targetet object.
+    attributes : str or list[str]
+        Name of the attribute to record.
+
+    Attributes
+    ----------
+    records : dict
+        Dictionnary of shape {attribute:value}.
+        Record the values of the targeted attributes. There is no historic.
+        Values are overwrote when the value of the attribute change
+    target
+    attributes
+
     """
 
     def __init__(
@@ -39,8 +59,28 @@ class Observer(AbstractMonitor):
 
 
 class Monitor(AbstractMonitor):
-    """
+    """Monitor
+
     Records state variables of interest.
+    There is a historic, when the targeted attribute is change, the value is
+    appended to the record.
+
+    Parameters
+    ----------
+    target : Object
+        Targetet object.
+    attributes : str or list[str]
+        Name of the attribute to record.
+
+    Attributes
+    ----------
+    records : dict
+        Dictionnary of shape {attribute:[values]}.
+        Record the values of the targeted attributes. There is historic.
+        Values are appended when the value of the attribute change.
+    target
+    attributes
+
     """
 
     def __init__(

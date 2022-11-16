@@ -12,6 +12,14 @@ from abc import ABC, abstractmethod
 
 
 class Heuristic(ABC):
+    """Heuristic
+
+    Heuristic is an abstract class defining the scoring method of DAC.
+    It is similar to an acquisition function in BO. According to sampled points,
+    it gives a score to a :ref:`frac`, which determines how promising it is.
+
+    """
+
     def __init__(self):
         pass
 
@@ -30,7 +38,7 @@ class Min(Heuristic):
     """
 
     def __call__(self, search_space, indexes):
-        """Short summary.
+        """__call__(loss, indexes)
 
         Parameters
         ----------
@@ -58,8 +66,8 @@ class Median(Heuristic):
         Median score found inside the fractal
     """
 
-    def __call__(self, loss, indexes):
-        """Short summary.
+    def __call__(self, search_space, indexes):
+        """__call__(loss, indexes)
 
         Parameters
         ----------
@@ -110,6 +118,8 @@ class Mean(Heuristic):
 class Std(Heuristic):
     """Std
 
+    Standard deviation
+
     Returns
     -------
     out : float
@@ -117,7 +127,7 @@ class Std(Heuristic):
     """
 
     def __call__(self, search_space, indexes):
-        """Short summary.
+        """__call__(loss, indexes)
 
         Parameters
         ----------
@@ -146,22 +156,24 @@ class Distance_to_the_best(Heuristic):
     """
 
     def __call__(self, search_space, indexes):
-        """Short summary.
+        def __call__(self, search_space, indexes):
+            """__call__(loss, indexes)
 
-        Parameters
-        ----------
-        search_space : Searchspace
-            Search space object containing bounds of the search space.
-        indexes : {int,slice}
-            Indexes of the scores, saved in `loss.all_scores`
-            used when computing heuristic.
+            Parameters
+            ----------
+            search_space : Searchspace
+                Search space object containing bounds of the search space.
+            indexes : {int,slice}
+                Indexes of the scores, saved in `loss.all_scores`
+                used when computing heuristic.
 
-        Returns
-        -------
-        out : float
-            Distance_to_the_best score found.
+            Returns
+            -------
+            out : float
+                Distance_to_the_best score found.
 
-        """
+            """
+
         if search_space.to_convert:
             best_ind = search_space.convert.to_continuous(
                 search_space.loss.best_sol, sub_values=True
@@ -200,7 +212,7 @@ class Distance_to_the_best(Heuristic):
 
 
 class Distance_to_the_best_corrected(Heuristic):
-    """Distance_to_the_best
+    """Distance_to_the_best_corrected
 
     Returns
     -------
@@ -209,7 +221,7 @@ class Distance_to_the_best_corrected(Heuristic):
     """
 
     def __call__(self, search_space, indexes):
-        """Short summary.
+        """__call__(loss, indexes)
 
         Parameters
         ----------
@@ -282,7 +294,8 @@ class Belief(Heuristic):
         self.gamma = gamma
 
     def __call__(self, search_space, indexes):
-        """Short summary.
+        """__call__(loss, indexes)
+
 
         Parameters
         ----------

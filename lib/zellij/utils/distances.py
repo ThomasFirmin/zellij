@@ -20,7 +20,7 @@ class Euclidean(Distance):
     """Euclidean distance
 
     Compute the Euclidean distance between two points.
-    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.euclidean.html#scipy.spatial.distance.euclidean>`
+    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.euclidean.html#scipy.spatial.distance.euclidean>`_
 
     Example
     -------
@@ -55,7 +55,7 @@ class Manhattan(Distance):
     """Manhattan distance
 
     Compute the Manhattan distance between two points.
-    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.cityblock.html#scipy.spatial.distance.cityblock>`
+    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.cityblock.html#scipy.spatial.distance.cityblock>`_
 
     Example
     -------
@@ -90,6 +90,7 @@ class Mixed(Distance):
     """Mixed distance
 
     Compute a distance between two mixed points, using following equations:
+    
     .. math::
 
         \\smash{
@@ -99,7 +100,7 @@ class Mixed(Distance):
         \\delta_{i,j}^{(n)}=0, \\quad \\text{if, $x_{i,n}=x_{j,n}$}\\\\
         \\delta_{i,j}^{(n)}=1, \\quad \\text{otherwise}
         \\end{cases} , \\quad \\text{if: $x_{h,n}$ is categorical}\\\\
-        d(x_i,x_j)=\frac{\sum_{n=1}^{p}(\delta_{i,j}^{(n)})^2}{\sum_{n=1}^{p}\delta_{i,j}^{(n)}}\\\\
+        d(x_i,x_j)=\\frac{\\sum_{n=1}^{p}(\\delta_{i,j}^{(n)})^2}{\\sum_{n=1}^{p}\\delta_{i,j}^{(n)}}\\\\
         \\end{cases}}
 
 

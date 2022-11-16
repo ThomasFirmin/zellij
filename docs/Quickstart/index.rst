@@ -2,9 +2,9 @@
 Quickstart
 ==========
 
-For this tutorial, we will use the `Himmelblau <https://en.wikipedia.org/wiki/Himmelblau%27s_function>`_ benchmark function,
-which is a continuous optimization problem, for computation time issues. (e.g. training a neural network is time consumming).
-For advanced applications see :ref:`examples`.
+In this tutorial, for computation time issues, we will use the `Himmelblau <https://en.wikipedia.org/wiki/Himmelblau%27s_function>`_ benchmark function,
+which is a continuous optimization problem. (e.g. training a neural network is time consumming).
+More applications here: :ref:`examples`.
 
 **Zellij is based on two main components:**
 
@@ -17,8 +17,8 @@ For advanced applications see :ref:`examples`.
     **Search space**
     ^^^^^^^^^^^^^^
 
-    The Searchspace object allows the user to define a mixed search space
-    with methods to draw random points, convert to continuous...
+    The :ref:`sp` allows to define various search space. It can be continuous,
+    discrete or Mixed. The base of a :ref:`sp` is its decision :ref:`var`.
 
     ++++++++++++++
     .. link-button:: ../Core/searchspace
@@ -33,7 +33,7 @@ For advanced applications see :ref:`examples`.
     **Loss function**
     ^^^^^^^^^^^^^^
 
-    The LossFunc object, is a wrapper for a Python callable defined as: f(x)=y.
+    The :ref:`lf` object, is a wrapper for a Python callable defined as: f(x)=y.
 
     ++++++++++++++
     .. link-button:: ../Core/lossfunc

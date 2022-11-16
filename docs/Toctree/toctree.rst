@@ -33,11 +33,11 @@
   ../Advanced/index
 
 .. toctree::
-  :caption: Fractal Decomposition
+  :caption: Divide-and-conquer
   :maxdepth: 2
   :hidden:
 
-  ../Fda/index
+  ../Dac/index
 
 .. toctree::
   :caption: Examples

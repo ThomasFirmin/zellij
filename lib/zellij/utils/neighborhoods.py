@@ -23,6 +23,24 @@ logger = logging.getLogger("zellij.neighborhoods")
 
 
 class ArrayInterval(VarNeighborhood):
+    """ArrayInterval
+
+    :ref:`spadd`, used to determine the neighbor of an ArrayVar.
+    neighbor kwarg must be implemented for all :ref:`var` of the ArrayVar.
+
+    Parameters
+    ----------
+    variable : ArrayVar, default=None
+        Targeted :ref:`var`.
+    neighborhood : list, default=None
+        Not yet implemented
+
+    Attributes
+    ----------
+    neighborhood
+
+    """
+
     def __init__(self, variable=None, neighborhood=None):
         super(ArrayInterval, self).__init__(variable)
         self.neighborhood = neighborhood
@@ -65,6 +83,15 @@ class ArrayInterval(VarNeighborhood):
 
 
 class BlockInterval(VarNeighborhood):
+    """BlockInterval
+
+    :ref:`spadd`, used to determine the neighbor of an BlockInterval.
+    neighbor kwarg must be implemented for all :ref:`var` of the BlockInterval.
+
+    Not yet implemented...
+
+    """
+
     def __call__(self, value, size=1):
         raise NotImplementedError(
             f"{self.__class__.__name__}\
@@ -73,6 +100,15 @@ class BlockInterval(VarNeighborhood):
 
 
 class DynamicBlockInterval(VarNeighborhood):
+    """BlockInterval
+
+    :ref:`spadd`, used to determine the neighbor of an BlockInterval.
+    neighbor kwarg must be implemented for all :ref:`var` of the BlockInterval.
+
+    Not yet implemented...
+
+    """
+
     def __call__(self, value, size=1):
         raise NotImplementedError(
             f"{self.__class__.__name__}\
@@ -81,6 +117,24 @@ class DynamicBlockInterval(VarNeighborhood):
 
 
 class FloatInterval(VarNeighborhood):
+    """FloatInterval
+
+    :ref:`varadd`, used to determine the neighbor of a FloatVar.
+    Draw a random point in :math:`x \pm neighborhood`.
+
+    Parameters
+    ----------
+    variable : FloatVar, default=None
+        Targeted :ref:`var`.
+    neighborhood : float, default=None
+        :math:`x \pm neighborhood`
+
+    Attributes
+    ----------
+    neighborhood
+
+    """
+
     def __call__(self, value, size=1):
         upper = np.min([value + self.neighborhood, self.target.up_bound])
         lower = np.max([value - self.neighborhood, self.target.low_bound])
@@ -122,6 +176,24 @@ class FloatInterval(VarNeighborhood):
 
 
 class IntInterval(VarNeighborhood):
+    """IntInterval
+
+    :ref:`varadd`, used to determine the neighbor of an IntVar.
+    Draw a random point in :math:`x \pm neighborhood`.
+
+    Parameters
+    ----------
+    variable : IntVar, default=None
+        Targeted :ref:`var`.
+    neighborhood : int, default=None
+        :math:`x \pm neighborhood`
+
+    Attributes
+    ----------
+    neighborhood
+
+    """
+
     def __call__(self, value, size=1):
 
         upper = np.min([value + self.neighborhood, self.target.up_bound])
@@ -164,6 +236,24 @@ class IntInterval(VarNeighborhood):
 
 
 class CatInterval(VarNeighborhood):
+    """CatInterval
+
+    :ref:`varadd`, used to determine the neighbor of a CatVar.
+    Draw a random feature in CatVar.
+
+    Parameters
+    ----------
+    variable : FlaotVar, default=None
+        Targeted :ref:`var`.
+    neighborhood : int, default=None
+        Undefined, for CatVar it draws a random feature.
+
+    Attributes
+    ----------
+    neighborhood
+
+    """
+
     def __init__(self, variable=None, neighborhood=None):
         super(CatInterval, self).__init__(variable)
         self.neighborhood = neighborhood
@@ -204,6 +294,24 @@ class CatInterval(VarNeighborhood):
 
 
 class ConstantInterval(VarNeighborhood):
+    """ConstantInterval
+
+    :ref:`varadd`, used to determine the neighbor of a Constant.
+    Do nothing. Return the constant.
+
+    Parameters
+    ----------
+    variable : Constant, default=None
+        Targeted :ref:`var`.
+    neighborhood : int, default=None
+        Not implemented.
+
+    Attributes
+    ----------
+    neighborhood
+
+    """
+
     def __init__(self, variable=None, neighborhood=None):
         super(ConstantInterval, self).__init__(variable)
         self.neighborhood = neighborhood
@@ -233,6 +341,27 @@ class ConstantInterval(VarNeighborhood):
 
 
 class Intervals(Neighborhood):
+    """Intervals
+
+    :ref:`spadd`, used to determine the neighbor of a given point.
+    All :ref:`var` of the :ref:`sp` must have the neighbor addon implemented.
+
+    Parameters
+    ----------
+    variable : :ref:`sp`, default=None
+        Targeted :ref:`sp`.
+    neighborhood : list, default=None
+        If a list of the shape of the values from the :ref:`sp`.
+        Modify the neighborhood attribute of all :ref:`varadd` of type
+        VarNeighborhood, for each :ref:`var`.
+
+
+    Attributes
+    ----------
+    neighborhood
+
+    """
+
     def __init__(self, search_space=None, neighborhood=None):
         super(Intervals, self).__init__(search_space, neighborhood)
 
@@ -256,8 +385,8 @@ class Intervals(Neighborhood):
 
         """get_neighbor(point, size=1)
 
-        Draw a neighbor of a solution, according to the search space bounds and\
-        dimensions types.
+        Draw a neighbor of a solution, according to the :ref:`var` neighbor
+        function.
 
         Parameters
         ----------

@@ -21,26 +21,32 @@ class ILS(Metaheuristic):
 
     """ILS
 
-    Intensive local search is an exploitation algorithm comming from original FDA paper.
-    It evaluate a point in each dimension arround an initial solution.
-    Distance of the computed point to the initial one is decreasing according to a reduction rate.
-    At each iteration the algorithm moves to the best solution found.
+    Intensive local search is an exploitation algorithm comming from the
+    original FDA paper. It evaluate a point in each dimension arround
+    an initial solution. Distance of the computed point to the initial one is
+    decreasing according to a reduction rate. At each iteration the algorithm
+    moves to the best solution found.
 
     Attributes
     ----------
+    search_space : Searchspace
+        :ref:`sp` object containing decision variables and the loss function.
 
-    up_bounds : list
-        List of float containing the upper bounds of the search space converted to continuous.
-    lo_bounds : list
-        List of float containing the lower bounds of the search space converted to continuous.
-    center : float
-        List of floats containing the coordinates of the search space center converted to continuous.
-    radius : float
-        List of floats containing the radius for each dimensions of the search space converted to continuous.
+    f_calls : int
+        Maximum number of calls to search.space_space.loss.
+
+    save : boolean, optional
+        If True save results into a file
+
+    verbose : boolean, default=True
+        Activate or deactivate the progress bar.
+
     red_rate : float
         determine the step reduction rate ate each iteration.
+
     precision : float
-        dtermine the stopping criterion. When the step is lower than <precision> the algorithm stops.
+        dtermine the stopping criterion.
+        When the step is lower than the precision the algorithm stops.
 
     Methods
     -------
@@ -111,8 +117,8 @@ class ILS(Metaheuristic):
         Y0 : {int, float}, optional
             Score of the initial solution
             Determine the starting point of the chaotic map.
-        H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+        H : :ref:`frac`, optional
+            Instend of X0, user can give a :ref:`frac`.
         n_process : int, default=1
             Determine the number of best solution found to return.
 

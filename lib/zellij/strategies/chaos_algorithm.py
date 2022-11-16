@@ -826,9 +826,8 @@ class Chaotic_optimization(Metaheuristic):
 
     """Chaotic_optimization
 
-    Chaotic optimization combines CGS, CLS and CFS. Using a unique chaos map. You can determine the number of outer and inner iteration is determine using an exploration ratio,\
-     and according to chaotic levels associated to CGS, CLS and CFS. The best solution found by CGS is used as a starting for CLS, and the best solution found by CLS is used by CFS.
-
+    Chaotic optimization combines CGS, CLS and CFS.
+    
     Attributes
     ----------
 

@@ -14,6 +14,26 @@ from deap import tools
 
 
 class NeighborMutation(Mutator):
+    """NeighborMutation
+
+    Based on `DEAP <https://deap.readthedocs.io/>`_.
+    It is a :ref:`spadd` which defines a mutation.
+    The mutation itself is based on the neighbor :ref:`addons` defined
+    for each :ref:`var` of the :ref:`sp`. See :ref:`nbh`.
+
+    Parameters
+    ----------
+    probability : float
+        Probaility for an individual to be mutated.
+    search_space : :ref:`sp`
+        Targeted :ref:`sp`.
+
+    Attributes
+    ----------
+    probability
+
+    """
+
     def __init__(self, probability, search_space=None):
         assert (
             probability > 0 and probability <= 1
@@ -59,6 +79,24 @@ class NeighborMutation(Mutator):
 
 
 class DeapTournament(Selector):
+    """DeapTournament
+
+    Based on `DEAP <https://deap.readthedocs.io/>`_ tournament.
+    :ref:`spadd` defining a selection method.
+
+    Parameters
+    ----------
+    size : int
+        Size of the tournament.
+    search_space : :ref:`sp`
+        Targeted :ref:`sp`.
+
+    Attributes
+    ----------
+    size
+
+    """
+
     def __init__(self, size, search_space=None):
         assert size > 0, f"Size must be an int > 0, got {size}"
         self.size = size
@@ -97,6 +135,18 @@ class DeapTournament(Selector):
 
 
 class DeapOnePoint(Crossover):
+    """DeapOnePoint
+
+    Based on `DEAP <https://deap.readthedocs.io/>`_ cxOnePoint.
+    :ref:`spadd` defining a crossover method.
+
+    Parameters
+    ----------
+    search_space : :ref:`sp`
+        Targeted :ref:`sp`.
+
+    """
+
     def __init__(self, search_space=None):
 
         super(Crossover, self).__init__(search_space)

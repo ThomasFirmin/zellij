@@ -22,22 +22,19 @@ class Metaheuristic(object):
 
     """Metaheuristic
 
-    Metaheuristic is a core object which defines the structure of a metaheuristic in Zellij.
-    It is an abtract class.
+    :ref:`meta` is a core object which defines the structure
+    of a metaheuristic in Zellij. It is an abtract class.
 
     Attributes
     ----------
     search_space : Searchspace
-        :ref:`sp` object containing bounds of all decision variables.
+        :ref:`sp` object containing decision variables and the loss function.
 
     f_calls : int
         Maximum number of calls to search.space_space.loss.
 
     save : boolean, optional
         If True save results into a file
-
-    H : Fractal, optional
-        If a :ref:`frac` is given, allows to use it.
 
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
@@ -119,10 +116,11 @@ class Metaheuristic(object):
         Parameters
         ----------
         nb : int
-            Length of the update. e.g. if the progress bar measure the number of iterations,
-            at each iteration `nb=1`.
+            Length of the update. e.g. if the progress bar measure
+            the number of iterations, at each iteration `nb=1`.
         explor : bool, default=True
-            If True the color associated to the update will be blue. Orange, otherwise.
+            If True the color associated to the update will be blue.
+            Orange, otherwise.
         best : bool default=False
             If True the score of the current solution will be displayed.
 
@@ -138,7 +136,8 @@ class Metaheuristic(object):
     def pending_pb(self, nb):
         """pending_pb(nb)
 
-        Update the progress bar with a pending property (white). This update will be replaced when using
+        Update the progress bar with a pending property (white).
+        This update will be replaced when using
         `update_main_pb`.
 
         Parameters
@@ -169,7 +168,7 @@ class Metaheuristic(object):
     def run(self):
         """run()
 
-        Abstract method, describe how to run a metaheuristic
+        Abstract method, describes how to run a metaheuristic
 
         """
         pass
@@ -182,7 +181,8 @@ class Metaheuristic(object):
         Parameters
         ----------
         filepath : string, default=""
-            If a filepath to a file containing points is given, it will read those points and plot them.
+            If a filepath to a file containing points is given,
+            it will read those points and plot them.
         save : bool, default=False
             If true, it saves the plots.
 

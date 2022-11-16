@@ -20,6 +20,13 @@ logger.setLevel(logging.INFO)
 
 
 class DoNothing(VarConverter):
+    """DoNothing
+
+    :ref:`varadd` used when a :ref:`var` must not be converted.
+    It does nothing, excep returning a non converted value.
+
+    """
+
     def convert(self, value, *args, **kwargs):
         return value
 
@@ -57,6 +64,23 @@ class CatNothing(DoNothing):
 
 
 class ArrayMinmax(VarConverter):
+    """ArrayMinmax
+
+    :ref:`varadd` used when elements of the array must be converted to
+    continous.
+
+    Parameters
+    ----------
+    variable : ArrayVar
+        Targeted ArrayVar.
+
+    Attributes
+    ----------
+    variable : ArrayVar
+        Targeted ArrayVar.
+
+    """
+
     def __init__(self, variable=None):
         super(ArrayMinmax, self).__init__(variable)
         if variable:
@@ -84,6 +108,23 @@ class ArrayMinmax(VarConverter):
 
 
 class BlockMinmax(VarConverter):
+    """BlockMinmax
+
+    :ref:`varadd` used when elements of the Block must be converted to
+    continous.
+
+    Parameters
+    ----------
+    variable : Block
+        Targeted Block.
+
+    Attributes
+    ----------
+    variable : Block
+        Targeted Block.
+
+    """
+
     def __init__(self, variable=None):
         super(BlockMinmax, self).__init__(variable)
 
@@ -119,6 +160,23 @@ class BlockMinmax(VarConverter):
 
 
 class DynamicBlockMinmax(VarConverter):
+    """DynamicBlockMinmax
+
+    :ref:`varadd` used when elements of the DynamicBlockMinmax must be
+    converted to continous.
+
+    Parameters
+    ----------
+    variable : DynamicBlockMinmax
+        Targeted DynamicBlockMinmax.
+
+    Attributes
+    ----------
+    variable : DynamicBlockMinmax
+        Targeted DynamicBlockMinmax.
+
+    """
+
     def __init__(self, variable=None):
         super(DynamicBlockMinmax, self).__init__(variable)
 
@@ -154,6 +212,14 @@ class DynamicBlockMinmax(VarConverter):
 
 
 class FloatMinmax(VarConverter):
+    """FloatMinmax
+
+    Convert the value of a FloatVar, using
+    :math:`\\frac{x-lower}{upper-lower}=y`
+    .Reverse: :math:`y(upper-lower)+lower=x`
+
+    """
+
     def convert(self, value):
         return (value - self.target.low_bound) / (
             self.target.up_bound - self.target.low_bound
@@ -167,6 +233,13 @@ class FloatMinmax(VarConverter):
 
 
 class IntMinmax(VarConverter):
+    """IntMinmax
+
+    Convert the value of an IntVar, using :math:`\\frac{x-lower}{upper-lower}=y`
+    .Reverse: :math:`y(upper-lower)+lower=x`
+
+    """
+
     def convert(self, value):
         return (value - self.target.low_bound) / (
             self.target.up_bound - self.target.low_bound
@@ -180,6 +253,14 @@ class IntMinmax(VarConverter):
 
 
 class CatMinmax(VarConverter):
+    """CatMinmax
+
+    Convert the value of a CatVar, using the index of the value in the list
+    of the features of CatVar. :math:`\\frac{index}{len(features)}=y`
+    .Reverse: :math:`features[floor(y*(len(features)-1))]=x`.
+
+    """
+
     def convert(self, value):
 
         return self.target.features.index(value) / len(self.target.features)
@@ -191,6 +272,13 @@ class CatMinmax(VarConverter):
 
 
 class ConstantMinmax(VarConverter):
+    """ConstantMinmax
+
+    Convert the value of a Constant. :math:`y=1.0`
+    .Reverse: :math:`x=value`.
+
+    """
+
     def convert(self, value):
         return 1.0
 
@@ -204,6 +292,23 @@ class ConstantMinmax(VarConverter):
 
 
 class ArrayBinning(VarConverter):
+    """ArrayBinning
+
+    :ref:`varadd` used when elements of the array must be converted to
+    discrete.
+
+    Parameters
+    ----------
+    variable : ArrayVar
+        Targeted ArrayVar.
+
+    Attributes
+    ----------
+    variable : ArrayVar
+        Targeted ArrayVar.
+
+    """
+
     def __init__(self, variable=None):
         super(ArrayBinning, self).__init__(variable)
         if variable:
@@ -252,6 +357,23 @@ class ArrayBinning(VarConverter):
 
 
 class BlockBinning(VarConverter):
+    """BlockBinning
+
+    :ref:`varadd` used when elements of the Block must be converted to
+    discrete.
+
+    Parameters
+    ----------
+    variable : Block
+        Targeted Block.
+
+    Attributes
+    ----------
+    variable : Block
+        Targeted Block.
+
+    """
+
     def __init__(self, variable=None):
         super(BlockBinning, self).__init__(variable)
 
@@ -287,6 +409,23 @@ class BlockBinning(VarConverter):
 
 
 class DynamicBlockBinning(VarConverter):
+    """DynamicBlockMinmax
+
+    :ref:`varadd` used when elements of the DynamicBlockMinmax must be
+    converted to discrete.
+
+    Parameters
+    ----------
+    variable : DynamicBlockMinmax
+        Targeted DynamicBlockMinmax.
+
+    Attributes
+    ----------
+    variable : DynamicBlockMinmax
+        Targeted DynamicBlockMinmax.
+
+    """
+
     def __init__(self, variable=None):
         super(DynamicBlockBinning, self).__init__(variable)
 
@@ -322,6 +461,12 @@ class DynamicBlockBinning(VarConverter):
 
 
 class FloatBinning(VarConverter):
+    """FloatBinning
+
+    Convert the value of a FloatVar, using binning.
+
+    """
+
     def convert(self, value, K):
         bins = np.linspace(self.target.low_bound, self.target.up_bound, K)
         return np.digitize(value, bins)
@@ -333,6 +478,12 @@ class FloatBinning(VarConverter):
 
 
 class IntBinning(VarConverter):
+    """IntMinmax
+
+    Do nothing.
+
+    """
+
     def convert(self, value, K):
         return value
 
@@ -341,6 +492,14 @@ class IntBinning(VarConverter):
 
 
 class CatBinning(VarConverter):
+    """CatMinmax
+
+    Convert the value of a CatVar to its corresponding index in the
+    features list.
+    .Reverse: index to feature.
+
+    """
+
     def convert(self, value, K):
         return self.target.features.index(value)
 
@@ -349,6 +508,13 @@ class CatBinning(VarConverter):
 
 
 class ConstantBinning(VarConverter):
+    """ConstantMinmax
+
+    Convert the value of a Constant. :math:`y=1`
+    .Reverse: :math:`x=value`.
+
+    """
+
     def convert(self, value, K):
         return 1
 
@@ -362,6 +528,23 @@ class ConstantBinning(VarConverter):
 
 
 class Continuous(Converter):
+    """Continuous
+
+    Convert :ref:`var` of a :ref:`sp` to continuous.
+    to_continuous addon must be implemented for each :ref:`var`.
+
+    Parameters
+    ----------
+    search_space : :ref:`sp`
+        Targeted :ref:`sp`.
+
+    Attributes
+    ----------
+    target : :ref:`sp`
+        Targeted :ref:`sp`.
+
+    """
+
     def __init__(self, search_space=None):
         super(Continuous, self).__init__(search_space)
         if search_space:
@@ -455,6 +638,23 @@ class Continuous(Converter):
 
 
 class Discrete(Converter):
+    """Discrete
+
+    Convert :ref:`var` of a :ref:`sp` to discrete.
+    to_discrete addon must be implemented for each :ref:`var`.
+
+    Parameters
+    ----------
+    search_space : :ref:`sp`
+        Targeted :ref:`sp`.
+
+    Attributes
+    ----------
+    target : :ref:`sp`
+        Targeted :ref:`sp`.
+
+    """
+
     def __init__(self, search_space=None, K=10):
         super(Discrete, self).__init__(search_space)
         if search_space:

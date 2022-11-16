@@ -49,7 +49,9 @@ class LossFunc(ABC):
     Attributes
     ----------
     model : function
-        Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x` must be a solution. A solution can be a list of float, int... It can also be of mixed types...
+        Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x`
+        must be a solution. A solution can be a list of float, int...
+        It can also be of mixed types...
     objective : Objective, default=Minimizer()
         Objectve object determines what and and how to optimize.
         (minimization, maximization, ratio...)
@@ -183,11 +185,15 @@ class LossFunc(ABC):
 
     @abstractmethod
     def _save_model(self, *args):
-        """ _save_model()
+        """_save_model()
 
-        Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form :math:`f(x) = (y, model)`\
-         `y` are the results of the evaluation of `x` by `f`. `model` is optional, if you want to save the best model found (e.g. a neural network)\
-         you can return the model. However the model must have a "save" method with a filename. (e.g. model.save(filename)).
+        Private abstract method to save a model.
+        Be carefull, to be exploitable, the initial loss func must be of form
+        :math:`f(x) = (y, model)`, `y` are the results of the evaluation of `x`
+        by `f`. `model` is optional, if you want to save the best model
+        found (e.g. a neural network) you can return the model.
+        However the model must have a "save" method with a filename.
+        (e.g. model.save(filename)).
 
         """
         pass
@@ -440,8 +446,11 @@ class MPILoss(LossFunc):
 
     """MPILoss
 
-    MPILoss allows to wrap function of type f(x)=(y, model). MPILoss adds method to distribute dynamically the evaluation of multiple solutions.
-    It does not distribute the original loss function itself
+    MPILoss allows to wrap function of type f(x)=(y, model).
+    MPILoss adds method to distribute dynamically the evaluation
+    of multiple solutions within a distributed environment, where a version of
+    `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`_
+    is available.
 
     Attributes
     ----------
@@ -528,7 +537,7 @@ class MPILoss(LossFunc):
 
     def __call__(self, X, label=[], **kwargs):
 
-        """__call__(model, save_model='')
+        """__call__(X, label=[], **kwargs)
 
         Evaluate a list X of solutions with the original loss function.
 
@@ -650,7 +659,8 @@ class MPILoss(LossFunc):
 
         """worker()
 
-        Initialize worker. Whilte it does not receive a stop message, a worker will wait for a solution to evaluate.
+        Initialize worker. While it does not receive a stop message,
+        a worker will wait for a solution to evaluate.
 
         """
 
@@ -719,14 +729,20 @@ class MPILoss(LossFunc):
 
     def _save_model(self, score, source):
 
-        """ _save_model()
+        """_save_model(score, source)
 
-        Private method to save a model. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
-         y is the results of the evaluation of x by f. model is optional, if you want to save the best found model (e.g. a neural network)\
-         you can return the model. However the model must have a "save" method (e.g. model.save(filename)).
+        Be carefull, to be exploitable, the initial loss func must be of form
+        :math:`f(x) = (y, model)`, `y` are the results of the evaluation of `x`
+        by `f`. `model` is optional, if you want to save the best model
+        found (e.g. a neural network) you can return the model.
+        However the model must have a "save" method with a filename.
+        (e.g. model.save(filename)).
 
-         score : int
-            Score corresponding to the source file
+        Parameters
+        ----------
+
+        score : int
+            Score corresponding to the solution saved by the worker.
         source : int
             Worker rank which evaluate a solution and return score
 
@@ -749,7 +765,8 @@ class SerialLoss(LossFunc):
 
     """SerialLoss
 
-    SerialLoss allows to wrap function of type f(x)=(y, model). SerialLoss adds methods to save and evaluate the original loss function.
+    SerialLoss allows to wrap function of type f(x)=(y, model).
+    SerialLoss adds methods to save and evaluate the original loss function.
 
     Methods
     -------
@@ -874,8 +891,12 @@ def Loss(
     Parameters
     ----------
     model : function, default=None
-        Function of type f(x)=y. x must be a solution. A solution can be a list of float, int... It can also be of mixed types, containing, strings, float, int...
-
+        Function of type f(x)=y. x must be a solution.
+        A solution can be a list of float, int...
+        It can also be of mixed types, containing, strings, float, int...
+    objective : Objective, default=Minimizer()
+        Objectve object determines what and and how to optimize.
+        (minimization, maximization, ratio...)
     save : string, optional
         Filename where to save the best found model. Only one model is saved for memory issues.
 

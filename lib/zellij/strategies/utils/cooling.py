@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 class Cooling(object):
     """Cooling
 
-    Cooling is a base object which define what a cooling Schedule is.
+    Cooling is a base object which defines what a cooling Schedule is.
 
     Attributes
     ----------

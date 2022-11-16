@@ -14,68 +14,45 @@ import copy
 
 import logging
 
-logger = logging.getLogger("zellij.FDA")
+logger = logging.getLogger("zellij.DAC")
 
 
-class FDA(Metaheuristic):
+class DAC(Metaheuristic):
 
-    """FDA
+    """DAC
 
-    Fractal Decomposition Algorithm (FDA) is composed of 5 part:
-        –  Fractal decomposition : FDA uses hyper-spheres or hyper-cubes to decompose the search-space into smaller sub-spaces in a fractal way.
-        –  Tree search algorithm : Fractals form a tree, so FDA is also a tree search problem. It can use Best First Search, Beam Search or others algorithms from the A* family.
-        –  Exploration : To explore a fractal, FDA requires an exploration algorithm, for example GA,or in our case CGS.
-        –  Exploitation : At the final fractal level (e.g. a leaf of the rooted tree) FDA performs an exploitation.
-        –  Scoring method: To score a fractal, FDA can use the best score found, the median, ... See heuristics.py.
+    Divide-and-conquer (DAC) is made of 5 part:
+        * **Geometry** : DAC uses hyper-spheres or hyper-cubes to decompose the search-space into smaller sub-spaces in a fractal way.
+        * **Tree** search algorithm : Fractals form a tree, so DAC is also a tree search problem. It can use Best First Search, Beam Search or others algorithms from the A* family.
+        * **Exploration** : To explore a fractal, DAC requires an exploration algorithm, for example GA,or in our case CGS.
+        * **Exploitation** : At the final fractal level (e.g. a leaf of the rooted tree) DAC performs an exploitation.
+        * **Scoring method**: To score a fractal, DAC can use the best score found, the median, ...
 
-    It a continuous optimization algorithm. SO the search space is converted to continuous.
+    It a continuous optimization algorithm.
 
     Attributes
     ----------
 
-    heuristic : callable
-        Determine using using current state of the algorithm, how to score the current fractal. Used informations are given to the function at the following order:
-        - The current fractal
-        - The best solution found so far (converted to continuous)
-        - The best score found so far (computed with the loss function)
+    search_space : Fractal
+        :ref:`sp` defined as a  :ref:`frac`. Contains decision
+        variables of the search space, converted to continuous and
+        constrained to an EUclidean :ref:`frac`.
 
-    exploration : Metaheuristic
-        At each node of a fractal FDA applies an exploration algorithm to determine if this fractal is promising or not.
+    f_calls : int
+        Maximum number of :ref:`lf` calls
 
-    exploitation : Metaheuristic
-        At a leaf of the rooted fractal tree, FDA applies an exploitation algorithm, which ignores subspace bounds (not SearchSpace bounds),
-        to refine the best solution found inside this fractal.
+    exploration : {Metaheuristic, list[Metaheuristic]}, default=None
+        Algorithm used to sample inside each subspaces.
 
-    level : int
-        Depth of the fractal tree
-
-    up_bounds : list
-        List of float containing the upper bounds of the search space converted to continuous
-
-    lo_bounds : list
-        List of float containing the lower bounds of the search space converted to continuous
-
-    fractal : Fractal
-        Fractal object used to build the fractal tree
-
-    explor_kwargs : list[dict]
-        List of keyword arguments to pass to the exploration strategy at each level of the tree.
-        If len(explor_kwargs) < level, then that last element of the list will be used for the next levels.
-
-    explor_kwargs : dict
-        Keyword arguments to pass to the exploitation strategy.
-
-    start_H : Fractal
-        Root of the fractal tree
+    exploitation : Metaheuristic, default=None
+        Intensification algorithm applied on a subspace at the last level
+        of the partition tree.
 
     tree_search : Tree_search
-        Tree_search object to use to explore and exploit the fractal tree.
+        Tree search algorithm applied on the partition tree.
 
-    n_h : int
-        Number of explored nodes of the tree
-
-    total_h : int
-        Theoretical number of nodes.
+    verbose : boolean, default=True
+        Algorithm verbosity
 
 
     Methods
@@ -85,7 +62,7 @@ class FDA(Metaheuristic):
         Evaluate a list of fractals using exploration and/or exploitation
 
     run(n_process=1)
-        Runs FDA
+        Runs DAC
 
     See Also
     --------
@@ -107,38 +84,29 @@ class FDA(Metaheuristic):
         **kwargs,
     ):
 
-        """__init__(loss_func, search_space, f_calls, exploration, exploitation, fractal, tree_search, heuristic, level=5, verbose=True, **kwargs)
+        """__init__(search_space, f_calls, tree_search, exploration=None, exploitation=None, verbose=True, **kwargs)
 
-        Initialize FDA class
+        Initialize DAC class
 
         Parameters
         ----------
         search_space : Fractal
-            Search space object containing bounds of the search space
+            :ref:`sp` defined as a  :ref:`frac`. Contains decision
+            variables of the search space, converted to continuous and
+            constrained to an EUclidean :ref:`frac`.
 
         f_calls : int
             Maximum number of :ref:`lf` calls
 
         exploration : {Metaheuristic, list[Metaheuristic]}, default=None
-            At each node of a fractal FDA applies an exploration algorithm to determine if this fractal is promising or not.
-            If a list of metaheuristic is given, at each level FDA will use the metaheuristic at the index equel to the current level.
-            If len(exploration) < level, the last metaheuristic will be used for following levels.
+            Algorithm used to sample inside each subspaces.
 
         exploitation : Metaheuristic, default=None
-            At a leaf of the rooted fractal tree, FDA applies an exploitation algorithm, which ignores subspace bounds (not SearchSpace bounds),
-            to refine the best solution found inside this fractal.
+            Intensification algorithm applied on a subspace at the last level
+            of the partition tree.
 
         tree_search : Tree_search
-            BFS : Breadth first search
-            DFS : Depth first search
-            BS : Beam_search
-            BestFS : Best first search
-            CBFS : Cyclic best first search
-            DBFS : Diverse best first search
-            EGS : Epsilon greedy search
-
-        level : int, default=5
-            Fractal tree depth.
+            Tree search algorithm applied on the partition tree.
 
         verbose : boolean, default=True
             Algorithm verbosity
@@ -149,7 +117,7 @@ class FDA(Metaheuristic):
         # PARAMETERS #
         ##############
 
-        super(FDA, self).__init__(search_space, f_calls, verbose)
+        super(DAC, self).__init__(search_space, f_calls, verbose)
 
         # Exploration and exploitation function
         if exploration:
@@ -170,7 +138,7 @@ class FDA(Metaheuristic):
         # VARIABLES #
         #############
 
-        # Save f_calls from metaheuristic, to adapt them during FDA.
+        # Save f_calls from metaheuristic, to adapt them during DAC.
         if self.exploitation:
             self.explor_calls = [i.f_calls for i in self.exploration]
         else:
@@ -261,7 +229,7 @@ class FDA(Metaheuristic):
                             # Progress bar
                             prec_calls = self.search_space.loss.calls
 
-                            # Run exploration, scores and evaluated solutions are saved using FDA_loss_func class
+                            # Run exploration, scores
                             self.exploration[opti_idx].run(
                                 H=child, n_process=n_process
                             )
@@ -306,7 +274,7 @@ class FDA(Metaheuristic):
                 # Exploitation
                 elif self.exploitation:
 
-                    # Run exploitation, scores and evaluated solutions are saved using FDA_loss_func class
+                    # Run exploitation, scores
                     calls_left = np.min(
                         [
                             self.exploi_calls,
@@ -363,7 +331,7 @@ class FDA(Metaheuristic):
 
         """run(n_process=1)
 
-        Runs FDA.
+        Runs DAC.
 
         Parameters
         ----------

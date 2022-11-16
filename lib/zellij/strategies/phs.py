@@ -28,13 +28,21 @@ class PHS(Metaheuristic):
 
     Attributes
     ----------
+    search_space : Searchspace
+        :ref:`sp` object containing decision variables and the loss function.
 
-    up_bounds : list
-        List of float containing the upper bounds of the search space converted to continuous.
-    lo_bounds : list
-        List of float containing the lower bounds of the search space converted to continuous.
+    f_calls : int
+        Maximum number of calls to search.space_space.loss.
+
+    save : boolean, optional
+        If True save results into a file
+
+    verbose : boolean, default=True
+        Activate or deactivate the progress bar.
+
     center : float
         List of floats containing the coordinates of the search space center converted to continuous.
+
     radius : float
         List of floats containing the radius for each dimensions of the search space converted to continuous.
 

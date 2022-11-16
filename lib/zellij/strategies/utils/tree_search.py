@@ -18,20 +18,21 @@ class Tree_search(object):
 
     """Tree_search
 
-    Tree_search is an abstract class which determines how to explore the fractal rooted tree, builded during Fractal Decomposition.
+    Tree_search is an abstract class which determines how to explore a
+    partition tree defined by :ref:`dac`.
     It is based on the OPEN/CLOSED lists algorithm.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Open list containing not explored nodes from the fractal rooted tree.
+        Open list containing not explored nodes from the partition tree.
 
     close : list[Fractal]
-        Close list containing explored nodes from the fractal rooted tree.
+        Close list containing explored nodes from the partition tree.
 
     max_depth : int
-        Maximum depth of the fractal rooted tree.
+        Maximum depth of the partition tree.
 
     Methods
     -------
@@ -54,10 +55,10 @@ class Tree_search(object):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         """
 
@@ -106,17 +107,18 @@ class Tree_search(object):
 class Breadth_first_search(Tree_search):
     """Breadth_first_search
 
-    Breadth First Search algorithm (BFS), computationally inefficient with fractal decomposition algorithm, because it is a greedy algorithm doing only exploration of the fractal tree,\
-     exploring entirely each fractal level.
+    Breadth First Search algorithm (BFS). It is inefficient with :ref:`dac`.
+    Indeed before selecting node of the next level, all nodes of the current
+    level must have been decomposed.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Breadth_first_search, at each get_next, tries to return Q nodes.
@@ -148,10 +150,10 @@ class Breadth_first_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Breadth_first_search, at each get_next, tries to return Q nodes.
@@ -207,17 +209,17 @@ class Breadth_first_search(Tree_search):
 class Depth_first_search(Tree_search):
     """Depth_first_search
 
-    Depth First Search algorithm (DFS), computationally inefficient with fractal decomposition algorithm, because it is a greedy algorithm doing only exploitation of the fractal tree,\
-    by trying to go has deep as possible.
+    Depth First Search algorithm (DFS). It is inefficient with :ref:`dac`.
+    Indeed DFS, is favorising the deep nodes no matter their quality.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Depth_first_search, at each get_next, tries to return Q nodes.
@@ -248,10 +250,10 @@ class Depth_first_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Depth_first_search, at each get_next, tries to return Q nodes.
@@ -311,16 +313,17 @@ class Best_first_search(Tree_search):
 
     """Best_first_search
 
-    Best First Search algorithm (BestFS), BestFS is better than BFS and DFS, because it tries to explore and exploit only the best current node in the tree.
+    Best First Search algorithm (BestFS).
+    At each iterations, it selects the Q-best nodes.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -351,10 +354,10 @@ class Best_first_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -415,17 +418,17 @@ class Beam_search(Tree_search):
 
     """Beam_search
 
-    Beam Search algorithm (BS). BS is an improvement of BestFS. It includes a beam length (resp. open list length),\
-    which allows to prune the worst nodes and only keep in memory a certain number of the best found nodes.
+    Beam Search algorithm (BS). BS is an improvement of BestFS.
+    It includes a beam length which allows to prune the worst nodes.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Beam_search, at each get_next, tries to return Q nodes.
@@ -460,10 +463,10 @@ class Beam_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Beam_search, at each get_next, tries to return Q nodes.
@@ -526,18 +529,21 @@ class Diverse_best_first_search(Tree_search):
 
     """Diverse_best_first_search
 
-    Diverse Best First Search (DBFS). DBFS is an improvement of BestFS. When a node is badly evaluated, this one has no more chance to be explored.\
-    DBFS tries to tackle this problem by randomly selecting nodes according to a probability computed with its heuristic value (score) and its parents scores,\
-    or according to a probability P.
+    Diverse Best First Search (DBFS). DBFS is an improvement of BestFS.
+    When a node is badly evaluated, this one has no more chance to be explored.
+    DBFS tries to overcome this problem by randomly selecting nodes according to
+    a probability computed with its heuristic value (score) and its parents
+    scores, or according to a probability P.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the fractal
+        rooted tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Diverse_best_first_search, at each get_next, tries to return Q nodes.
@@ -546,10 +552,13 @@ class Diverse_best_first_search(Tree_search):
         if False do a descending sort the open list, else do an ascending sort
 
     P : float, default=0.1
-        Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration DBFS does.
+        Probability to select a random node from the open list.
+        Determine how random the selection must be. The higher it is,
+        the more exploration DBFS does.
 
     T : float, default=0.5
-        Influences the probability of a node to be selected according to its score compared to the best score from the open list.
+        Influences the probability of a node to be selected according to its
+        score compared to the best score from the open list.
 
     Methods
     -------
@@ -575,22 +584,27 @@ class Diverse_best_first_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the fractal
+            rooted tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
-            Q-Diverse_best_first_search, at each get_next, tries to return Q nodes.
+            Q-Diverse_best_first_search, at each get_next, tries to
+            return Q nodes.
 
         reverse : boolean, default=False
-            If False do a descending sort the open list, else do an ascending sort
+            If False do a descending sort the open list, else do
+            an ascending sort
 
         P : float, default=0.1
-            Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration DBFS does.
+            Probability to select a random node from the open list.
+            Determine how random the selection must be. The higher it is, the more exploration DBFS does.
 
         T : float, default=0.5
-            Influences the probability of a node to be selected according to its score compared to the best score from the open list.
+            Influences the probability of a node to be selected according to its
+            score compared to the best score from the open list.
         """
 
         super().__init__(open, max_depth)
@@ -688,18 +702,23 @@ class Cyclic_best_first_search(Tree_search):
 
     """Cyclic_best_first_search
 
-    Cyclic Best First Search (CBFS). CBFS is an hybrid of DFS and BestFS. First, CBFS tries to reach a leaf of the fractal tree to quickly determine a base score.
-    Then CBFS will do pruning according to this value, and it will decompose the problem into subproblems by inserting nodes into contours (collection of unexplored subproblems).
-    At each iteration CBFS select the best subproblem according to an heuristic value. Then the child subproblems will be inserted into their respective contours, according to a labelling function.
+    Cyclic Best First Search (CBFS). CBFS is an hybridation between DFS and
+    BestFS. First, CBFS tries to reach a leaf of the fractal tree to quickly
+    determine a base score. Then CBFS will do pruning according to this value,
+    and it will decompose the problem into subproblems by inserting nodes into
+    contours (collection of unexplored subproblems). At each iteration CBFS
+    selects the best subproblem according to an heuristic value.
+    Then the child subproblems will be inserted into their respective contours
+    according to a labelling function.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Cyclic_best_first_search, at each get_next, tries to return Q nodes.
@@ -731,10 +750,10 @@ class Cyclic_best_first_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Cyclic_best_first_search, at each get_next, tries to return Q nodes.
@@ -850,16 +869,18 @@ class Epsilon_greedy_search(Tree_search):
 
     """Epsilon_greedy_search
 
-    Epsilon Greedy Search (EGS). EGS is an improvement of BestFS. At each iteration nodes are selected randomly or according to their best score.
+    Epsilon Greedy Search (EGS).
+    EGS is an improvement of BestFS. At each iteration nodes are selected
+    randomly or according to their best score.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Epsilon_greedy_search, at each get_next, tries to return Q nodes.
@@ -868,7 +889,9 @@ class Epsilon_greedy_search(Tree_search):
         if False do a descending sort the open list, else do an ascending sort
 
     epsilon : float, default=0.1
-        Probability to select a random node from the open list. Determine how random the selection must be. The higher it is, the more exploration EGS does.
+        Probability to select a random node from the open list.
+        Determine how random the selection must be.
+        The higher it is, the more exploration EGS does.
 
     Methods
     -------
@@ -894,10 +917,10 @@ class Epsilon_greedy_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Epsilon_greedy_search, at each get_next, tries to return Q nodes.
@@ -976,16 +999,17 @@ class Potentially_Optimal_Rectangle(Tree_search):
 
     """Potentially_Optimal_Rectangle
 
-    Potentially Optimal Rectangle algorithm (POR), is a the selection strategy comming from DIRECT.
+    Potentially Optimal Rectangle algorithm (POR),
+    is a the selection strategy comming from DIRECT.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -1016,10 +1040,10 @@ class Potentially_Optimal_Rectangle(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -1028,7 +1052,8 @@ class Potentially_Optimal_Rectangle(Tree_search):
             if False do a descending sort the open list, else do an ascending sort
 
         error : float, default=1e-4
-            Small value which determines when an evaluation should be considered as good as the best solution found so far.
+            Small value which determines when an evaluation should be considered
+            as good as the best solution found so far.
 
         """
         super().__init__(open, max_depth)
@@ -1157,16 +1182,17 @@ class Locally_biased_POR(Tree_search):
 
     """Locally_biased_POR
 
-    Potentially Optimal Rectangle algorithm (POR), is a the selection strategy comming from DIRECT.
+    Potentially Optimal Rectangle algorithm (POR),
+    is a the selection strategy comming from DIRECT.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -1197,10 +1223,10 @@ class Locally_biased_POR(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -1209,7 +1235,8 @@ class Locally_biased_POR(Tree_search):
             if False do a descending sort the open list, else do an ascending sort
 
         error : float, default=1e-4
-            Small value which determines when an evaluation should be considered as good as the best solution found so far.
+            Small value which determines when an evaluation should be considered
+            as good as the best solution found so far.
 
         """
         super().__init__(open, max_depth)
@@ -1341,18 +1368,19 @@ class Locally_biased_POR(Tree_search):
 
 class Adaptive_POR(Tree_search):
 
-    """Potentially_Optimal_Rectangle
+    """Adaptive_POR
 
-    Potentially Optimal Rectangle algorithm (POR), is a the selection strategy comming from DIRECT.
+    Adaptive_POR, is a the selection strategy
+    comming from DIRECT-Restart.
 
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -1385,10 +1413,10 @@ class Adaptive_POR(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Best_first_search, at each get_next, tries to return Q nodes.
@@ -1397,7 +1425,8 @@ class Adaptive_POR(Tree_search):
             if False do a descending sort the open list, else do an ascending sort
 
         error : float, default=1e-4
-            Small value which determines when an evaluation should be considered as good as the best solution found so far.
+            Small value which determines when an evaluation should be considered
+            as good as the best solution found so far.
 
         """
         super().__init__(open, max_depth)
@@ -1556,10 +1585,10 @@ class Soo_tree_search(Tree_search):
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Depth_first_search, at each get_next, tries to return Q nodes.
@@ -1590,10 +1619,10 @@ class Soo_tree_search(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Depth_first_search, at each get_next, tries to return Q nodes.
@@ -1671,14 +1700,16 @@ class Soo_tree_search(Tree_search):
 class Move_up(Tree_search):
     """Move_up
 
+    FDA tree search.
+
     Attributes
     ----------
 
     open : list[Fractal]
-        Initial Open list containing not explored nodes from the fractal rooted tree.
+        Initial Open list containing not explored nodes from the partition tree.
 
     max_depth : int
-        maximum depth of the fractal rooted tree.
+        maximum depth of the partition tree.
 
     Q : int, default=1
         Q-Depth_first_search, at each get_next, tries to return Q nodes.
@@ -1709,10 +1740,10 @@ class Move_up(Tree_search):
         Parameters
         ----------
         open : list[Fractal]
-            Initial Open list containing not explored nodes from the fractal rooted tree.
+            Initial Open list containing not explored nodes from the partition tree.
 
         max_depth : int
-            maximum depth of the fractal rooted tree.
+            maximum depth of the partition tree.
 
         Q : int, default=1
             Q-Depth_first_search, at each get_next, tries to return Q nodes.

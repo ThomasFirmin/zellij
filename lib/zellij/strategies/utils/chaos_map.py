@@ -15,19 +15,16 @@ class Chaos_map(object):
 
     """Chaos_map
 
-    Chaos_map is used to build the chaotic map according to the give name, the level and dimensions of the Searchspace.
-    See Chaotic_optimization for more info. Th chaotic map is matrix of shape: (level, dimension).
+    Chaos_map is in abstract class describing what a chaos map is.
 
     Attributes
     ----------
-    level : int
-        Chaotic level corresponds to the number of iteration of the chaotic map
-    dimension : int
-        Dimension of the Searchspace.
-    map_kwargs : dict
-        Keyword arguments associated to the selected map.
-    map : np.array(dtype=np.array(dtype=float))
-        Contains the chaotic map of size level*dimension.
+    vectors : int
+        Size of the map (rows).
+    params : int
+        Number of parameters (columns).
+    map : np.array
+        Chaos map of shape (vectors, params).
 
     See Also
     --------

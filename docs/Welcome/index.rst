@@ -2,10 +2,10 @@
 Zellij Documentation
 ====================
 
-**Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Fractal Decomposition based algorithms* [1]_ [2]_ [3]_ .
+**Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Divide-and-conquer algorithms* [1]_ [2]_ .
 It includes tools to define mixed search space, manage objective functions, and a few algorithms.
-To implements metaheuristics and other optimization methods, **Zellij** uses `DEAP <https://deap.readthedocs.io/>`_ [4]_ for the *Evolutionary Algorithms* part
-and `BoTorch <https://botorch.org/>`_ [5]_ for *Bayesian Optimization*.
+To implements metaheuristics and other optimization methods, **Zellij** uses `DEAP <https://deap.readthedocs.io/>`_ [3]_ for the *Evolutionary Algorithms* part
+and `BoTorch <https://botorch.org/>`_ [4]_ for *Bayesian Optimization*.
 
 In **Zellij** we consider a  **minimization** problem with a loss function :math:`f: \mathcal{X} \subset \mathbb{R}^n \rightarrow \mathbb{R}`:
 
@@ -69,6 +69,5 @@ References
 ==================
 .. [1] Nakib, A., Ouchraa, S., Shvai, N., Souquet, L. & Talbi, E.-G. Deterministic metaheuristic based on fractal decomposition for large-scale optimization. Applied Soft Computing 61, 468–485 (2017).
 .. [2] Demirhan, M., Özdamar, L., Helvacıoğlu, L. & Birbil, Ş. I. FRACTOP: A Geometric Partitioning Metaheuristic for Global Optimization. Journal of Global Optimization 14, 415–436 (1999).
-.. [3] T.Firmin, Fractal decomposition: A divide and conquer approach for global optimization
-.. [4] Félix-Antoine Fortin, François-Michel De Rainville, Marc-André Gardner, Marc Parizeau and Christian Gagné, "DEAP: Evolutionary Algorithms Made Easy", Journal of Machine Learning Research, vol. 13, pp. 2171-2175, jul 2012.
-.. [5] M. Balandat, B. Karrer, D. R. Jiang, S. Daulton, B. Letham, A. G. Wilson, and E. Bakshy. BoTorch: A Framework for Efficient Monte-Carlo Bayesian Optimization. Advances in Neural Information Processing Systems 33, 2020
+.. [3] Félix-Antoine Fortin, François-Michel De Rainville, Marc-André Gardner, Marc Parizeau and Christian Gagné, "DEAP: Evolutionary Algorithms Made Easy", Journal of Machine Learning Research, vol. 13, pp. 2171-2175, jul 2012.
+.. [4] M. Balandat, B. Karrer, D. R. Jiang, S. Daulton, B. Letham, A. G. Wilson, and E. Bakshy. BoTorch: A Framework for Efficient Monte-Carlo Bayesian Optimization. Advances in Neural Information Processing Systems 33, 2020
