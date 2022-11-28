@@ -57,7 +57,7 @@ class LossFunc(ABC):
         (minimization, maximization, ratio...)
     best_score : float
         Best score found so far.
-    best_sol : list
+    best_point : list
         Best solution found so far.
     best_argmin : int
         Index of the best solution found so far.
@@ -126,7 +126,7 @@ class LossFunc(ABC):
         #############
 
         self.best_score = float("inf")
-        self.best_sol = None
+        self.best_point = None
         self.best_argmin = None
 
         self.all_scores = []
@@ -232,7 +232,7 @@ class LossFunc(ABC):
 
         # Create a valid folder
         try:
-            os.mkdir(self.folder_name)
+            os.makedirs(self.folder_name)
             created = False
         except FileExistsError as error:
             created = True
@@ -281,12 +281,7 @@ class LossFunc(ABC):
             if self.only_score:
                 f.write("objective\n")
             else:
-                f.write(
-                    ",".join(str(e) for e in self.labels)
-                    + ",objective"
-                    + suffix
-                    + "\n"
-                )
+                f.write(",".join(str(e) for e in self.labels) + suffix + "\n")
 
         logger.info(
             f"INFO: Results will be saved at: {os.path.abspath(self.folder_name)}"
@@ -313,18 +308,16 @@ class LossFunc(ABC):
 
         # Determine if additionnal contents must be added to the save
         if len(kwargs) > 0:
-            suffix = "," + ",".join(str(e) for e in kwargs.values())
+            suffix = ",".join(str(e) for e in kwargs.values())
         else:
             suffix = ""
 
         # Save a solution and additionnal contents
         with open(self.loss_file, "a+") as f:
             if self.only_score:
-                f.write(str(y) + "\n")
+                f.write(f"{kwargs['objective']}\n")
             else:
-                f.write(
-                    ",".join(str(e) for e in x) + "," + str(y) + suffix + "\n"
-                )
+                f.write(",".join(str(e) for e in x) + "," + suffix + "\n")
 
     # Save best found solution
     def _save_best(self, x, y):
@@ -340,7 +333,6 @@ class LossFunc(ABC):
             Loss value (score) associated to x.
 
         """
-
         # historic
         self.all_solutions.append(list(x)[:])
         self.all_scores.append(y)
@@ -348,7 +340,7 @@ class LossFunc(ABC):
         # Save best
         if y < self.best_score:
             self.best_score = y
-            self.best_sol = list(x)[:]
+            self.best_point = list(x)[:]
             self.best_argmin = len(self.all_scores)
 
             self.new_best = True
@@ -399,7 +391,7 @@ class LossFunc(ABC):
             best = [self.all_solutions[i] for i in best_idx[:n_process]]
             min = [self.all_scores[i] for i in best_idx[:n_process]]
         else:
-            best = self.best_sol
+            best = self.best_point
             min = self.best_score
 
         return best, min
@@ -412,7 +404,7 @@ class LossFunc(ABC):
         """
 
         self.best_score = float("inf")
-        self.best_sol = None
+        self.best_point = None
         self.best_argmin = None
 
         self.all_scores = []
@@ -514,6 +506,8 @@ class MPILoss(LossFunc):
         try:
             self.comm = MPI.COMM_WORLD
             self.status = MPI.Status()
+            self.p_name = MPI.Get_processor_name()
+
             self.rank = self.comm.Get_rank()
             self.p = self.comm.Get_size()
         except Exception as err:
@@ -916,7 +910,7 @@ def Loss(
     ... def himmelblau(x):
     ...   x_ar = np.array(x)
     ...   return np.sum(x_ar**4 -16*x_ar**2 + 5*x_ar) * (1/len(x_ar))
-    >>> print(f"Best solution found: f({himmelblau.best_sol}) = {himmelblau.best_score}")
+    >>> print(f"Best solution found: f({himmelblau.best_point}) = {himmelblau.best_score}")
     Best solution found: f(None) = inf
     >>> print(f"Number of evaluations:{himmelblau.calls}")
     Number of evaluations:0
