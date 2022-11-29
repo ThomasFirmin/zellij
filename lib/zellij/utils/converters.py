@@ -266,9 +266,11 @@ class CatMinmax(VarConverter):
         return self.target.features.index(value) / len(self.target.features)
 
     def reverse(self, value):
-        return self.target.features[
-            int(np.floor(value * (len(self.target.features) - 1)))
-        ]
+        idx = int(value * len(self.target.features))
+        if idx == len(self.target.features):
+            idx -= 1
+
+        return self.target.features[idx]
 
 
 class ConstantMinmax(VarConverter):
