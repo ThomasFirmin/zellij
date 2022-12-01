@@ -139,7 +139,7 @@ class DAC(Metaheuristic):
         #############
 
         # Save f_calls from metaheuristic, to adapt them during DAC.
-        if self.exploitation:
+        if self.exploration:
             self.explor_calls = [i.f_calls for i in self.exploration]
         else:
             self.explor_calls = None
@@ -202,6 +202,7 @@ class DAC(Metaheuristic):
                         opti_idx = (
                             np.min([child.level, len(self.exploration)]) - 1
                         )
+
                         calls_left = np.min(
                             [
                                 self.explor_calls[opti_idx],
@@ -378,7 +379,7 @@ class DAC(Metaheuristic):
             f"Explored {self.search_space.__class__.__name__}: {self.n_h}"
         )
         logger.info(f"Best score: {self.search_space.loss.best_score}")
-        logger.info(f"Best solution: {self.search_space.loss.best_sol}")
+        logger.info(f"Best solution: {self.search_space.loss.best_point}")
 
         self.close_bar()
 
