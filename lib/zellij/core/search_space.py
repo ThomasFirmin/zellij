@@ -239,6 +239,9 @@ class Searchspace(ABC):
 
         return sp
 
+    def __len__(self):
+        return len(self.values)
+
     def show(self, X, Y, save=False, path=""):
 
         """show(X, Y, save=False, path="")
