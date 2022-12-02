@@ -8,7 +8,6 @@ import copy
 import logging
 
 from zellij.core.addons import VarAddon
-from zellij.core.node import AdjMatrix, fill_adj_matrix
 
 logger = logging.getLogger("zellij.variables")
 logger.setLevel(logging.INFO)
@@ -898,54 +897,3 @@ class Constant(Variable):
 
     def __repr__(self):
         return super(Constant, self).__repr__() + f"{self.value})"
-
-# Directed Acyclic Graph represented by adjacency matrix for NAS
-class AdjMatrixVariable(Variable):
-    def __init__(self, label, operations, **kwargs):
-        assert isinstance(operations, DynamicBlock), f"""
-        Operations must inherit from `DynamicBlock`, got {operations}
-        """
-        self.operations = operations
-        self.max_size = operations.repeat
-        super(AdjMatrixVariable, self).__init__(label, **kwargs)
-
-    def random(self, size=1):
-        """random(size=1)
-            Parameters
-            ----------
-            size : int, default=None
-                Number of draws.
-
-            Returns AdjMatrix
-            ---------
-        """
-        operations = self.operations.random()
-        operations = [['Input']] + operations
-        matrix = np.random.randint(0, 2, (len(operations), len(operations)))
-        matrix = np.triu(matrix, k=1)
-        matrix = fill_adj_matrix(matrix)
-        adj_matrix = AdjMatrix(operations, matrix)
-        return adj_matrix
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: False
-            Return False, a dynamic block cannot be constant. (It is a binary)
-
-        """
-        return False
-
-    def subset(self, lower, upper):
-        new_values = self.operations.subset(lower, upper)
-        return AdjMatrixVariable(self.label, new_values)
-
-    def __repr__(self):
-        return (
-                super(AdjMatrixVariable, self).__repr__()
-                + f"\
-        \t- Operations:\n"
-                + self.operations.__repr__()
-        )
