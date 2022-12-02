@@ -6,7 +6,8 @@
 # @Last modified time: 2022-06-09T15:06:43+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 # @Copyright: Copyright (C) 2022 Thomas Firmin
-
+import random
+import time
 
 from zellij.core.metaheuristic import Metaheuristic
 from zellij.core.addons import Mutator, Selector, Crossover
@@ -97,7 +98,6 @@ class Genetic_algorithm(Metaheuristic):
     >>> ga.run()
     >>> ga.show()
 
-
     .. image:: ../_static/ga_sp_ex.png
         :width: 924px
         :align: center
@@ -122,9 +122,11 @@ class Genetic_algorithm(Metaheuristic):
         pop_size=10,
         generation=1000,
         elitism=0.5,
+        random=0,
         filename="",
         verbose=True,
-        ind_init=None
+        ind_init=None,
+        best_selection=None
     ):
 
         """__init__(search_space, f_calls, pop_size = 10, generation = 1000, verbose=True)
@@ -183,7 +185,10 @@ class Genetic_algorithm(Metaheuristic):
         self.pop_size = pop_size
         self.generation = generation
         self.elitism = elitism
-
+        self.random = random
+        if best_selection is None:
+            best_selection = tools.selBest
+        self.best_selection = best_selection
         self.pop_historic = []
         self.fitness_historic = []
 
@@ -327,9 +332,11 @@ class Genetic_algorithm(Metaheuristic):
 
         # Create a tool to select best individuals from a population
         bpn = int(self.pop_size * self.elitism)
+        rcn = int(self.pop_size * self.random)
         bcn = self.pop_size - bpn
-        toolbox.register("best_p", tools.selBest, k=bpn)
-        toolbox.register("best_c", tools.selBest, k=bcn)
+        toolbox.register("best_p", self.best_selection, k=bpn)
+        toolbox.register("best_c", self.best_selection, k=bcn)
+        toolbox.register("best_pop", self.best_selection, k=self.pop_size - rcn)
 
         best_of_all = tools.HallOfFame(n_process)
 
@@ -396,6 +403,9 @@ class Genetic_algorithm(Metaheuristic):
             logger.debug("Selection...")
 
             offspring = self.search_space.selection(pop, k=len(pop))
+
+            offspring = toolbox.best_pop(pop) + toolbox.population(n=rcn)
+            random.shuffle(offspring)
 
             children = []
 

@@ -17,7 +17,6 @@ from zellij.core.variables import (
     ArrayVar,
     Block,
     DynamicBlock,
-    DAGraphVariable,
     AdjMatrixVariable
 )
 import numpy as np
@@ -254,56 +253,6 @@ class AdjMatrixInterval(VarNeighborhood):
                 inter.matrix[i, i + 1:] = new_row
             inter.matrix[-2, -1] = 1
         return inter
-
-
-class DAGraphInterval(VarNeighborhood):
-
-    def __init__(self, neighborhood=None, variable=None):
-        super(DAGraphInterval, self).__init__(variable)
-        self._neighborhood = neighborhood
-
-    def __call__(self, value, size=1):
-        if size == 1:
-            inter = value.copy()
-            variables_idx = list(set(np.random.choice(range(1, len(inter.nodes)), size=self._neighborhood)))
-            for i in variables_idx:
-                if inter.nodes[i].operation != ['Input']:
-                    new_ops = self.target.operations.value.neighbor(inter.nodes[i].operation)
-                    inter.nodes[i].operation = new_ops
-            return inter
-        else:
-            res = []
-
-            for _ in range(size):
-                inter = value.copy()
-                variables_idx = list(set(np.random.choice(range(1, len(inter.nodes)), size=self._neighborhood)))
-                for i in variables_idx:
-                    if inter.nodes[i].operation != ['Input']:
-                        inter.nodes[i].operation = self.target.operations.value.neighbor(inter.nodes[i].operation)
-                res.append(inter)
-            return res
-
-    @VarNeighborhood.neighborhood.setter
-    def neighborhood(self, neighborhood=None):
-        if isinstance(neighborhood, list):
-            self._neighborhood = neighborhood[0]
-            self.target.operations.value.neighborhood = neighborhood
-        else:
-            self._neighborhood = neighborhood
-
-    @VarNeighborhood.target.setter
-    def target(self, variable):
-        assert isinstance(variable, DAGraphVariable) or variable is None, logger.error(
-            f"Target object must be a `DAGraphVariable` for {self.__class__.__name__},\
-             got {variable}"
-        )
-        self._target = variable
-
-        if variable is not None:
-            assert hasattr(self.target.operations.value, "neighbor"), logger.error(
-                f"To use `DAGraphVariable`, value for operations for `DAGraphVariable` must have a `neighbor` method. "
-                f"Use `neighbor` kwarg when defining a variable "
-            )
 
 
 class DynamicInterval(VarNeighborhood):

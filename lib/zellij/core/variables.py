@@ -8,7 +8,7 @@ import copy
 import logging
 
 from zellij.core.addons import VarAddon
-from zellij.core.node import Node, DAGraph, AdjMatrix, fill_adj_matrix
+from zellij.core.node import AdjMatrix, fill_adj_matrix
 
 logger = logging.getLogger("zellij.variables")
 logger.setLevel(logging.INFO)
@@ -945,87 +945,6 @@ class AdjMatrixVariable(Variable):
     def __repr__(self):
         return (
                 super(AdjMatrixVariable, self).__repr__()
-                + f"\
-        \t- Operations:\n"
-                + self.operations.__repr__()
-        )
-
-
-# Directed Acyclic Graph for NAS.
-class DAGraphVariable(Variable):
-    def __init__(self, label, operations, **kwargs):
-        assert isinstance(operations, DynamicBlock) ,f"""
-        Operations must inherit from `DynamicBlock`, got {operations}
-        """
-        self.operations = operations
-        super(DAGraphVariable, self).__init__(label, **kwargs)
-
-
-    def random(self, size=1):
-        """random(size=1)
-
-        Parameters
-        ----------
-        size : int, default=None
-            Number of draws.
-
-        Returns DAGraph
-        ---------
-        >>> from zellij.core.variables import DynamicBlock, ArrayVar, IntVar, FloatVar, CatVar, DAGraphVariable
-        >>> layer1 = ArrayVar("Layer1", CatVar("Operation", ['LSTM', 'Dense']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']))
-        ... layer2 = ArrayVar("Layer2", CatVar("Operation", ['CNN']), IntVar("N neurons", 1, 100), CatVar("Activation", ['gelu', 'relu']), IntVar("Filter", 1, 3))
-        ... layer3 = ArrayVar("Layer3", CatVar("Operation", ['Id', 'Zero']))
-        ... operations = CatVar("Candidates", [layer1, layer2, layer3])
-        ... ops = DynamicBlock('Nodes', operations, 4)
-        ... dag = DAGraphVariable("dag1", ops)
-        >>> print(dag)
-        DAGraphVariable(dag1,
-        - Operations:
-        DynamicBlock(Nodes, CatVar(Candidates,
-        [ArrayVar(Layer1, [CatVar(Operation, ['LSTM', 'Dense']),IntVar(N neurons, [1;100]),
-            CatVar(Activation, ['gelu', 'relu'])]),
-        ArrayVar(Layer2, [CatVar(Operation, ['CNN']),IntVar(N neurons, [1;100]),CatVar(Activation, ['gelu', 'relu']),
-            IntVar(Filter, [1;3])]),
-        ArrayVar(Layer3, [CatVar(Operation, ['Id', 'Zero'])])])
-        >>> print(dag.random())
-        ['Input'] -> [['LSTM', 42, 'gelu']]
-        ['LSTM', 42, 'gelu'] -> []
-        """
-        operations = self.operations.random()
-        operations = [['Input']] + operations
-        nodes = np.empty(len(operations), dtype=np.dtype(Node))
-        connections = [[] for _ in range(len(operations))]
-        for i in range(1, len(operations)):
-            parents_ids = list(set(random.choices(range(i), k=i)))
-            for p in parents_ids:
-                connections[p].append(i)
-        n = len(connections)
-        for i in range(len(connections) - 1):
-            if len(connections[i]) == 0:
-                connections[i] = list(set(random.choices(range(i+1, n), k=n - i)))
-        for i in range(len(connections) - 1, -1, -1):
-            nodes[i] = Node(operations[i], [nodes[o] for o in connections[i]])
-        graph = DAGraph(nodes.tolist())
-        return graph
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: False
-            Return False, a dynamic block cannot be constant. (It is a binary)
-
-        """
-        return False
-
-    def subset(self, lower, upper):
-        new_values = self.operations.subset(lower, upper)
-        return DAGraphVariable(self.label, new_values)
-
-    def __repr__(self):
-        return (
-                super(DAGraphVariable, self).__repr__()
                 + f"\
         \t- Operations:\n"
                 + self.operations.__repr__()
