@@ -17,8 +17,8 @@ class Addon(ABC):
     """Addon
 
     Abstract class describing what an addon is.
-    An `Addon` in Zellij, is an additionnal feature that can be added to a
-    `target` object. See :ref:`varadd` for addon targeting :ref:`var` or
+    An :code:`Addon` in Zellij, is an additionnal feature that can be added to a
+    :code:`target` object. See :ref:`varadd` for addon targeting :ref:`var` or
     :ref:`spadd` targeting :ref:`sp`.
 
     Parameters
@@ -145,7 +145,7 @@ class Neighborhood(SearchspaceAddon):
         return self._neighborhood
 
     @abstractmethod
-    def get_neighbor(self, point, size=1):
+    def __call__(self, point, size=1):
         pass
 
 
