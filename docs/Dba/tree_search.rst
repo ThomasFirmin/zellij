@@ -4,7 +4,7 @@
 Tree search algorithms
 ======================
 
-.. automodule:: zellij.strategies.utils.tree_search
+.. automodule:: zellij.strategies.tools.tree_search
    :members: Tree_search
    :undoc-members:
    :show-inheritance:
@@ -15,7 +15,7 @@ Tree search algorithms
 Basics
 ******
 
-.. automodule:: zellij.strategies.utils.tree_search
+.. automodule:: zellij.strategies.tools.tree_search
    :members: Breadth_first_search, Depth_first_search, Best_first_search
    :undoc-members:
    :show-inheritance:
@@ -25,7 +25,7 @@ Basics
 Advanced
 ********
 
-.. automodule:: zellij.strategies.utils.tree_search
+.. automodule:: zellij.strategies.tools.tree_search
    :members: Epsilon_greedy_search, Diverse_best_first_search
    :undoc-members:
    :show-inheritance:
@@ -35,7 +35,7 @@ Advanced
 Prunning
 ********
 
-.. automodule:: zellij.strategies.utils.tree_search
+.. automodule:: zellij.strategies.tools.tree_search
   :members: Beam_search, Cyclic_best_first_search
   :undoc-members:
   :show-inheritance:
@@ -45,7 +45,7 @@ Prunning
 Miscellaneous
 *************
 
-.. automodule:: zellij.strategies.utils.tree_search
+.. automodule:: zellij.strategies.tools.tree_search
   :members: Potentially_Optimal_Rectangle, Locally_biased_POR, Adaptive_POR, Soo_tree_search, Move_up
   :undoc-members:
   :show-inheritance:

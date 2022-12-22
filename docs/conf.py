@@ -12,7 +12,6 @@
 
 import os
 import sys
-import sphinx_rtd_theme
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -31,7 +30,7 @@ copyright = "2022, Thomas Firmin"
 author = "Thomas Firmin"
 
 # The full version, including alpha/beta/rc tags
-release = "0.0.2"
+release = "1.0.0"
 
 
 # -- General configuration ---------------------------------------------------
@@ -41,36 +40,44 @@ release = "0.0.2"
 # ones.
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "sphinx.ext.mathjax",
     "sphinx.ext.imgmath",
     "sphinx_rtd_theme",
-    "sphinx.ext.napoleon",
     "sphinx_copybutton",
-    "sphinx_tabs.tabs",
-    "sphinx_panels",
-    "sphinx.ext.mathjax",
+    "sphinx_togglebutton",
 ]
-
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = ["*/tests", "setup.py", "test_*.py"]
-
+exclude_patterns = [
+    "*/tests",
+    "setup.py",
+    "test_*.py",
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "**.ipynb_checkpoints",
+]
 
 # -- Options for HTML output -------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
-html_logo = "logo_5st.png"
+html_theme = "sphinx_book_theme"
+html_title = ""
+html_logo = "zellij_logo.png"
 html_theme_options = {
-    "logo_only": True,
-    "display_version": True,
+    "repository_url": "https://github.com/ThomasFirmin/zellij",
+    "use_repository_button": True,
     "collapse_navigation": False,
+    "logo_only": True,
+    "extra_navbar": f"<p>Version: {release}</p>",
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -83,3 +90,28 @@ html_static_path = ["_static"]
 add_module_names = False
 
 autodoc_member_order = "bysource"
+
+
+def setup(app):
+    # -- To demonstrate ReadTheDocs switcher -------------------------------------
+    # This links a few JS and CSS files that mimic the environment that RTD uses
+    # so that we can test RTD-like behavior. We don't need to run it on RTD and we
+    # don't wanted it loaded in GitHub Actions because it messes up the lighthouse
+    # results.
+    if not os.environ.get("READTHEDOCS") and not os.environ.get(
+        "GITHUB_ACTIONS"
+    ):
+        app.add_css_file(
+            "https://assets.readthedocs.org/static/css/readthedocs-doc-embed.css"
+        )
+        app.add_css_file(
+            "https://assets.readthedocs.org/static/css/badge_only.css"
+        )
+
+        # Create the dummy data file so we can link it
+        # ref: https://github.com/readthedocs/readthedocs.org/blob/bc3e147770e5740314a8e8c33fec5d111c850498/readthedocs/core/static-src/core/js/doc-embed/footer.js  # noqa: E501
+        app.add_js_file("rtd-data.js")
+        app.add_js_file(
+            "https://assets.readthedocs.org/static/javascript/readthedocs-doc-embed.js",
+            priority=501,
+        )

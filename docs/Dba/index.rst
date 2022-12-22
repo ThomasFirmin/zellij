@@ -4,7 +4,7 @@ Decomposition algorithm
 
 .. toctree::
 
-   dac
+   dba
    geometry
    tree_search
-   heuristics
+   scoring

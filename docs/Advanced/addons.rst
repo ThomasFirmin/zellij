@@ -12,34 +12,35 @@ Known kwargs are:
 
 * For :ref:`sp`:
 
-  * to_continuous: used in algorithms using continuous :ref:`sp`, when the given :ref:`sp` is not continuous.
+  * :code:`to_continuous`: used in algorithms using continuous :ref:`sp`, when the given :ref:`sp` is not continuous.
 
-  * to_discrete: used in algorithms using discrete :ref:`sp`, when the given :ref:`sp` is not discrete.
+  * :code:`to_discrete`: used in algorithms using discrete :ref:`sp`, when the given :ref:`sp` is not discrete.
 
-  * distance: used in algorithms where a distance is needed.
+  * :code:`distance`: used in algorithms where a distance is needed.
 
-  * neighbor: used in algorithms using neighborhood between points.
+  * :code:`neighbor`: used in algorithms using neighborhood between points.
 
-  * mutation: used in :ref:`ga`.
+  * :code:`mutation`: used in :ref:`ga`.
 
-  * selection: used in :ref:`ga`.
+  * :code:`selection`: used in :ref:`ga`.
 
-  * crossover: used in :ref:`ga`.
+  * :code:`crossover`: used in :ref:`ga`.
 
 
 * For :ref:`var`:
 
-  * to_continuous: used by the to_continuous :ref:`spadd`.
+  * :code:`to_continuous`: used by the to_continuous :ref:`spadd`.
 
-  * to_discrete: used by the to_discrete :ref:`spadd`.
+  * :code:`to_discrete`: used by the to_discrete :ref:`spadd`.
 
-  * neighbor: Defines what is a neighbor for a given :ref:`var`. It uses the neighbor :ref:`spadd`.
+  * :code:`neighbor`: Defines what is a neighbor for a given :ref:`var`. It uses the neighbor :ref:`spadd`.
 
 
 .. automodule:: zellij.core.addons
    :members: Addon
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
 .. _varadd:
 
@@ -51,6 +52,7 @@ Variable Addon
    :members: VarAddon
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
 **********
 Subclasses
@@ -59,6 +61,7 @@ Subclasses
   :members: VarNeighborhood, VarConverter
   :undoc-members:
   :show-inheritance:
+  :noindex:
 
 .. _spadd:
 
@@ -70,6 +73,7 @@ Search space Addon
    :members: SearchspaceAddon
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
 **********
 Subclasses
@@ -79,6 +83,7 @@ Subclasses
    :members: Neighborhood, Converter, Operator, Mutator, Crossover, Selector, Distance
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
 
 ########
@@ -87,6 +92,7 @@ See also
 
 Many addons are linked to metaheuristics.
 See:
+
   * :ref:`gaadd`
   * :ref:`nbh`
   * :ref:`dist`

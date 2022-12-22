@@ -5,6 +5,7 @@
 
   ../Welcome/index
   ../Quickstart/index
+..
   ../Organisation/index
 
 .. toctree::
@@ -13,6 +14,7 @@
   :hidden:
 
   ../Core/index
+..
   ../Build_meta/index
 
 
@@ -23,6 +25,8 @@
   :hidden:
 
   ../Strategies/index
+
+..
   ../Plotting/index
 
 .. toctree::
@@ -33,11 +37,11 @@
   ../Advanced/index
 
 .. toctree::
-  :caption: Divide-and-conquer
+  :caption: Decomposition based
   :maxdepth: 2
   :hidden:
 
-  ../Dac/index
+  ../Dba/index
 
 .. toctree::
   :caption: Examples
@@ -46,9 +50,10 @@
 
   ../Examples/index
 
-.. toctree::
-  :caption: Developer's guide
-  :maxdepth: 2
-  :hidden:
+..
+  .. toctree::
+    :caption: Developer's guide
+    :maxdepth: 2
+    :hidden:
 
-  ../Dev_guide/index
+    ../Dev_guide/index

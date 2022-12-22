@@ -1,11 +1,11 @@
-.. _heuristic:
+.. _scoring:
 
 ===============
 Scoring methods
 ===============
 
-.. automodule:: zellij.strategies.utils.heuristics
-   :members: Heuristic
+.. automodule:: zellij.strategies.tools.scoring
+   :members: Scoring
    :undoc-members:
    :show-inheritance:
    :noindex:
@@ -15,7 +15,7 @@ Scoring methods
 Basics
 ******
 
-.. automodule:: zellij.strategies.utils.heuristics
+.. automodule:: zellij.strategies.tools.scoring
    :members: Min, Median, Mean, Std
    :undoc-members:
    :show-inheritance:
@@ -25,7 +25,7 @@ Basics
 Fuzzy measure
 *************
 
-.. automodule:: zellij.strategies.utils.heuristics
+.. automodule:: zellij.strategies.tools.scoring
   :members: Belief
   :undoc-members:
   :show-inheritance:
@@ -35,7 +35,7 @@ Fuzzy measure
 Miscellaneous
 *************
 
-.. automodule:: zellij.strategies.utils.heuristics
+.. automodule:: zellij.strategies.tools.scoring
   :members: Distance_to_the_best, Distance_to_the_best_corrected
   :undoc-members:
   :show-inheritance:

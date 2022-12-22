@@ -4,12 +4,17 @@
 Variables
 ============
 
+******************
+Abstract variables
+******************
+
 :ref:`var` functionnalities can be extended with :ref:`addons`.
 
 .. automodule:: zellij.core.variables
    :members: Variable
    :undoc-members:
    :show-inheritance:
+   :noindex:
 
 **************
 Base variables
