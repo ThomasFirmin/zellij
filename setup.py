@@ -61,8 +61,6 @@ setuptools.setup(
         "DEAP>=1.3.1",
         "botorch>=0.6.3.1",
         "gpytorch>=1.6.0",
-        "matplotlib>=3.5.0",
-        "seaborn>=0.11.2",
         "pandas>=1.3.4",
         "enlighten>=1.10.2",
     ],
