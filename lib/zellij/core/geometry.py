@@ -13,15 +13,15 @@ import copy
 
 import time
 
-from zellij.strategies.utils.spoke_dart import (
+from zellij.strategies.tools.spoke_dart import (
     randomMuller,
     Hyperplane,
     HalfLine,
 )
-from zellij.strategies.utils.heuristics import Min
+from zellij.strategies.tools.scoring import Min
 from zellij.core.search_space import Searchspace
 from zellij.core.variables import FloatVar, Constant
-from zellij.strategies.utils.direct_utils import SigmaInf
+from zellij.strategies.tools.direct_utils import SigmaInf
 
 import logging
 
@@ -31,21 +31,12 @@ logger = logging.getLogger("zellij.geometry")
 class Fractal(Searchspace):
     """Fractal
 
-    Fractal is an abstract class used in DAC.
+    Fractal is an abstract class used in DBA.
     This class is used to build a new kind of search space.
     Fractals are constrained continuous subspaces.
 
     Attributes
     ----------
-
-    lo_bounds : list[float]
-        Contains the lower bounds for each dimension of the fractal.
-        Each fractal is bounded by its circumscribed hypercube.
-
-    up_bounds : list[float]
-        Contains the upper bounds for each dimension of the fractal.
-        Each fractal is bounded by its circumscribed hypercube.
-
     id : int
         Identifier of a fractal.
 
@@ -61,18 +52,6 @@ class Fractal(Searchspace):
 
     level : int
         Current level of the fractal in the partition tree. See Tree_search.
-
-    min_score : {float, int}
-        Score associated to the best found solution inside the fractal
-
-    best_sol : list[{float, int, str}]
-        Best solution found inside the fractal in its mixed format.
-
-    all_solutions : float
-        Historic of all evaluated solutions inside the fractal.
-
-    all_scores : float
-        Historic of all evaluated scores inside the fractal.
 
     See Also
     --------
@@ -649,6 +628,7 @@ class Section(Fractal):
         self.longest = np.argmax(up_m_lo)
         self.width = up_m_lo[self.longest]
         self.center = up_m_lo / 2
+        self.length = self.width
 
     def create_children(self):
         """create_children()
@@ -1111,6 +1091,7 @@ class Soo(Fractal):
         self.longest = np.argmax(up_m_lo)
         self.width = up_m_lo[self.longest]
         self.center = (self.lo_bounds + self.up_bounds) * 0.5
+        self.length = self.width
 
         if self.level == 0:
             if self.to_convert:
