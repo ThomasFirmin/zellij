@@ -14,7 +14,6 @@
 [![Documentation Status](https://readthedocs.org/projects/zellij/badge/?version=latest)](https://zellij.readthedocs.io/en/latest/?badge=latest)
 [![GitHub latest commit](https://badgen.net/github/last-commit/Naereen/Strapdown.js)](https://GitHub.com/Naereen/StrapDown.js/commit/)
 ![Maintainer](https://img.shields.io/badge/maintainer-T.Firmin-blue)
-![Python](https://img.shields.io/badge/python-3670A0?style=for-the-badge&logo=python&logoColor=ffdd54)
 
 
 **Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Fractal Decomposition based algorithms* [[1]](#1) [[2]](#2).
