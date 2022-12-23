@@ -1,7 +1,6 @@
 numpydoc
+sphinx-togglebutton
 sphinx-copybutton
-sphinx-tabs
-sphinx-panels
 sphinx-rtd-theme
 pillow>=6.2.0
 -e .[docs]
