@@ -38,6 +38,14 @@ Concrete loss
   :show-inheritance:
   :noindex:
 
+Mock Model
+----------
+.. automodule:: zellij.core.loss_func
+  :members: MockModel
+  :undoc-members:
+  :show-inheritance:
+  :noindex:
+  
 .. _objective:
 
 =========
