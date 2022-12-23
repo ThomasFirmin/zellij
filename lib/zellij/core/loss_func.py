@@ -37,11 +37,8 @@ class LossFunc(ABC):
     :math:`f(x)=results,model` for example.
     Where:
 
-    * :math:`results` can be a `list <https://docs.python.org/3/tutorial/datastructures.html#more-on-lists>`_ or a `dictionary <https://docs.python.org/3/tutorial/datastructures.html#dictionaries>`_.
-    Be default the first element of the list or the dictionary is considered as
-    the loss vale.
-    * :math:`model` is optionnal, it is an object with a
-    *save()* method. (e.g. a neural network from Tensorflow)
+        * :math:`results` can be a `list <https://docs.python.org/3/tutorial/datastructures.html#more-on-lists>`__ or a `dictionary <https://docs.python.org/3/tutorial/datastructures.html#dictionaries>`__. Be default the first element of the list or the dictionary is considered as the loss vale.
+        * :math:`model` is optionnal, it is an object with a save() method. (e.g. a neural network from Tensorflow)
 
     You must wrap your function so it can be used in Zellij by adding
     several features, such as calls count, saves, parallelization, historic...
@@ -52,7 +49,7 @@ class LossFunc(ABC):
         Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x`
         must be a solution. A solution can be a list of float, int...
         It can also be of mixed types...
-    objective : Objective, default=Minimizer()
+    objective : Objective, default=Minimizer
         Objectve object determines what and and how to optimize.
         (minimization, maximization, ratio...)
     best_score : float
@@ -78,7 +75,7 @@ class LossFunc(ABC):
     def __init__(
         self,
         model,
-        objective=Minimizer(),
+        objective=Minimizer,
         historic=True,
         save=False,
         verbose=True,
@@ -95,7 +92,7 @@ class LossFunc(ABC):
             :math:`x` must be a solution.
             A solution can be a list of float, int...
             It can also be of mixed types...
-        objective : Objective, default=Minimizer()
+        objective : Objective, default=Minimizer
             Objectve object determines what and and how to optimize.
             (minimization, maximization, ratio...)
         save : string
@@ -113,7 +110,11 @@ class LossFunc(ABC):
         ##############
 
         self.model = model
-        self.objective = objective
+        if isinstance(objective, type):
+            self.objective = objective()
+        else:
+            self.objective = objective
+
         self.historic = historic
         self.save = save
         self.only_score = only_score
@@ -189,8 +190,8 @@ class LossFunc(ABC):
 
         Private abstract method to save a model.
         Be carefull, to be exploitable, the initial loss func must be of form
-        :math:`f(x) = (y, model)`, `y` are the results of the evaluation of `x`
-        by `f`. `model` is optional, if you want to save the best model
+        :math:`f(x) = (y, model)`, :math:`y` are the results of the evaluation of :math:`x`
+        by :math:`f`. :math:`model` is optional, if you want to save the best model
         found (e.g. a neural network) you can return the model.
         However the model must have a "save" method with a filename.
         (e.g. model.save(filename)).
@@ -323,7 +324,7 @@ class LossFunc(ABC):
     def _save_best(self, x, y):
         """_save_best(x, y)
 
-        Save point x with score y, and verify if this point is the best found so far.
+        Save point :code:`x` with score :code:`y`, and verify if this point is the best found so far.
 
         Parameters
         ----------
@@ -399,7 +400,7 @@ class LossFunc(ABC):
     def reset(self):
         """reset()
 
-        Reset all attributes of `LossFunc` at their initial values.
+        Reset all attributes of :code:`LossFunc` at their initial values.
 
         """
 
@@ -438,10 +439,9 @@ class MPILoss(LossFunc):
 
     """MPILoss
 
-    MPILoss allows to wrap function of type f(x)=(y, model).
-    MPILoss adds method to distribute dynamically the evaluation
+    MPILoss adds method to dynamically distribute the evaluation
     of multiple solutions within a distributed environment, where a version of
-    `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`_
+    `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`__
     is available.
 
     Attributes
@@ -481,7 +481,7 @@ class MPILoss(LossFunc):
     def __init__(
         self,
         model,
-        objective=Minimizer(),
+        objective=Minimizer,
         historic=True,
         save=False,
         verbose=True,
@@ -533,7 +533,7 @@ class MPILoss(LossFunc):
 
         """__call__(X, label=[], **kwargs)
 
-        Evaluate a list X of solutions with the original loss function.
+        Evaluate a list :code:`X` of solutions with the original loss function.
 
         Parameters
         ----------
@@ -726,8 +726,8 @@ class MPILoss(LossFunc):
         """_save_model(score, source)
 
         Be carefull, to be exploitable, the initial loss func must be of form
-        :math:`f(x) = (y, model)`, `y` are the results of the evaluation of `x`
-        by `f`. `model` is optional, if you want to save the best model
+        :math:`f(x) = (y, model)`, :math:`y` are the results of the evaluation of :math:`x`
+        by :math:`f`. :math:`model` is optional, if you want to save the best model
         found (e.g. a neural network) you can return the model.
         However the model must have a "save" method with a filename.
         (e.g. model.save(filename)).
@@ -759,7 +759,6 @@ class SerialLoss(LossFunc):
 
     """SerialLoss
 
-    SerialLoss allows to wrap function of type f(x)=(y, model).
     SerialLoss adds methods to save and evaluate the original loss function.
 
     Methods
@@ -781,7 +780,7 @@ class SerialLoss(LossFunc):
     def __init__(
         self,
         model,
-        objective=Minimizer(),
+        objective=Minimizer,
         historic=True,
         save=False,
         verbose=True,
@@ -870,7 +869,7 @@ class SerialLoss(LossFunc):
 # Wrap different loss functions
 def Loss(
     model=None,
-    objective=Minimizer(),
+    objective=Minimizer,
     historic=True,
     save=False,
     verbose=True,
@@ -880,7 +879,7 @@ def Loss(
 ):
     """Loss(model=None, save=False, verbose=True, MPI=False)
 
-    Wrap a function of type :math:`f(x)=y`. See `LossFunc` for more info.
+    Wrap a function of type :math:`f(x)=y`. See :code:`LossFunc` for more info.
 
     Parameters
     ----------
@@ -888,7 +887,7 @@ def Loss(
         Function of type f(x)=y. x must be a solution.
         A solution can be a list of float, int...
         It can also be of mixed types, containing, strings, float, int...
-    objective : Objective, default=Minimizer()
+    objective : Objective, default=Minimizer
         Objectve object determines what and and how to optimize.
         (minimization, maximization, ratio...)
     save : string, optional
@@ -969,8 +968,9 @@ class MockModel(object):
     return_format : string
         Output format.
         It can be:
-            - "dict" -> {"o1":value1,"o2":value2,...}
-            - "list" -> [value1,value2,...]
+
+            * "dict" -> {"o1":value1,"o2":value2,...}
+            * "list" -> [value1,value2,...]
 
     return_model : boolean
         Return MockModel (self) or not.
@@ -1025,7 +1025,6 @@ class MockModel(object):
                 print(f"\nI am Mock !\n\t->saving in {filename}")
 
     def __call__(self, *args, **kwargs):
-
         if self.verbose:
             print(f"\nI am Mock !\n\t->*args: {args}\n\t->**kwargs: {kwargs}")
 
