@@ -3,7 +3,7 @@
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
 # @Last modified by:   tfirmin
-# @Last modified time: 2022-12-23T14:32:07+01:00
+# @Last modified time: 2022-12-23T14:48:07+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
 
@@ -203,7 +203,9 @@ class Bayesian_optimization(Metaheuristic):
                 algorithm="BO",
                 acquisition=0,
             )
-        train_obj = torch.tensor(res).unsqueeze(-1)  # add output dimension
+
+        # add output dimension
+        train_obj = torch.tensor(res).unsqueeze(-1).double()
 
         return train_x, train_obj
 
