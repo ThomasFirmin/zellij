@@ -8,6 +8,10 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+import logging
+
+logger = logging.getLogger("zellij.direct_utils")
+
 
 class Direct_size(ABC):
     @abstractmethod

@@ -10,11 +10,15 @@
 import numpy as np
 from abc import ABC, abstractmethod
 
+import logging
 
-class Heuristic(ABC):
-    """Heuristic
+logger = logging.getLogger("zellij.scoring")
 
-    Heuristic is an abstract class defining the scoring method of DAC.
+
+class Scoring(ABC):
+    """Scoring
+
+    Scoring is an abstract class defining the scoring method of DAC.
     It is similar to an acquisition function in BO. According to sampled points,
     it gives a score to a :ref:`frac`, which determines how promising it is.
 
@@ -28,7 +32,7 @@ class Heuristic(ABC):
         pass
 
 
-class Min(Heuristic):
+class Min(Scoring):
     """Min
 
     Returns
@@ -45,8 +49,8 @@ class Min(Heuristic):
         search_space : Searchspace
             Search space object containing bounds of the search space.
         indexes : {int,slice}
-            Indexes of the scores, saved in `loss.all_scores`
-            used when computing heuristic.
+            Indexes of the scores, saved in :code:`loss.all_scores`
+            used when computing score.
 
         Returns
         -------
@@ -57,7 +61,7 @@ class Min(Heuristic):
         return np.min(search_space.loss.all_scores[indexes])
 
 
-class Median(Heuristic):
+class Median(Scoring):
     """Median
 
     Returns
@@ -74,8 +78,8 @@ class Median(Heuristic):
         search_space : Searchspace
             Search space object containing bounds of the search space.
         indexes : {int,slice}
-            Indexes of the scores, saved in `loss.all_scores`
-            used when computing heuristic.
+            Indexes of the scores, saved in :code:`loss.all_scores`
+            used when computing score.
 
         Returns
         -------
@@ -86,7 +90,7 @@ class Median(Heuristic):
         return np.median(search_space.loss.all_scores[indexes])
 
 
-class Mean(Heuristic):
+class Mean(Scoring):
     """Mean
 
     Returns
@@ -103,8 +107,8 @@ class Mean(Heuristic):
         search_space : Searchspace
             Search space object containing bounds of the search space.
         indexes : {int,slice}
-            Indexes of the scores, saved in `loss.all_scores`
-            used when computing heuristic.
+            Indexes of the scores, saved in :code:`loss.all_scores`
+            used when computing score.
 
         Returns
         -------
@@ -112,10 +116,10 @@ class Mean(Heuristic):
             Mean score found.
 
         """
-        return np.mean(loss.all_scores[indexes])
+        return np.mean(search_space.loss.all_scores[indexes])
 
 
-class Std(Heuristic):
+class Std(Scoring):
     """Std
 
     Standard deviation
@@ -134,8 +138,8 @@ class Std(Heuristic):
         search_space : Searchspace
             Search space object containing bounds of the search space.
         indexes : {int,slice}
-            Indexes of the scores, saved in `loss.all_scores`
-            used when computing heuristic.
+            Indexes of the scores, saved in :code:`loss.all_scores`
+            used when computing score.
 
         Returns
         -------
@@ -146,7 +150,7 @@ class Std(Heuristic):
         return np.std(search_space.loss.all_scores[indexes])
 
 
-class Distance_to_the_best(Heuristic):
+class Distance_to_the_best(Scoring):
     """Distance_to_the_best
 
     Returns
@@ -164,8 +168,8 @@ class Distance_to_the_best(Heuristic):
             search_space : Searchspace
                 Search space object containing bounds of the search space.
             indexes : {int,slice}
-                Indexes of the scores, saved in `loss.all_scores`
-                used when computing heuristic.
+                Indexes of the scores, saved in :code:`loss.all_scores`
+                used when computing score.
 
             Returns
             -------
@@ -176,7 +180,7 @@ class Distance_to_the_best(Heuristic):
 
         if search_space.to_convert:
             best_ind = search_space.convert.to_continuous(
-                search_space.loss.best_sol, sub_values=True
+                search_space.loss.best_point, sub_values=True
             )
 
             return -np.max(
@@ -196,7 +200,7 @@ class Distance_to_the_best(Heuristic):
                 )
             )
         else:
-            best_ind = search_space.loss.best_sol
+            best_ind = search_space.loss.best_point
             res = -np.max(
                 np.array(search_space.loss.all_scores[indexes])
                 / (
@@ -211,7 +215,7 @@ class Distance_to_the_best(Heuristic):
             return res
 
 
-class Distance_to_the_best_corrected(Heuristic):
+class Distance_to_the_best_corrected(Scoring):
     """Distance_to_the_best_corrected
 
     Returns
@@ -228,8 +232,8 @@ class Distance_to_the_best_corrected(Heuristic):
         search_space : Searchspace
             Search space object containing bounds of the search space.
         indexes : {int,slice}
-            Indexes of the scores, saved in `loss.all_scores`
-            used when computing heuristic.
+            Indexes of the scores, saved in :code:`loss.all_scores`
+            used when computing score.
 
         Returns
         -------
@@ -239,7 +243,7 @@ class Distance_to_the_best_corrected(Heuristic):
         """
         if search_space.to_convert:
             best_ind = search_space.convert.to_continuous(
-                search_space.loss.best_sol, sub_values=True
+                search_space.loss.best_point, sub_values=True
             )
 
             return np.min(
@@ -262,7 +266,7 @@ class Distance_to_the_best_corrected(Heuristic):
                 )
             )
         else:
-            best_ind = search_space.loss.best_sol
+            best_ind = search_space.loss.best_point
             res = np.min(
                 (
                     np.array(search_space.loss.all_scores[indexes])
@@ -280,7 +284,7 @@ class Distance_to_the_best_corrected(Heuristic):
             return res
 
 
-class Belief(Heuristic):
+class Belief(Scoring):
     """Belief
 
     Returns
@@ -302,8 +306,8 @@ class Belief(Heuristic):
         search_space : Searchspace
             Search space object containing bounds of the search space.
         indexes : {int,slice}
-            Indexes of the scores, saved in `loss.all_scores`
-            used when computing heuristic.
+            Indexes of the scores, saved in :code:`loss.all_scores`
+            used when computing score.
 
         Returns
         -------

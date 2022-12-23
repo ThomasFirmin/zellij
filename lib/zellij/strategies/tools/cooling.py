@@ -9,7 +9,10 @@
 
 import numpy as np
 from abc import abstractmethod
-import matplotlib.pyplot as plt
+
+import logging
+
+logger = logging.getLogger("zellij.cooling")
 
 
 class Cooling(object):
@@ -35,7 +38,7 @@ class Cooling(object):
         <T0>. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
         <peaks> times.
 
     Methods
@@ -58,6 +61,9 @@ class Cooling(object):
         # PARAMETERS #
         ##############
 
+        assert (
+            T0 > Tend
+        ), f"T0 must be stricly greater than Tend, got {T0}>{Tend}"
         self.T0 = T0
         self.Tend = Tend
         self.peaks = peaks
@@ -82,28 +88,6 @@ class Cooling(object):
         self.k = 0
         self.cross = 0
 
-    def show(self, filepath=""):
-
-        pts = [self.cool() for i in range(self.iterations())]
-        self.reset()
-
-        fig, ax = plt.subplots(figsize=(19.2, 14.4))
-        fig.suptitle(f"{self.__class__.__name__} cooling schedule")
-        plt.xlabel("Iterations")
-        plt.ylabel("Temperature")
-        plt.plot(pts, ls="-", color="orange")
-
-        if filepath:
-            save_path = os.path.join(
-                self.loss_func.plots_path, f"cooling_sa.png"
-            )
-
-            plt.savefig(save_path, bbox_inches="tight")
-            plt.close()
-        else:
-            plt.show()
-            plt.close()
-
 
 class MulExponential(Cooling):
     """MulExponential
@@ -115,18 +99,18 @@ class MulExponential(Cooling):
     Attributes
     ----------
     alpha : float
-        Decrease factor. 0.8<=`alpha`<=0.9
+        Decrease factor. :math:`0.8 \\leq \\alpha \\leq 0.9`
     T0 : float
         Initial temperature of the cooling schedule.\
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------
@@ -148,7 +132,7 @@ class MulExponential(Cooling):
 
     def cool(self):
 
-        self.Tcurrent = self.T0 * self.alpha ** self.k
+        self.Tcurrent = self.T0 * self.alpha**self.k
 
         if self.Tcurrent <= self.Tend:
             self.cross += 1
@@ -175,18 +159,18 @@ class MulLogarithmic(Cooling):
     Parameters
     ----------
     alpha : float
-        Decrease factor. `alpha`>1
+        Decrease factor. :math:`\\alpha>1`
     T0 : float
         Initial temperature of the cooling schedule.\
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------
@@ -220,7 +204,7 @@ class MulLogarithmic(Cooling):
 
     def iterations(self):
         return (
-            int(np.ceil(np.exp((self.T0 / self.Tend - 1 / self.alpha)) - 1))
+            int(np.ceil(np.exp((self.T0 / self.Tend - 1 / self.alpha)) + 1))
             * self.peaks
         )
 
@@ -235,18 +219,18 @@ class MulLinear(Cooling):
     Parameters
     ----------
     alpha : float
-        Decrease factor. `alpha`>0
+        Decrease factor. :math:`\\alpha>0`
     T0 : float
         Initial temperature of the cooling schedule.\
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------
@@ -292,18 +276,18 @@ class MulQuadratic(Cooling):
     Parameters
     ----------
     alpha : float
-        Decrease factor. `alpha`>0
+        Decrease factor. :math:`\\alpha>0`
     T0 : float
         Initial temperature of the cooling schedule.\
          Higher temperature leads to higher acceptance of a worse solution. (more exploration)
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------
@@ -325,7 +309,7 @@ class MulQuadratic(Cooling):
 
     def cool(self):
 
-        self.Tcurrent = self.T0 / (1 + self.alpha * self.k ** 2)
+        self.Tcurrent = self.T0 / (1 + self.alpha * self.k**2)
 
         if self.Tcurrent <= self.Tend:
             self.cross += 1
@@ -360,11 +344,11 @@ class AddLinear(Cooling):
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------
@@ -420,11 +404,11 @@ class AddQuadratic(Cooling):
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------
@@ -482,11 +466,11 @@ class AddExponential(Cooling):
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------
@@ -513,9 +497,7 @@ class AddExponential(Cooling):
             / (
                 1
                 + np.exp(
-                    2
-                    * np.log(self.T0 - self.Tend)
-                    / self.cycles
+                    (2 * np.log(self.T0 - self.Tend) / self.cycles)
                     * (self.k - 0.5 * self.cycles)
                 )
             )
@@ -551,11 +533,11 @@ class AddTrigonometric(Cooling):
 
     Tend : float
         Temperature threshold. When reached the temperature is violently increased proportionally to\
-        `T0`. It allows to periodically easily escape from local optima.
+        :code:`T0`. It allows to periodically easily escape from local optima.
 
     peaks : int, default=1
-        Maximum number of crossed threshold according to `Tend`. The temperature will be increased\
-        `peaks` times.
+        Maximum number of crossed threshold according to :code:`Tend`. The temperature will be increased\
+        :code:`peaks` times.
 
     Methods
     -------

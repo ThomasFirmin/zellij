@@ -8,14 +8,17 @@
 
 
 import numpy as np
-import matplotlib.pyplot as plt
+
+import logging
+
+logger = logging.getLogger("zellij.chaos_map")
 
 
 class Chaos_map(object):
 
     """Chaos_map
 
-    Chaos_map is in abstract class describing what a chaos map is.
+    :code:`Chaos_map` is in abstract class describing what a chaos map is.
 
     Attributes
     ----------
@@ -99,7 +102,7 @@ class Henon(Chaos_map):
             y[i, :] = b * x
 
             # x_{k+1} = a.(1-x_{k}^2) + b.y_{k}
-            x = 1 - a * x ** 2 + y[i - 1, :]
+            x = 1 - a * x**2 + y[i - 1, :]
 
         # Min_{params}(y_{params,vectors})
         alpha = np.amin(y, axis=0)
@@ -247,12 +250,3 @@ class Random(Chaos_map):
         super().__init__(vectors, params)
 
         self.map = np.random.random((vectors, params))
-
-
-chaos_map_name = {
-    "henon": Henon,
-    "logistic": Logistic,
-    "kent": Kent,
-    "tent": Tent,
-    "random": Random,
-}
