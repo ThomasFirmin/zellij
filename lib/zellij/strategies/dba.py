@@ -14,21 +14,20 @@ import copy
 
 import logging
 
-logger = logging.getLogger("zellij.DAC")
+logger = logging.getLogger("zellij.DBA")
 
 
-class DAC(Metaheuristic):
+class DBA(Metaheuristic):
 
-    """DAC
+    """DBA
 
-    Divide-and-conquer (DAC) is made of 5 part:
-        * **Geometry** : DAC uses hyper-spheres or hyper-cubes to decompose the search-space into smaller sub-spaces in a fractal way.
-        * **Tree** search algorithm : Fractals form a tree, so DAC is also a tree search problem. It can use Best First Search, Beam Search or others algorithms from the A* family.
-        * **Exploration** : To explore a fractal, DAC requires an exploration algorithm, for example GA,or in our case CGS.
-        * **Exploitation** : At the final fractal level (e.g. a leaf of the rooted tree) DAC performs an exploitation.
-        * **Scoring method**: To score a fractal, DAC can use the best score found, the median, ...
+    Decomposition-Based-Algorithm (DBA) is made of 5 part:
 
-    It a continuous optimization algorithm.
+        * **Geometry** : DBA uses hyper-spheres or hyper-cubes to decompose the search-space into smaller sub-spaces in a fractal way.
+        * **Tree search**: Fractals are stored in a *k-ary rooted tree*. The tree search determines how to move inside this tree.
+        * **Exploration** : To explore a fractal, DBA requires an exploration algorithm.
+        * **Exploitation** : At the final fractal level (e.g. a leaf of the rooted tree) DBA performs an exploitation.
+        * **Scoring method**: To score a fractal, DBA can use the best score found, the median, ...
 
     Attributes
     ----------
@@ -36,7 +35,7 @@ class DAC(Metaheuristic):
     search_space : Fractal
         :ref:`sp` defined as a  :ref:`frac`. Contains decision
         variables of the search space, converted to continuous and
-        constrained to an EUclidean :ref:`frac`.
+        constrained to an Euclidean :ref:`frac`.
 
     f_calls : int
         Maximum number of :ref:`lf` calls
@@ -62,7 +61,7 @@ class DAC(Metaheuristic):
         Evaluate a list of fractals using exploration and/or exploitation
 
     run(n_process=1)
-        Runs DAC
+        Runs DBA
 
     See Also
     --------
@@ -86,7 +85,7 @@ class DAC(Metaheuristic):
 
         """__init__(search_space, f_calls, tree_search, exploration=None, exploitation=None, verbose=True, **kwargs)
 
-        Initialize DAC class
+        Initialize DBA class
 
         Parameters
         ----------
@@ -117,7 +116,7 @@ class DAC(Metaheuristic):
         # PARAMETERS #
         ##############
 
-        super(DAC, self).__init__(search_space, f_calls, verbose)
+        super(DBA, self).__init__(search_space, f_calls, verbose)
 
         # Exploration and exploitation function
         if exploration:
@@ -138,7 +137,7 @@ class DAC(Metaheuristic):
         # VARIABLES #
         #############
 
-        # Save f_calls from metaheuristic, to adapt them during DAC.
+        # Save f_calls from metaheuristic, to adapt them during DBA.
         if self.exploration:
             self.explor_calls = [i.f_calls for i in self.exploration]
         else:
@@ -332,7 +331,7 @@ class DAC(Metaheuristic):
 
         """run(n_process=1)
 
-        Runs DAC.
+        Runs DBA.
 
         Parameters
         ----------
@@ -342,10 +341,10 @@ class DAC(Metaheuristic):
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -386,18 +385,3 @@ class DAC(Metaheuristic):
         logger.info("Ending")
 
         return self.search_space.loss.get_best(n_process)
-
-    def show(self, filepath="", save=False):
-
-        """show(filename=None)
-
-        Plots solutions and scores evaluated during the optimization
-
-        Parameters
-        ----------
-        filename : str, default=None
-            If a filepath is given, the method will read the file and will try to plot contents.
-
-        """
-
-        super().show(filepath, save)
