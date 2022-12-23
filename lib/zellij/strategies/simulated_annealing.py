@@ -8,12 +8,10 @@
 
 
 from zellij.core.metaheuristic import Metaheuristic
-from zellij.strategies.utils.cooling import Cooling
+from zellij.strategies.tools.cooling import Cooling
 import zellij.utils.progress_bar as pb
 import numpy as np
 import os
-import matplotlib.pyplot as plt
-import pandas as pd
 
 import logging
 
@@ -60,12 +58,12 @@ class Simulated_annealing(Metaheuristic):
     Examples
     --------
 
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import ContinuousSearchspace
-    >>> from zellij.core.variables import FloatVar, ArrayVar
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
     >>> from zellij.utils.neighborhoods import FloatInterval, ArrayInterval, Intervals
-    >>> from zellij.strategies.simulated_annealing import Simulated_annealing
-    >>> from zellij.strategies.utils.cooling import MulExponential
+    >>> from zellij.strategies import Simulated_annealing
+    >>> from zellij.strategies.tools import MulExponential
     >>> from zellij.utils.benchmark import himmelblau
     ...
     >>> lf = Loss()(himmelblau)
@@ -80,18 +78,6 @@ class Simulated_annealing(Metaheuristic):
     ...
     >>> point = sp.random_point()
     >>> sa.run(point, lf([point])[0])
-    >>> sa.show()
-
-    .. image:: ../_static/sa_sp_ex.png
-        :width: 924px
-        :align: center
-        :height: 487px
-        :alt: alternate text
-    .. image:: ../_static/sa_res_ex.png
-        :width: 924px
-        :align: center
-        :height: 487px
-        :alt: alternate text
     """
 
     # Initialize simulated annealing
@@ -157,17 +143,17 @@ class Simulated_annealing(Metaheuristic):
             Score of the initial solution
             Determine the starting point of the chaotic map.
         H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
         n_process : int, default=1
             Determine the number of best solution found to return.
 
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -228,9 +214,7 @@ class Simulated_annealing(Metaheuristic):
                 and self.search_space.loss.calls < self.f_calls
             ):
 
-                neighbors = self.search_space.neighbor.get_neighbor(
-                    X, size=n_process
-                )
+                neighbors = self.search_space.neighbor(X, size=n_process)
 
                 # Update progress bar
                 self.pending_pb(len(neighbors))
@@ -355,132 +339,3 @@ class Simulated_annealing(Metaheuristic):
         self.cooling.reset()
         self.close_bar()
         return best, min
-
-    def show(self, filepath="", save=False):
-
-        """show(self, filename=None)
-
-        Plots solutions and scores computed during the optimization
-
-        Parameters
-        ----------
-        filepath : str, default=""
-            If a filepath is given, the method will read files insidethe folder and will try to plot contents.
-
-        save : boolean, default=False
-            Save figures
-        """
-
-        data_all, all_scores = super().show(filepath, save)
-
-        if filepath:
-
-            path_sa = os.path.join(filepath, "outputs", "sa_best.csv")
-            data_sa = pd.read_table(path_sa, sep=",", decimal=".")
-            sa_scores = data_sa["loss"].to_numpy()
-
-            temperature = data_sa["temperature"].to_numpy()
-            probability = data_sa["probability"].to_numpy()
-
-        else:
-            data_sa = self.n_best
-            sa_scores = np.array(self.n_scores)
-
-            temperature = np.array(self.record_temp)
-            probability = np.array(self.record_proba)
-
-        argmin = np.argmin(sa_scores)
-
-        f, (l1, l2) = plt.subplots(2, 2, figsize=(19.2, 14.4))
-
-        ax1, ax2 = l1
-        ax3, ax4 = l2
-
-        ax1.plot(list(range(len(sa_scores))), sa_scores, "-")
-        argmin = np.argmin(sa_scores)
-        all_argmin = np.argmin(all_scores)
-
-        ax1.scatter(
-            argmin,
-            sa_scores[argmin],
-            color="red",
-            label="Best score: " + str(sa_scores[argmin]),
-        )
-        ax1.scatter(
-            0,
-            sa_scores[0],
-            color="green",
-            label="Initial score: " + str(sa_scores[0]),
-        )
-
-        ax1.set_title("Simulated annealing")
-        ax1.set_xlabel("Iteration")
-        ax1.set_ylabel("Score")
-        ax1.legend(loc="upper right")
-
-        if len(all_scores) < 100:
-            s = 5
-        else:
-            s = 2500 / len(all_scores)
-
-        ax2.scatter(list(range(len(all_scores))), all_scores, s=s)
-        ax2.scatter(
-            all_argmin,
-            all_scores[all_argmin],
-            color="red",
-            label="Best score: " + str(sa_scores[argmin]),
-        )
-        ax2.scatter(
-            0,
-            sa_scores[0],
-            color="green",
-            label="Initial score: " + str(sa_scores[0]),
-        )
-
-        ax2.set_title("All evaluated solutions")
-        ax2.set_xlabel("Solution ID")
-        ax2.set_ylabel("Score")
-        ax2.legend(loc="upper right")
-
-        ax3.plot(list(range(len(sa_scores))), temperature, "-")
-        argmin = np.argmin(sa_scores)
-        ax3.scatter(
-            argmin,
-            temperature[argmin],
-            color="red",
-            label="Best score: " + str(temperature[argmin]),
-        )
-
-        ax3.set_title("Temperature decrease")
-        ax3.set_xlabel("Iteration")
-        ax3.set_ylabel("Temperature")
-        ax3.legend(loc="upper right")
-
-        if len(sa_scores) < 100:
-            s = 5
-        else:
-            s = 2500 / len(all_scores)
-
-        ax4.scatter(list(range(len(sa_scores))), probability, s=s)
-        argmin = np.argmin(sa_scores)
-        ax4.scatter(
-            argmin,
-            probability[argmin],
-            color="red",
-            label="Best score: " + str(probability[argmin]),
-        )
-
-        ax4.set_title("Escaping probability")
-        ax4.set_xlabel("Iteration")
-        ax4.set_ylabel("Probability")
-        ax4.legend(loc="upper right")
-
-        if save:
-            save_path = os.path.join(
-                self.search_space.loss.plots_path, f"sa_summary.png"
-            )
-
-            plt.savefig(save_path, bbox_inches="tight")
-            plt.close()
-        else:
-            plt.show()
