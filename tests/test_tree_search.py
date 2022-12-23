@@ -9,7 +9,25 @@
 
 import unittest
 from unittest.mock import Mock
-from zellij.utils.tree_search import *
+from zellij.strategies.tools import (
+    Breadth_first_search,
+    Depth_first_search,
+    Best_first_search,
+    Beam_search,
+    Diverse_best_first_search,
+    Cyclic_best_first_search,
+    Epsilon_greedy_search,
+)
+
+tree_search_algorithm = [
+    Breadth_first_search,
+    Depth_first_search,
+    Best_first_search,
+    Beam_search,
+    Diverse_best_first_search,
+    Cyclic_best_first_search,
+    Epsilon_greedy_search,
+]
 
 
 class TestTreeSearch(unittest.TestCase):
@@ -41,7 +59,7 @@ class TestTreeSearch(unittest.TestCase):
 
     def test_tree_search_algorithms(self):
 
-        for t in tree_search_algorithm.values():
+        for t in tree_search_algorithm:
             ts = t([self.element], 10)
 
             self.assertTrue(
@@ -105,3 +123,7 @@ class TestTreeSearch(unittest.TestCase):
                 go,
                 f"Error on ending for children,\nFor {ts.__class__.__name__}",
             )
+
+
+if __name__ == "__main__":
+    unittest.main()
