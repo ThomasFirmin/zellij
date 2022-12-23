@@ -20,7 +20,7 @@ class Euclidean(Distance):
     """Euclidean distance
 
     Compute the Euclidean distance between two points.
-    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.euclidean.html#scipy.spatial.distance.euclidean>`_
+    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.euclidean.html#scipy.spatial.distance.euclidean>`__
 
     Example
     -------
@@ -55,7 +55,7 @@ class Manhattan(Distance):
     """Manhattan distance
 
     Compute the Manhattan distance between two points.
-    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.cityblock.html#scipy.spatial.distance.cityblock>`_
+    More info on `SciPy <https://docs.scipy.org/doc/scipy/reference/generated/scipy.spatial.distance.cityblock.html#scipy.spatial.distance.cityblock>`__
 
     Example
     -------
@@ -90,7 +90,7 @@ class Mixed(Distance):
     """Mixed distance
 
     Compute a distance between two mixed points, using following equations:
-    
+
     .. math::
 
         \\smash{
@@ -143,7 +143,7 @@ class Mixed(Distance):
 
         for x, y, op, w in zip(point_a, point_b, self.operations, self.weights):
             res = op(x, y) * w
-            num += res ** 2
+            num += res**2
             denum += res
         if denum == 0:
             if num == 0:
