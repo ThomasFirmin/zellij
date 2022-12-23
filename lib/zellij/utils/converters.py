@@ -11,7 +11,7 @@ from zellij.core.addons import VarConverter, Converter
 import numpy as np
 import logging
 
-logger = logging.getLogger("zellij.neighborhoods")
+logger = logging.getLogger("zellij.converters")
 logger.setLevel(logging.INFO)
 
 ####################################
@@ -32,30 +32,6 @@ class DoNothing(VarConverter):
 
     def reverse(self, value, *args, **kwargs):
         return value
-
-
-class ArrayNothing(DoNothing):
-    pass
-
-
-class BlockNothing(DoNothing):
-    pass
-
-
-class DynamicBlockNothing(DoNothing):
-    pass
-
-
-class FloatNothing(DoNothing):
-    pass
-
-
-class IntNothing(DoNothing):
-    pass
-
-
-class CatNothing(DoNothing):
-    pass
 
 
 ####################################
@@ -297,7 +273,7 @@ class ArrayBinning(VarConverter):
     """ArrayBinning
 
     :ref:`varadd` used when elements of the array must be converted to
-    discrete.
+    discrete. When binning some information can be lost.
 
     Parameters
     ----------
@@ -324,36 +300,17 @@ class ArrayBinning(VarConverter):
                  """
             )
 
-    def convert(self, value, K):
-
-        if isinstance(K, list):
-            assert len(K) == len(value), logger.error(
-                f"length of `K`(number of bins) must be equal to\
-                `ArrayVar` length, got {K}=={len(value)}"
-            )
-        else:
-            K = [K] * len(value)
-
+    def convert(self, value):
         res = []
-
-        for variable, v, k in zip(self.target.values, value, K):
-            res.append(variable.to_discrete.convert(v, k))
+        for variable, v in zip(self.target.values, value):
+            res.append(variable.to_discrete.convert(v))
 
         return res
 
-    def reverse(self, value, K):
+    def reverse(self, value):
         res = []
-
-        if isinstance(K, list):
-            assert len(K) == len(value), logger.error(
-                f"length of `K`(number of bins) must be equal to\
-                `ArrayVar` length, got {K}=={len(value)}"
-            )
-        else:
-            K = [K] * len(value)
-
-        for variable, v, k in zip(self.target.values, value, K):
-            res.append(variable.to_discrete.reverse(v, k))
+        for variable, v in zip(self.target.values, value):
+            res.append(variable.to_discrete.reverse(v))
 
         return res
 
@@ -383,7 +340,7 @@ class BlockBinning(VarConverter):
             f"To use `BlockBinning`, value in `Block` must have a `to_discrete` method. Use `to_discrete` kwarg when defining a variable"
         )
 
-    def convert(self, value, K):
+    def convert(self, value):
 
         assert len(value) == self.target.repeat, logger.error(
             f"Length of value must be equal to `Block` length,\
@@ -396,7 +353,7 @@ class BlockBinning(VarConverter):
 
         return res
 
-    def reverse(self, value, K):
+    def reverse(self, value):
 
         assert len(value) == self.target.repeat, logger.error(
             f"Length of value must be equal to `Block` length,\
@@ -435,7 +392,7 @@ class DynamicBlockBinning(VarConverter):
             f"To use `DynamicBlockBinning`, value in `DynamicBlock` must have a `to_discrete` method. Use `to_discrete` kwarg when defining a variable"
         )
 
-    def convert(self, value, K):
+    def convert(self, value):
 
         assert len(value) == self.target.repeat, logger.error(
             f"Length of value must be inferior or equal to `DynamicBlock`\
@@ -448,7 +405,7 @@ class DynamicBlockBinning(VarConverter):
 
         return res
 
-    def reverse(self, value, K):
+    def reverse(self, value):
 
         assert len(value) == self.target.repeat, logger.error(
             f"Length of value must be inferior or equal to `DynamicBlock`\
@@ -465,32 +422,54 @@ class DynamicBlockBinning(VarConverter):
 class FloatBinning(VarConverter):
     """FloatBinning
 
-    Convert the value of a FloatVar, using binning.
+    Convert a value from an FloatVar using binning between its
+    upper and lower bounds. Reversing a converted value will not return the
+    initial value. When binning some information can be lost. here the decimal
+    part of the float number.
 
     """
 
-    def convert(self, value, K):
-        bins = np.linspace(self.target.low_bound, self.target.up_bound, K)
-        return np.digitize(value, bins)
+    def __init__(self, K, variable=None):
+        super(FloatBinning, self).__init__(variable)
 
-    def reverse(self, value, K):
-        bins = np.linspace(self.target.low_bound, self.target.up_bound, K)
+        assert (
+            isinstance(K, int) and K > 1
+        ), f"K must be an int >1 for FloatBinning, got {K}"
+        self.K = K
 
+    def convert(self, value):
+        bins = np.linspace(self.target.low_bound, self.target.up_bound, self.K)
+        return np.digitize(value, bins) - 1
+
+    def reverse(self, value):
+        bins = np.linspace(self.target.low_bound, self.target.up_bound, self.K)
         return bins[value]
 
 
 class IntBinning(VarConverter):
     """IntMinmax
 
-    Do nothing.
+    Convert a value from an IntVar using binning between its
+    upper and lower bounds. Reversing a converted value will not return the
+    initial value. When binning some information can be lost.
 
     """
 
-    def convert(self, value, K):
-        return value
+    def __init__(self, K, variable=None):
+        super(IntBinning, self).__init__(variable)
 
-    def reverse(self, value, K):
-        return value
+        assert (
+            isinstance(K, int) and K > 1
+        ), f"K must be an int >1 for IntBinning, got {K}"
+        self.K = K
+
+    def convert(self, value):
+        bins = np.linspace(self.target.low_bound, self.target.up_bound, self.K)
+        return np.digitize(value, bins) - 1
+
+    def reverse(self, value):
+        bins = np.linspace(self.target.low_bound, self.target.up_bound, self.K)
+        return bins[value]
 
 
 class CatBinning(VarConverter):
@@ -498,14 +477,13 @@ class CatBinning(VarConverter):
 
     Convert the value of a CatVar to its corresponding index in the
     features list.
-    .Reverse: index to feature.
 
     """
 
-    def convert(self, value, K):
+    def convert(self, value):
         return self.target.features.index(value)
 
-    def reverse(self, value, K):
+    def reverse(self, value):
         return self.target.features[value]
 
 
@@ -513,14 +491,14 @@ class ConstantBinning(VarConverter):
     """ConstantMinmax
 
     Convert the value of a Constant. :math:`y=1`
-    .Reverse: :math:`x=value`.
+    Reverse: :math:`x=value`.
 
     """
 
-    def convert(self, value, K):
+    def convert(self, value):
         return 1
 
-    def reverse(self, value, K):
+    def reverse(self, value):
         return self.target.value
 
 
@@ -566,7 +544,8 @@ class Continuous(Converter):
         points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
             List of points to convert
         sub_values : boolean, default=True
-            If the search space is a subspace, uses the original values to convert if True, else uses its own bounds.
+            If the search space is a subspace and if True,
+            uses the original values to convert, else uses its own bounds.
             See :ref:`sp`
 
         Returns
@@ -609,7 +588,8 @@ class Continuous(Converter):
         points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
             List of points to convert
         sub_values : boolean, default=True
-            If the search space is a subspace, uses the original values to convert if True, else uses its own bounds.
+            If the search space is a subspace and if True,
+            uses the original values to convert, else uses its own bounds.
             See :ref:`sp`
 
         Returns
@@ -678,7 +658,8 @@ class Discrete(Converter):
         points : {list[list[{int, float, str}, {int, float, str}...], ...],\list[list[float, float...], ...]}
             List of points to convert
         sub_values : boolean, default=True
-            If the search space is a subspace, uses the original values to convert if True, else uses its own bounds.
+            If the search space is a subspace and if True,
+            uses the original values to convert, else uses its own bounds.
             See :ref:`sp`
 
         Returns
@@ -701,7 +682,7 @@ class Discrete(Converter):
 
         # Mixed to discrete
         for point in points:
-            res.append(val.to_discrete.convert(point, self.K))
+            res.append(val.to_discrete.convert(point))
 
         return res
 
@@ -717,7 +698,8 @@ class Discrete(Converter):
         points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
             List of points to convert
         sub_values : boolean, default=True
-            If the search space is a subspace, uses the original values to convert if True, else uses its own bounds.
+            If the search space is a subspace and if True,
+            uses the original values to convert, else uses its own bounds.
             See :ref:`sp`
 
         Returns
@@ -740,6 +722,6 @@ class Discrete(Converter):
 
         # Mixed to discrete
         for point in points:
-            res.append(val.to_discrete.reverse(point, self.K))
+            res.append(val.to_discrete.reverse(point))
 
         return res
