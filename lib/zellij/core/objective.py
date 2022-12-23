@@ -12,7 +12,7 @@ import numpy as np
 
 import logging
 
-logger = logging.getLogger("zellij.Meta")
+logger = logging.getLogger("zellij.objective")
 
 
 class Objective(ABC):
@@ -35,7 +35,17 @@ class Objective(ABC):
     """
 
     def __init__(self, target=0):
-        self.target = target
+        if isinstance(target, str):
+            self.target = [target]
+        elif isinstance(target, int):
+            self.target = [target]
+        elif isinstance(target, list) and (
+            all(isinstance(i, int) for i in target)
+            or all(isinstance(i, str) for i in target)
+        ):
+            self.target = target
+        else:
+            raise AssertionError(f"Unknown target type got, {target}")
         self.index_built = False
 
     @abstractmethod
@@ -95,11 +105,10 @@ class Objective(ABC):
             Cleaned outputs
 
         """
-
         rd = {}
         # Separate results
         if isinstance(outputs, int) or isinstance(outputs, float):
-            rd["objective"] = None
+            rd["objective"] = outputs
         elif isinstance(outputs, dict):
             rd = outputs
         elif isinstance(outputs, list):
@@ -109,10 +118,9 @@ class Objective(ABC):
 
     def _build_index(self, outputs):
         if not self.index_built:
-            if isinstance(self.target, int):
-                for i, t in enumerate(self.target):
-                    if isinstance(t, int):
-                        self.target = list(outputs.keys)[self.target]
+            for i, t in enumerate(self.target):
+                if isinstance(t, int):
+                    self.target[i] = list(outputs.keys())[t]
             self.index_built = True
 
     def reset(self):
@@ -167,9 +175,7 @@ class Minimizer(Objective):
     def __call__(self, outputs):
         clean = self._cleaner(outputs)
         self._build_index(clean)
-
-        clean["objective"] = outputs[self.target]
-
+        clean["objective"] = clean[self.target[0]]
         return clean
 
 
@@ -222,7 +228,7 @@ class Maximizer(Objective):
         clean = self._cleaner(outputs)
         self._build_index(clean)
 
-        clean["objective"] = -outputs[self.target]
+        clean["objective"] = -clean[self.target[0]]
 
         return clean
 
@@ -252,19 +258,15 @@ class Lambda(Objective):
     """
 
     def __init__(self, function, selector="min", target=0):
-        super(self, Objectve).__init__(target)
-        if isinstance(self.target, str):
-            self.target = [self.target]
-        elif isinstance(self.target, int):
-            self.target = [self.target]
+        super().__init__(target)
 
-        if function.__code__.co_argcount != len(target):
+        if function.__code__.co_argcount != len(self.target):
             raise AssertionError(
                 logger.error(
                     f"""
                     Number of parameters of `function` must be equal to
                     the length of `target`,
-                    got {function.__code__.co_argcount} != {len(target)}
+                    got {function.__code__.co_argcount} != {len(self.target)}
                     """
                 )
             )
@@ -307,14 +309,13 @@ class Lambda(Objective):
             if isinstance(self.target, list):
                 for i, t in enumerate(self.target):
                     if isinstance(t, int):
-                        self.target[i] = list(outputs.keys)[self.target]
+                        self.target[i] = list(outputs.keys())[self.target[i]]
             self.index_built = True
 
     def __call__(self, outputs):
         clean = self._cleaner(outputs)
         self._build_index(clean)
-
-        parameter = [outputs[t] for t in self.target]
+        parameter = [clean[t] for t in self.target]
         for t in self.target:
             clean["objective"] = self.function(*parameter)
 
