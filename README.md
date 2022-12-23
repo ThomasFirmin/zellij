@@ -22,6 +22,8 @@ To implements metaheuristics and other optimization methods, **Zellij** uses [DE
 and [BoTorch](https://botorch.org/) [[4]](#4) for *Bayesian Optimization*.
 **Zellij** is defined as an easy to use and modular framework, based on Python object oriented paradigm.
 
+See [documentation](https://zellij.readthedocs.io/en/latest/).
+
 ## Install Zellij
 
 #### Original version
@@ -45,40 +47,6 @@ User will then be able to use the `MPI` option of the `Loss` decorator.
 Then the python script must be executed using `mpiexec`:
 ```python
 $ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path/to/python/script>
-```
-
-## Quickstart
-
-#### Define your search space
-```python
-
-from zellij.core import ContinuousSearchspace
-
-labels = ["a","b"]
-types = ["R","R"]
-values = [[-5, 5],[-5, 5]]
-neighborhood = [0.5,0.5]
-sp = Searchspace(labels,types,values)
-```
-
-#### Define your loss function
-```python
-import numpy as np
-from zellij.core import Loss
-
-@Loss(save=False, verbose=True)
-def himmelblau(x):
-  x_ar = np.array(x)
-  return np.sum(x_ar**4 -16*x_ar**2 + 5*x_ar) * (1/len(x_ar))
-```
-
-#### Choose an optimization algorithm
-
-```python
-from zellij.strategies import Genetic_algorithm
-ga = Genetic_algorithm(himmelblau, sp, 1000, pop_size=25, generation=40)
-best_point, score = ga.run()
-print(f"Best solution found: f({best_point})={score}")
 ```
 
 ## Dependencies
