@@ -8,7 +8,6 @@
 
 
 from zellij.core.metaheuristic import Metaheuristic
-import matplotlib.pyplot as plt
 
 import torch
 import numpy as np
@@ -18,8 +17,6 @@ from botorch.optim import optimize_acqf
 from botorch.acquisition.analytic import ExpectedImprovement
 from botorch import fit_gpytorch_model
 from zellij.core.search_space import ContinuousSearchspace
-from zellij.core.variables import CatVar
-import time
 
 import logging
 
@@ -36,7 +33,7 @@ class Bayesian_optimization(Metaheuristic):
     loss function. Once done, the gaussian process is updated using results
     obtained by evaluating these promising solutions with the loss function.
 
-    It is based on `BoTorch <https://botorch.org/>`_ and `GPyTorch <https://gpytorch.ai/>`_.
+    It is based on `BoTorch <https://botorch.org/>`_ and `GPyTorch <https://gpytorch.ai/>`__.
 
     Attributes
     ----------
@@ -58,12 +55,10 @@ class Bayesian_optimization(Metaheuristic):
         a point sampled from the surrogate is.
     initial_size : int, default=10
         Size of the initial set of solution to draw randomly.
-    sampler : botorch.sampling.samplers, default=None
-        Sampler used for a full Bayesian approach with Monte-Carlo sampling
-        applied to approximate the integrated acquisition function.
-
     gpu: bool, default=True
         Use GPU if available
+    **kwargs
+        Key word arguments linked to the surrogate and the acquisition function.
 
     See Also
     --------
@@ -73,9 +68,9 @@ class Bayesian_optimization(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import ContinuousSearchspace
-    >>> from zellij.core.variables import FloatVar, ArrayVar
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
     >>> from zellij.utils.benchmark import himmelblau
     >>> from zellij.strategies.bayesian_optimization import Bayesian_optimization
     >>> import botorch
@@ -87,20 +82,6 @@ class Bayesian_optimization(Metaheuristic):
     ...       acquisition=botorch.acquisition.monte_carlo.qExpectedImprovement,
     ...       q=5)
     >>> bo.run()
-    >>> bo.show()
-
-
-    .. image:: ../_static/bo_sp_ex.png
-        :width: 924px
-        :align: center
-        :height: 487px
-        :alt: alternate text
-    .. image:: ../_static/bo_res_ex.png
-        :width: 924px
-        :align: center
-        :height: 487px
-        :alt: alternate text
-
     """
 
     def __init__(
@@ -112,7 +93,6 @@ class Bayesian_optimization(Metaheuristic):
         likelihood=ExactMarginalLogLikelihood,
         acquisition=ExpectedImprovement,
         initial_size=10,
-        sampler=None,
         gpu=False,
         **kwargs,
     ):
@@ -138,11 +118,10 @@ class Bayesian_optimization(Metaheuristic):
             a point sampled from the surrogate is.
         initial_size : int, default=10
             Size of the initial set of solution to draw randomly.
-        sampler : botorch.sampling.samplers, default=None
-            Sampler used for a full Bayesian approach with Monte-Carlo sampling
-            applied to approximate the integrated acquisition function.
         gpu: bool, default=True
             Use GPU if available
+        **kwargs
+            Key word arguments linked to the surrogate and the acquisition function.
         """
 
         super().__init__(search_space, f_calls, verbose)
@@ -199,8 +178,6 @@ class Bayesian_optimization(Metaheuristic):
                 dtype=self.dtype,
             )
 
-        self.best_observed = []
-
         self.iterations = int(
             np.ceil(
                 (self.f_calls - self.initial_size) / self.kwargs.get("q", 1)
@@ -215,11 +192,18 @@ class Bayesian_optimization(Metaheuristic):
             device=self.device,
             dtype=self.dtype,
         )
-        res = self.search_space.loss(
-            self.search_space.to_continuous.reverse(train_x.cpu().numpy()),
-            algorithm="BO",
-            acquisition=0,
-        )
+        if isinstance(self.search_space, ContinuousSearchspace):
+            res = self.search_space.loss(
+                train_x.cpu().numpy(),
+                algorithm="BO",
+                acquisition=0,
+            )
+        else:
+            res = self.search_space.loss(
+                self.search_space.to_continuous.reverse(train_x.cpu().numpy()),
+                algorithm="BO",
+                acquisition=0,
+            )
         train_obj = torch.tensor(res).unsqueeze(-1)  # add output dimension
 
         return train_x, train_obj
@@ -266,16 +250,17 @@ class Bayesian_optimization(Metaheuristic):
 
         # progress bar
         self.pending_pb(len(new_x))
-
         if isinstance(self.search_space, ContinuousSearchspace):
             res = self.search_space.loss(
-                new_x.cpu().numpy(), algorithm="BO", acquisition=acqf.item()
+                new_x.cpu().numpy(),
+                algorithm="BO",
+                acquisition=acqf.cpu().item(),
             )
         else:
             res = self.search_space.loss(
                 self.search_space.to_continuous.reverse(new_x.cpu().numpy()),
                 algorithm="BO",
-                acquisition=acqf.item(),
+                acquisition=acqf.cpu().item(),
             )
         new_obj = torch.tensor(res).unsqueeze(-1)  # add output dimension
 
@@ -286,16 +271,23 @@ class Bayesian_optimization(Metaheuristic):
 
         return new_x, new_obj
 
+    def _build_acqf_kwarg(self):
+        self.acqf_kwargs = {
+            key: value
+            for key, value in self.kwargs.items()
+            if key in self.acquisition.__init__.__code__.co_varnames
+        }
+
     def run(self, H=None, n_process=1):
 
         """run(n_process=1)
 
-        Runs SA
+        Runs BO.
 
         Parameters
         ----------
         H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
 
         n_process : int, default=1
             Determine the number of best solution found to return.
@@ -303,11 +295,11 @@ class Bayesian_optimization(Metaheuristic):
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points
+            Returns a list of the :code:`n_process` best found points
             to the continuous format.
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated
+            Returns a list of the :code:`n_process` best found scores associated
             to best_sol.
 
         """
@@ -318,9 +310,6 @@ class Bayesian_optimization(Metaheuristic):
 
         # progress bar
         self.build_bar(self.iterations)
-
-        self.best_observed = []
-        self.best_idx = [0]
 
         # call helper functions to generate initial training data and initialize model
         train_x, train_obj = self._generate_initial_data()
@@ -336,8 +325,6 @@ class Bayesian_optimization(Metaheuristic):
         )
         self.meta_pb.update()
 
-        self.best_observed.append(self.search_space.loss.best_score)
-
         iteration = 1
 
         # run N_BATCH rounds of BayesOpt after the initial random batch
@@ -349,17 +336,13 @@ class Bayesian_optimization(Metaheuristic):
             # fit the models
             fit_gpytorch_model(mll)
 
-            acqf = self.acquisition(
-                model=model,
-                best_f=-self.search_space.loss.best_score,
-                sampler=self.sampler,
-                X_baseline=(train_x,),
-                **{
-                    key: value
-                    for key, value in self.kwargs.items()
-                    if key in self.acquisition.__init__.__code__.co_varnames
-                },
-            )
+            # Add potentially usefull kwargs for acqf kwargs
+            self.kwargs["best_f"] = -self.search_space.loss.best_score
+            self.kwargs["X_baseline"] = (train_x,)
+
+            # Build acqf kwargs
+            self._build_acqf_kwarg()
+            acqf = self.acquisition(model=model, **self.acqf_kwargs)
 
             # optimize and get new observation
             (
@@ -379,10 +362,6 @@ class Bayesian_optimization(Metaheuristic):
                 model.state_dict(),
             )
 
-            # update progress
-            self.best_observed.append(self.search_space.loss.best_score)
-            self.best_idx.append(iteration)
-
             iteration += 1
 
             # progress bar
@@ -390,59 +369,3 @@ class Bayesian_optimization(Metaheuristic):
 
         self.close_bar()
         return self.search_space.loss.get_best(n_process)
-
-    def show(self, filepath=None, save=False):
-
-        """show(self, filename=None)
-
-        Plots solutions and scores computed during the optimization
-
-        Parameters
-        ----------
-        filepath : str, default=""
-            If a filepath is given, the method will read files insidethe folder
-            and will try to plot contents.
-
-        save : boolean, default=False
-            Save figures
-        """
-
-        data_all, all_scores = super().show(filepath, save)
-
-        min = np.argmin(all_scores)
-        indexes = np.repeat(0, self.initial_size)
-        indexes = np.append(
-            indexes,
-            np.repeat(
-                np.arange(1, self.iterations, dtype=int),
-                self.kwargs.get("q", 1),
-            )[: len(all_scores) - self.initial_size],
-        )
-        plt.scatter(
-            indexes,
-            all_scores,
-            c=all_scores,
-            cmap="plasma_r",
-        )
-        plt.plot(
-            self.best_idx,
-            self.best_observed,
-            color="red",
-            lw=2,
-            label="Best scores list",
-        )
-        plt.title("Scores evolution during bayesian optimization")
-        plt.scatter(
-            min // self.kwargs.get("q", 1),
-            all_scores[min],
-            color="red",
-            label="Best score",
-        )
-        plt.annotate(
-            str(all_scores[min]),
-            (min // self.kwargs.get("q", 1), all_scores[min]),
-        )
-        plt.xlabel("iterations")
-        plt.ylabel("Scores")
-        plt.legend(loc=1)
-        plt.show()
