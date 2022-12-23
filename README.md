@@ -71,7 +71,6 @@ $ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path
 * [enlighten](https://python-enlighten.readthedocs.io/en/stable/)>=1.10.2
 * [mpi4py](https://mpi4py.readthedocs.io/en/stable/)>=3.1.2
 
-
 ## Contributors
 ### Design
 * Thomas Firmin: thomas.firmin@univ-lille.fr
