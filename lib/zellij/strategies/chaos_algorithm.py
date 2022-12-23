@@ -8,8 +8,7 @@
 
 from zellij.core.search_space import ContinuousSearchspace
 from zellij.core.metaheuristic import Metaheuristic
-from zellij.strategies.utils.chaos_map import Chaos_map
-from zellij.strategies.utils.chaos_map import chaos_map_name
+from zellij.strategies.tools.chaos_map import Chaos_map, Henon
 import zellij.utils.progress_bar as pb
 
 import numpy as np
@@ -51,11 +50,11 @@ class CGS(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import ContinuousSearchspace
-    >>> from zellij.core.variables import FloatVar, ArrayVar
-    >>> from zellij.strategies.chaos_algorithm import CGS
-    >>> from zellij.strategies.utils.chaos_map import Henon
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
+    >>> from zellij.strategies import CGS
+    >>> from zellij.strategies.tools import Henon
     >>> from zellij.utils.benchmark import himmelblau
     ...
     >>> lf = Loss()(himmelblau)
@@ -66,7 +65,6 @@ class CGS(Metaheuristic):
     ...                  # 4 points/iterations: 4x250=1000
     >>> cgs = CGS(sp, 1000, 250, chaosmap)
     >>> cgs.run()
-    >>> cgs.show()
 
 
     """
@@ -92,7 +90,7 @@ class CGS(Metaheuristic):
         level : int
             Chaotic level corresponds to the number of iteration of the chaotic map
         map : Chaos_map
-            Chaotic map used to sample points. See `Chaos_map` object.
+            Chaotic map used to sample points. See :ref:`cmap` object.
         verbose : boolean, default=True
             Algorithm verbosity
 
@@ -152,7 +150,7 @@ class CGS(Metaheuristic):
             Determines the starting point of the chaotic map.
 
         H : Fractal, default=None
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
 
         n_process : int, default=1
             Determines the number of best solution found to return.
@@ -160,10 +158,10 @@ class CGS(Metaheuristic):
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -275,11 +273,11 @@ class CLS(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import ContinuousSearchspace
-    >>> from zellij.core.variables import FloatVar, ArrayVar
-    >>> from zellij.strategies.chaos_algorithm import CLS
-    >>> from zellij.strategies.utils.chaos_map import Henon
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
+    >>> from zellij.strategies import CLS
+    >>> from zellij.strategies.tools import Henon
     >>> from zellij.utils.benchmark import himmelblau
     ...
     >>> lf = Loss()(himmelblau)
@@ -291,7 +289,6 @@ class CLS(Metaheuristic):
     >>> cls = CLS(sp, 1000, 50, 10,chaosmap)
     >>> point = sp.random_point()
     >>> cls.run(point, lf([point])[0])
-    >>> cls.show()
 
     """
 
@@ -397,17 +394,17 @@ class CLS(Metaheuristic):
         shift : int, default=1
             Determines the starting point of the chaotic map.
         H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
         n_process : int, default=1
             Determines the number of best solution found to return.
 
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -556,11 +553,11 @@ class CFS(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import ContinuousSearchspace
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
     >>> from zellij.core.variables import FloatVar, ArrayVar
-    >>> from zellij.strategies.chaos_algorithm import CFS
-    >>> from zellij.strategies.utils.chaos_map import Henon
+    >>> from zellij.strategies import CFS
+    >>> from zellij.strategies.tools import Henon
     >>> from zellij.utils.benchmark import himmelblau
     ...
     >>> lf = Loss()(himmelblau)
@@ -572,7 +569,6 @@ class CFS(Metaheuristic):
     >>> cfs = CFS(sp, 1000, 50, 10, chaosmap)
     >>> point = sp.random_point()
     >>> cfs.run(point, lf([point])[0])
-    >>> cfs.show()
 
     """
 
@@ -686,17 +682,17 @@ class CFS(Metaheuristic):
         shift : int, default=1
             Determines the starting point of the chaotic map.
         H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
         n_process : int, default=1
             Determines the number of best solution found to return.
 
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -775,7 +771,7 @@ class CFS(Metaheuristic):
             r = np.random.random()
 
             # for each parameter of a solution determines the improved radius
-            r_g = np.minimum((Rl * error_g) / (l ** 2 + 1), db)
+            r_g = np.minimum((Rl * error_g) / (l**2 + 1), db)
 
             # Compute both chaotic variable of the polygonal model thanks to a chaotic map
             xv = [np.multiply(r_g, y), np.multiply(r_g, y)]
@@ -827,7 +823,7 @@ class Chaotic_optimization(Metaheuristic):
     """Chaotic_optimization
 
     Chaotic optimization combines CGS, CLS and CFS.
-    
+
     Attributes
     ----------
 
@@ -862,9 +858,6 @@ class Chaotic_optimization(Metaheuristic):
     run(self, n_process=1)
         Runs Chaotic_optimization
 
-    show(filename=None)
-        Plots results
-
     See Also
     --------
     :ref:`meta` : Parent class defining what a Metaheuristic is
@@ -875,17 +868,16 @@ class Chaotic_optimization(Metaheuristic):
     Examples
     --------
 
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import ContinuousSearchspace
-    >>> from zellij.core.variables import FloatVar, ArrayVar
-    >>> from zellij.strategies.chaos_algorithm import Chaotic_optimization
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
+    >>> from zellij.strategies import Chaotic_optimization
     >>> from zellij.utils.benchmark import himmelblau
     ...
     >>> lf = Loss()(himmelblau)
     >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
     >>> co = Chaotic_optimization(sp, 1000)
     >>> co.run()
-    >>> co.show()
 
     """
 
@@ -893,7 +885,7 @@ class Chaotic_optimization(Metaheuristic):
         self,
         search_space,
         f_calls,
-        chaos_map="henon",
+        chaos_map=Henon,
         exploration_ratio=0.30,
         levels=(32, 6, 2),
         polygon=4,
@@ -1005,9 +997,7 @@ class Chaotic_optimization(Metaheuristic):
                 )
             )
 
-        self.map = chaos_map_name[self.chaos_map](
-            self.map_size, self.search_space.size
-        )
+        self.map = self.chaos_map(self.map_size, self.search_space.size)
 
         logging.info(str(self))
 
@@ -1020,7 +1010,7 @@ class Chaotic_optimization(Metaheuristic):
         Parameters
         ----------
         H : Fractal, default=None
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
 
         n_process : int, default=1
             Determine the number of best solution found to return.
@@ -1028,10 +1018,10 @@ class Chaotic_optimization(Metaheuristic):
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -1206,23 +1196,6 @@ class Chaotic_optimization(Metaheuristic):
         logger.info("Chaotic optimization ending")
 
         return self.search_space.loss.get_best(n_process)
-
-    def show(self, filepath="", save=False):
-
-        """show(filename="")
-
-        Plots solutions and scores evaluated during the optimization
-
-        Parameters
-        ----------
-        filename : str, default=None
-            If a filepath is given, the method will read the file and will try to plot contents.
-
-        save : boolean, default=False
-            Save figures
-        """
-
-        super().show(filepath, save)
 
     def __str__(self):
         return f"Max Loss function calls:{self.f_calls}\nDimensions:{self.search_space.size}\nExploration/Exploitation:{self.exploration_ratio}|{1-self.exploration_ratio}\nRegular polygon:{self.polygon}\nZoom:{self.red_rate}\nIterations:\n\tGlobal:{self.iterations}\n\tInner:{self.inner_iterations}\nChaos Levels:\n\tCGS:{self.CGS_level}\n\tCLS:{self.CLS_level}\n\tCFS:{self.CFS_level}\nMap size:{self.map_size}x{self.search_space.size}"
