@@ -27,7 +27,7 @@ This release introduces major changes in Zellij. These , concern the package org
 
 ### Show method
 
-- All show() methods has been removed from Bayesian optimization, Chaotic optimization, cooling, DBA, Genetic Algorithm, Metaheuristic, PHS, ILS, Simulated Annealing, Searchspace. Plotting methods will be reintroduced in next Zellij version.
+- All show() methods have been removed from Bayesian optimization, Chaotic optimization, cooling, DBA, Genetic Algorithm, Metaheuristic, PHS, ILS, Simulated Annealing, Searchspace. Plotting methods will be reintroduced in the next Zellij version, in another format.
 
 ## Rewrote all heuristics
 
@@ -133,11 +133,11 @@ All the documentation and README has been rewritten. The template has been chang
 
 As many modules were rewrote, many bugs were corrected.
 
-- LossFunc save() method: Fixed an issue where the header was not properly written in the save file.
+- LossFunc save() method: Fixed an issue where the header was not properly written into the save file.
 - LossFunc save() method: Fixed an issue where the objective was saved twice.
 - Searchspace: Fixed a bug where _exclude_ was not working.
 - MulLogarithmic iteration() method: Fixed a bug where the number of iteration was wrongly computed
 - Bayesian Optimization: Fixed an issue were wrong kwargs were passed to the acquisition function
 - Genetic Algorithm: Fixed a bug when a filename was given to initalize the population.
-- DBA: Fixed a bug were the number of remaining calls to the loss function for the exploration was computed according the exploitation metaheuristic.
+- DBA: Fixed a bug where the number of remaining calls to the loss function for the exploration was computed according the exploitation metaheuristic.
 - ...
