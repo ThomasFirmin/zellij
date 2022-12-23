@@ -10,6 +10,11 @@ import numpy as np
 from abc import ABC, abstractmethod
 
 
+def himmelblau(x):
+    x_ar = np.array(x)
+    return np.sum(x_ar ** 4 - 16 * x_ar ** 2 + 5 * x_ar) * (1 / len(x_ar))
+
+
 class Benchmark(ABC):
     def __init__(
         self,
