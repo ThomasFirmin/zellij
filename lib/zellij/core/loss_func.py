@@ -2,19 +2,18 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:13+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-11-09T14:29:38+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
 
 import numpy as np
 import os
 import shutil
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 import enlighten
 import zellij.utils.progress_bar as pb
-
+from zellij.core.objective import Minimizer
 import logging
 
 logger = logging.getLogger("zellij.loss")
@@ -28,27 +27,34 @@ except ImportError as err:
     )
 
 
-class LossFunc(object):
+class LossFunc(ABC):
 
     """LossFunc
 
-    LossFunc allows to wrap function of type :math:`f(x)=y`. With :math:`x` a set of hyperparameters.
-    However, **Zellij** supports alternative pattern: :math:`f(x)=results,model` for example.
+    LossFunc allows to wrap function of type :math:`f(x)=y`.
+    With :math:`x` a set of hyperparameters.
+    However, **Zellij** supports alternative pattern:
+    :math:`f(x)=results,model` for example.
     Where:
 
-    * :math:`results` can be a `list <https://docs.python.org/3/tutorial/datastructures.html#more-on-lists>`_ or a `dictionary <https://docs.python.org/3/tutorial/datastructures.html#dictionaries>`_. The first element of the list must be the loss value. If the return is a dictionary, the loss value must have the key *"score"*.
-    * :math:`model` is optionnal, it is an object with a *save()* method. (e.g. a neural network from Tensorflow)
+        * :math:`results` can be a `list <https://docs.python.org/3/tutorial/datastructures.html#more-on-lists>`__ or a `dictionary <https://docs.python.org/3/tutorial/datastructures.html#dictionaries>`__. Be default the first element of the list or the dictionary is considered as the loss vale.
+        * :math:`model` is optionnal, it is an object with a save() method. (e.g. a neural network from Tensorflow)
 
-    You must wrap your function so it can be used in Zellij by adding several features,\
-     such as calls count, saves, parallelization, historic...
+    You must wrap your function so it can be used in Zellij by adding
+    several features, such as calls count, saves, parallelization, historic...
 
     Attributes
     ----------
     model : function
-        Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x` must be a solution. A solution can be a list of float, int... It can also be of mixed types...
+        Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x`
+        must be a solution. A solution can be a list of float, int...
+        It can also be of mixed types...
+    objective : Objective, default=Minimizer
+        Objectve object determines what and and how to optimize.
+        (minimization, maximization, ratio...)
     best_score : float
         Best score found so far.
-    best_sol : list
+    best_point : list
         Best solution found so far.
     best_argmin : int
         Index of the best solution found so far.
@@ -66,18 +72,37 @@ class LossFunc(object):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, save=False, verbose=True):
+    def __init__(
+        self,
+        model,
+        objective=Minimizer,
+        historic=True,
+        save=False,
+        verbose=True,
+        only_score=False,
+        kwargs_mode=False,
+    ):
 
         """__init__(model, save=False)
 
         Parameters
         ----------
         model : function
-            Function of type :math:`f(x)=y` or :math:`f(x)=results,model. :math:`x` must be a solution. A solution can be a list of float, int... It can also be of mixed types...
+            Function of type :math:`f(x)=y` or :math:`f(x)=results,model.
+            :math:`x` must be a solution.
+            A solution can be a list of float, int...
+            It can also be of mixed types...
+        objective : Objective, default=Minimizer
+            Objectve object determines what and and how to optimize.
+            (minimization, maximization, ratio...)
         save : string
-            Filename where to save the best found model and the historic of the loss function.
-            Only one model is saved for memory issues. Be carefull, if you want to save a model,
-            the object that you loss function returns, must have a "save" method with a filename parameter. (e.g. model.save(filename)).
+            Filename where to save the best found model
+            and the historic of the loss function.
+            Only one model is saved for memory issues.
+            Be carefull, if you want to save a model,
+            the object that you loss function returns,
+            must have a "save" method with a filename parameter.
+            (e.g. model.save(filename)).
 
         """
         ##############
@@ -85,14 +110,24 @@ class LossFunc(object):
         ##############
 
         self.model = model
+        if isinstance(objective, type):
+            self.objective = objective()
+        else:
+            self.objective = objective
+
+        self.historic = historic
         self.save = save
+        self.only_score = only_score
+        self.kwargs_mode = kwargs_mode
+
         self.verbose = verbose
+
         #############
         # VARIABLES #
         #############
 
         self.best_score = float("inf")
-        self.best_sol = None
+        self.best_point = None
         self.best_argmin = None
 
         self.all_scores = []
@@ -151,11 +186,15 @@ class LossFunc(object):
 
     @abstractmethod
     def _save_model(self, *args):
-        """ _save_model()
+        """_save_model()
 
-        Private abstract method to save a model. Be carefull, to be exploitable, the initial loss func must be of form :math:`f(x) = (y, model)`\
-         `y` are the results of the evaluation of `x` by `f`. `model` is optional, if you want to save the best model found (e.g. a neural network)\
-         you can return the model. However the model must have a "save" method with a filename. (e.g. model.save(filename)).
+        Private abstract method to save a model.
+        Be carefull, to be exploitable, the initial loss func must be of form
+        :math:`f(x) = (y, model)`, :math:`y` are the results of the evaluation of :math:`x`
+        by :math:`f`. :math:`model` is optional, if you want to save the best model
+        found (e.g. a neural network) you can return the model.
+        However the model must have a "save" method with a filename.
+        (e.g. model.save(filename)).
 
         """
         pass
@@ -188,13 +227,13 @@ class LossFunc(object):
             Needs a solution to determine the header of the save file
 
         *args : list[label]
-            list of additionnal labels to add before the score/evaluation of a point.
+            Additionnal info to add after the score/evaluation of a point.
 
         """
 
         # Create a valid folder
         try:
-            os.mkdir(self.folder_name)
+            os.makedirs(self.folder_name)
             created = False
         except FileExistsError as error:
             created = True
@@ -240,9 +279,10 @@ class LossFunc(object):
                 self.labels.append(f"attribute{i}")
 
         with open(self.loss_file, "w") as f:
-            f.write(
-                ",".join(str(e) for e in self.labels) + ",loss" + suffix + "\n"
-            )
+            if self.only_score:
+                f.write("objective\n")
+            else:
+                f.write(",".join(str(e) for e in self.labels) + suffix + "\n")
 
         logger.info(
             f"INFO: Results will be saved at: {os.path.abspath(self.folder_name)}"
@@ -250,9 +290,9 @@ class LossFunc(object):
 
         self.file_created = True
 
-    def _save_file(self, x, y, **kwargs):
+    def _save_file(self, x, **kwargs):
 
-        """_save_file(x, y, **kwargs)
+        """_save_file(x, **kwargs)
 
         Private method to save informations about an evaluation of the loss function.
 
@@ -260,12 +300,8 @@ class LossFunc(object):
         ----------
         x : list
             Solution to save.
-        y : list
-            Evaluation of the solution by the loss function;
-        filename : str
-            Name of the file created by a Metaheuristic, where to save informations.
         **kwargs : dict, optional
-            Other informations to save after the score.
+            Other information to save linked to x.
         """
 
         if not self.file_created:
@@ -273,19 +309,22 @@ class LossFunc(object):
 
         # Determine if additionnal contents must be added to the save
         if len(kwargs) > 0:
-            suffix = "," + ",".join(str(e) for e in kwargs.values())
+            suffix = ",".join(str(e) for e in kwargs.values())
         else:
             suffix = ""
 
         # Save a solution and additionnal contents
         with open(self.loss_file, "a+") as f:
-            f.write(",".join(str(e) for e in x) + "," + str(y) + suffix + "\n")
+            if self.only_score:
+                f.write(f"{kwargs['objective']}\n")
+            else:
+                f.write(",".join(str(e) for e in x) + "," + suffix + "\n")
 
     # Save best found solution
     def _save_best(self, x, y):
         """_save_best(x, y)
 
-        Save point x with score y, and verify if this point is the best found so far.
+        Save point :code:`x` with score :code:`y`, and verify if this point is the best found so far.
 
         Parameters
         ----------
@@ -295,7 +334,6 @@ class LossFunc(object):
             Loss value (score) associated to x.
 
         """
-
         # historic
         self.all_solutions.append(list(x)[:])
         self.all_scores.append(y)
@@ -303,7 +341,7 @@ class LossFunc(object):
         # Save best
         if y < self.best_score:
             self.best_score = y
-            self.best_sol = list(x)[:]
+            self.best_point = list(x)[:]
             self.best_argmin = len(self.all_scores)
 
             self.new_best = True
@@ -337,8 +375,6 @@ class LossFunc(object):
 
         """
 
-        rd = {}
-
         # Separate results and model
         if isinstance(r, tuple):
             if len(r) > 1:
@@ -348,29 +384,28 @@ class LossFunc(object):
         else:
             results, model = r, False
 
-        # Separate results
-        if isinstance(results, int) or isinstance(results, float):
-            rd["score"] = results
-        elif isinstance(results, dict):
-            rd = results
-            rd["score"] = r.values()[0]
-        elif isinstance(results, list):
-            rd["score"] = results[0]
-            for i, j in enumerate(results):
-                label = f"return{i}"
-                rd[label] = j
+        return self.objective(results), model
 
-        return rd, model
+    def get_best(self, n_process=1, idx=None):
+        if self.historic and idx is not None:
+            best_idx = np.argpartition(self.all_scores[idx], n_process)
+            best = [self.all_solutions[i] for i in best_idx[:n_process]]
+            min = [self.all_scores[i] for i in best_idx[:n_process]]
+        else:
+            best = self.best_point
+            min = self.best_score
+
+        return best, min
 
     def reset(self):
         """reset()
 
-        Reset all attributes of `LossFunc` at their initial values.
+        Reset all attributes of :code:`LossFunc` at their initial values.
 
         """
 
         self.best_score = float("inf")
-        self.best_sol = None
+        self.best_point = None
         self.best_argmin = None
 
         self.all_scores = []
@@ -400,102 +435,14 @@ class LossFunc(object):
             self.manager = enlighten.get_manager(stream=None, enabled=False)
 
 
-class FDA_loss_func:
-
-    """FDA_loss_func
-
-    FDA_loss_func allows to wrap function of type f(x)=(y, model), so it can be used in by the Fractal Decomposition Algorithm.
-
-    Must be modified
-    """
-
-    def __init__(self, model, H, sp):
-
-        ##############
-        # PARAMETERS #
-        ##############
-
-        self.loss_func = model
-        self.H = H
-        self.search_space = sp
-
-    @property
-    def calls(self):
-        return self.loss_func.calls
-
-    @property
-    def save(self):
-        return self.loss_func.save
-
-    @property
-    def best_score(self):
-        return self.loss_func.best_score
-
-    @property
-    def best_sol(self):
-        return self.loss_func.best_sol
-
-    @property
-    def all_scores(self):
-        return self.loss_func.all_scores
-
-    @property
-    def all_solutions(self):
-        return self.loss_func.all_solutions
-
-    @property
-    def new_best(self):
-        return self.loss_func.new_best
-
-    @property
-    def labels(self):
-        return self.loss_func.labels
-
-    @labels.setter
-    def labels(self, v):
-        self.loss_func.labels = v
-
-    @property
-    def folder_name(self):
-        return self.loss_func.folder_name
-
-    @property
-    def outputs_path(self):
-        return self.loss_func.outputs_path
-
-    @property
-    def model_path(self):
-        return self.loss_func.model_path
-
-    @property
-    def plots_path(self):
-        return self.loss_func.plots_path
-
-    @property
-    def loss_file(self):
-        return self.loss_func.loss_file
-
-    @property
-    def file_created(self):
-        return self.loss_func.file_created
-
-    @file_created.setter
-    def file_created(self, v):
-        self.loss_func.file_created = v
-
-    def __call__(self, X, **kwargs):
-        res = self.loss_func(X, **kwargs)
-        X_c = self.search_space.convert_to_continuous(X)
-        self.H.add_point(res, X_c)
-        return res
-
-
 class MPILoss(LossFunc):
 
     """MPILoss
 
-    MPILoss allows to wrap function of type f(x)=(y, model). MPILoss adds method to distribute dynamically the evaluation of multiple solutions.
-    It does not distribute the original loss function itself
+    MPILoss adds method to dynamically distribute the evaluation
+    of multiple solutions within a distributed environment, where a version of
+    `MPI <https://en.wikipedia.org/wiki/Message_Passing_Interface>`__
+    is available.
 
     Attributes
     ----------
@@ -531,15 +478,26 @@ class MPILoss(LossFunc):
     SerialLoss : Basic version of LossFunc
     """
 
-    def __init__(self, model, save=False, verbose=True):
+    def __init__(
+        self,
+        model,
+        objective=Minimizer,
+        historic=True,
+        save=False,
+        verbose=True,
+        only_score=False,
+        kwargs_mode=False,
+    ):
 
-        """__init__(model, save=False)
+        """__init__(model, historic=True, save=False, verbose=True)
 
         Initialize MPI variables. For more info, see LossFunc.
 
         """
 
-        super().__init__(model, save, verbose)
+        super().__init__(
+            model, objective, historic, save, verbose, only_score, kwargs_mode
+        )
 
         #################
         # MPI VARIABLES #
@@ -548,31 +506,34 @@ class MPILoss(LossFunc):
         try:
             self.comm = MPI.COMM_WORLD
             self.status = MPI.Status()
+            self.p_name = MPI.Get_processor_name()
+
             self.rank = self.comm.Get_rank()
             self.p = self.comm.Get_size()
         except Exception as err:
             logger.error(
-                "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
-            You can use: pip install zellij[Parallel]"
+                """To use MPILoss object you need to install mpi4py and an MPI
+                distribution.\nYou can use: pip install zellij[Parallel]"""
             )
 
             raise err
 
         # Master or worker process
         self.master = self.rank == 0
+        self.worker_path = os.path.join(self.folder_name, "tmp_wks")
 
         if self.master:
-            if os.path.exists("tmp_wks"):
-                shutil.rmtree("tmp_wks")
-            os.makedirs("tmp_wks")
-        else:
-            self.worker()
+            if os.path.exists(self.worker_path):
+                shutil.rmtree(self.worker_path)
+            os.makedirs(self.worker_path)
+        # else:
+        #     self.worker()
 
     def __call__(self, X, label=[], **kwargs):
 
-        """__call__(model, save_model='')
+        """__call__(X, label=[], **kwargs)
 
-        Evaluate a list X of solutions with the original loss function.
+        Evaluate a list :code:`X` of solutions with the original loss function.
 
         Parameters
         ----------
@@ -632,7 +593,6 @@ class MPILoss(LossFunc):
                 # Save score and solution into a file
                 self._save_file(
                     X[send_history[source]],
-                    res[send_history[source]],
                     **others,
                     **kwargs,
                 )
@@ -676,7 +636,6 @@ class MPILoss(LossFunc):
                 # Save score and solution into a file
                 self._save_file(
                     X[send_history[source]],
-                    res[send_history[source]],
                     **others,
                     **kwargs,
                 )
@@ -694,7 +653,8 @@ class MPILoss(LossFunc):
 
         """worker()
 
-        Initialize worker. Whilte it does not receive a stop message, a worker will wait for a solution to evaluate.
+        Initialize worker. While it does not receive a stop message,
+        a worker will wait for a solution to evaluate.
 
         """
 
@@ -711,9 +671,17 @@ class MPILoss(LossFunc):
 
                 logger.debug(f"WORKER {self.rank} evaluating: {msg}")
 
-                res, trained_model = self._build_return(self.model(msg))
+                if self.kwargs_mode:
+                    new_kwargs = {
+                        key: value for key, value in zip(self.labels, msg)
+                    }
+                    res, trained_model = self._build_return(
+                        self.model(**new_kwargs)
+                    )
+                else:
+                    res, trained_model = self._build_return(self.model(msg))
 
-                score, others = res["score"], res
+                score, others = res["objective"], res
 
                 # Verify if a model is returned or not
                 # Save the model using its save method
@@ -722,7 +690,7 @@ class MPILoss(LossFunc):
                         getattr(trained_model, "save")
                     ):
                         worker_path = os.path.join(
-                            "tmp_wks", f"worker{self.rank}"
+                            self.worker_path, f"worker{self.rank}"
                         )
                         os.system(f"rm -rf {worker_path}")
                         trained_model.save(worker_path)
@@ -730,7 +698,6 @@ class MPILoss(LossFunc):
                         logger.error(
                             "Model/loss function does not have a method called `save`"
                         )
-                        exit()
 
                 # Send results
                 logger.debug(f"WORKER {self.rank} sending {score}")
@@ -752,18 +719,24 @@ class MPILoss(LossFunc):
         for i in range(1, self.p):
             self.comm.send(dest=i, tag=0, obj=None)
 
-        shutil.rmtree("tmp_wks", ignore_errors=True)
+        shutil.rmtree(self.worker_path, ignore_errors=True)
 
     def _save_model(self, score, source):
 
-        """ _save_model()
+        """_save_model(score, source)
 
-        Private method to save a model. Be carefull, to be exploitable, the initial loss func must be of form f(x) = (y, model)\
-         y is the results of the evaluation of x by f. model is optional, if you want to save the best found model (e.g. a neural network)\
-         you can return the model. However the model must have a "save" method (e.g. model.save(filename)).
+        Be carefull, to be exploitable, the initial loss func must be of form
+        :math:`f(x) = (y, model)`, :math:`y` are the results of the evaluation of :math:`x`
+        by :math:`f`. :math:`model` is optional, if you want to save the best model
+        found (e.g. a neural network) you can return the model.
+        However the model must have a "save" method with a filename.
+        (e.g. model.save(filename)).
 
-         score : int
-            Score corresponding to the source file
+        Parameters
+        ----------
+
+        score : int
+            Score corresponding to the solution saved by the worker.
         source : int
             Worker rank which evaluate a solution and return score
 
@@ -775,7 +748,7 @@ class MPILoss(LossFunc):
             master_path = ave_path = os.path.join(
                 self.model_path, f"{self.model.__class__.__name__}_best"
             )
-            worker_path = os.path.join("tmp_wks", f"worker{source}")
+            worker_path = os.path.join(self.worker_path, f"worker{source}")
 
             if os.path.isdir(worker_path):
                 os.system(f"rm -rf {master_path}")
@@ -786,7 +759,7 @@ class SerialLoss(LossFunc):
 
     """SerialLoss
 
-    SerialLoss allows to wrap function of type f(x)=(y, model). SerialLoss adds methods to save and evaluate the original loss function.
+    SerialLoss adds methods to save and evaluate the original loss function.
 
     Methods
     -------
@@ -804,18 +777,28 @@ class SerialLoss(LossFunc):
     MPILoss : Distributed version of LossFunc
     """
 
-    def __init__(self, model, save=False, verbose=True):
+    def __init__(
+        self,
+        model,
+        objective=Minimizer,
+        historic=True,
+        save=False,
+        verbose=True,
+        only_score=False,
+        kwargs_mode=False,
+    ):
 
-        """__init__(model, save=False)
+        """__init__(model, historic=True, save=False, verbose=True)
 
         Initialize SerialLoss.
 
         """
 
-        super().__init__(model, save, verbose)
+        super().__init__(
+            model, objective, historic, save, verbose, only_score, kwargs_mode
+        )
 
     def __call__(self, X, **kwargs):
-
         """__call__(model, **kwargs)
 
         Evaluate a list X of solutions with the original loss function.
@@ -837,12 +820,17 @@ class SerialLoss(LossFunc):
         self.build_bar(len(X))
 
         self.new_best = False
-
         res = []
 
         for x in X:
-            outputs, trained_model = self._build_return(self.model(x))
-            score, others = outputs["score"], outputs
+            if self.kwargs_mode:
+                new_kwargs = {key: value for key, value in zip(self.labels, x)}
+                outputs, trained_model = self._build_return(
+                    self.model(**new_kwargs)
+                )
+            else:
+                outputs, trained_model = self._build_return(self.model(x))
+            score, others = outputs["objective"], outputs
 
             res.append(score)
 
@@ -850,7 +838,7 @@ class SerialLoss(LossFunc):
 
             # Saving
             if self.save:
-                self._save_file(x, score, **others, **kwargs)
+                self._save_file(x, **others, **kwargs)
 
                 if trained_model:
                     self._save_model(score, trained_model)
@@ -879,16 +867,29 @@ class SerialLoss(LossFunc):
 
 
 # Wrap different loss functions
-def Loss(model=None, save=False, verbose=True, MPI=False):
+def Loss(
+    model=None,
+    objective=Minimizer,
+    historic=True,
+    save=False,
+    verbose=True,
+    MPI=False,
+    only_score=False,
+    kwargs_mode=False,
+):
     """Loss(model=None, save=False, verbose=True, MPI=False)
 
-    Wrap a function of type :math:`f(x)=y`. See `LossFunc` for more info.
+    Wrap a function of type :math:`f(x)=y`. See :code:`LossFunc` for more info.
 
     Parameters
     ----------
     model : function, default=None
-        Function of type f(x)=y. x must be a solution. A solution can be a list of float, int... It can also be of mixed types, containing, strings, float, int...
-
+        Function of type f(x)=y. x must be a solution.
+        A solution can be a list of float, int...
+        It can also be of mixed types, containing, strings, float, int...
+    objective : Objective, default=Minimizer
+        Objectve object determines what and and how to optimize.
+        (minimization, maximization, ratio...)
     save : string, optional
         Filename where to save the best found model. Only one model is saved for memory issues.
 
@@ -908,7 +909,7 @@ def Loss(model=None, save=False, verbose=True, MPI=False):
     ... def himmelblau(x):
     ...   x_ar = np.array(x)
     ...   return np.sum(x_ar**4 -16*x_ar**2 + 5*x_ar) * (1/len(x_ar))
-    >>> print(f"Best solution found: f({himmelblau.best_sol}) = {himmelblau.best_score}")
+    >>> print(f"Best solution found: f({himmelblau.best_point}) = {himmelblau.best_score}")
     Best solution found: f(None) = inf
     >>> print(f"Number of evaluations:{himmelblau.calls}")
     Number of evaluations:0
@@ -926,8 +927,116 @@ def Loss(model=None, save=False, verbose=True, MPI=False):
 
         def wrapper(model):
             if MPI:
-                return MPILoss(model, save, verbose)
+                return MPILoss(
+                    model,
+                    objective,
+                    historic,
+                    save,
+                    verbose,
+                    only_score,
+                    kwargs_mode,
+                )
             else:
-                return SerialLoss(model, save, verbose)
+                return SerialLoss(
+                    model,
+                    objective,
+                    historic,
+                    save,
+                    verbose,
+                    only_score,
+                    kwargs_mode,
+                )
 
         return wrapper
+
+
+class MockModel(object):
+    """MockModel
+
+    This object allows to replace your real model with a costless object,
+    by mimicking different available configurations in Zellij.
+    ** Be carefull: This object does not replace any Loss wrapper**
+
+    Parameters
+    ----------
+    outputs : dict, default={"o1",lambda *args, **kwargs: np.random.random()}
+        Dictionnary containing outputs name (keys)
+        and functions to execute to obtain outputs.
+        Pass *args and **kwargs to these functions when calling this MockModel
+    verbose : bool
+        If True print information when saving and __call___.
+    return_format : string
+        Output format.
+        It can be:
+
+            * "dict" -> {"o1":value1,"o2":value2,...}
+            * "list" -> [value1,value2,...]
+
+    return_model : boolean
+        Return MockModel (self) or not.
+        Return if:
+            - True -> (outputs, MockModel)
+            - False -> outputs
+
+    See Also
+    --------
+    Loss : Wrapper function
+    MPILoss : Distributed version of LossFunc
+    SerialLoss : Basic version of LossFunc
+
+    Examples
+    --------
+    >>> from zellij.core.loss_func import MockModel, Loss
+    >>> mock = MockModel()
+    >>> print(mock("test", 1, 2.0, param1="Mock", param2=True))
+    I am Mock !
+        ->*args: ('test', 1, 2.0)
+        ->**kwargs: {'param1': 'Mock', 'param2': True}
+    ({'o1': 0.3440051802032301},
+    <zellij.core.loss_func.MockModel at 0x7f5c8027a100>)
+    >>> loss = Loss(save=True, verbose=False)(mock)
+    >>> print(loss([["test", 1, 2.0, "Mock", True]], other_info="Hi !"))
+    I am Mock !
+        ->*args: (['test', 1, 2.0, 'Mock', True],)
+        ->**kwargs: {}
+    I am Mock !
+        ->saving in MockModel_zlj_save/model/MockModel_best/i_am_mock.txt
+    [0.7762604280531996]
+    """
+
+    def __init__(
+        self,
+        outputs={"o1": lambda *args, **kwargs: np.random.random()},
+        return_format="dict",
+        return_model=True,
+        verbose=True,
+    ):
+        super().__init__()
+        self.outputs = outputs
+        self.return_format = return_format
+        self.return_model = return_model
+        self.verbose = verbose
+
+    def save(self, filepath):
+        os.makedirs(filepath, exist_ok=True)
+        filename = os.path.join(filepath, "i_am_mock.txt")
+        with open(filename, "wb") as f:
+            if self.verbose:
+                print(f"\nI am Mock !\n\t->saving in {filename}")
+
+    def __call__(self, *args, **kwargs):
+        if self.verbose:
+            print(f"\nI am Mock !\n\t->*args: {args}\n\t->**kwargs: {kwargs}")
+
+        if self.return_format == "dict":
+            part_1 = {x: y(*args, **kwargs) for x, y in self.outputs.items()}
+        elif self.return_format == "list":
+            part_1 = [y(*args, **kwargs) for x, y in self.outputs.items()]
+        else:
+            raise NotImplementedError(
+                f"return_format={self.return_format} is not implemented"
+            )
+        if self.return_model:
+            return part_1, self
+        else:
+            return part_1

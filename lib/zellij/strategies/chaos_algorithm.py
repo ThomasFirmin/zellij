@@ -2,15 +2,13 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:45:03+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-10-03T22:38:06+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
 
-
+from zellij.core.search_space import ContinuousSearchspace
 from zellij.core.metaheuristic import Metaheuristic
-from zellij.strategies.utils.chaos_map import Chaos_map
-from zellij.strategies.utils.chaos_map import chaos_map_name
+from zellij.strategies.tools.chaos_map import Chaos_map, Henon
 import zellij.utils.progress_bar as pb
 
 import numpy as np
@@ -52,47 +50,47 @@ class CGS(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import Searchspace
-    >>> from zellij.strategies.chaos_algorithm import CGS
-    >>> from zellij.strategies.utils.chaos_map import Henon
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
+    >>> from zellij.strategies import CGS
+    >>> from zellij.strategies.tools import Henon
     >>> from zellij.utils.benchmark import himmelblau
     ...
-    >>> labels = ["a","b","c"]
-    >>> types = ["R","R","R"]
-    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
-    >>> sp = Searchspace(labels,types,values)
     >>> lf = Loss()(himmelblau)
+    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
     ...
     ...          # Henon(map size, dimensions)
-    >>> chaosmap = Henon(250,3)
+    >>> chaosmap = Henon(250,sp.size)
     ...                  # 4 points/iterations: 4x250=1000
-    >>> cgs = CGS(lf, sp, 1000, 250, chaosmap)
+    >>> cgs = CGS(sp, 1000, 250, chaosmap)
     >>> cgs.run()
-    >>> cgs.show()
 
 
     """
 
     def __init__(
-        self, loss_func, search_space, f_calls, level, map, verbose=True
+        self,
+        search_space,
+        f_calls,
+        level,
+        map,
+        verbose=True,
     ):
-        """__init__(loss_func, search_space, f_calls, level, map, verbose=True)
+        """__init__(search_space, f_calls, level, map, verbose=True)
 
         Initialize CGS class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
         search_space : Searchspace
             Search space object containing bounds of the search space
         f_calls : int
-            Maximum number of loss_func calls
+            Maximum number of :ref:`lf` calls
         level : int
             Chaotic level corresponds to the number of iteration of the chaotic map
         map : Chaos_map
-            Chaotic map used to sample points. See `Chaos_map` object.
+            Chaotic map used to sample points. See :ref:`cmap` object.
         verbose : boolean, default=True
             Algorithm verbosity
 
@@ -101,8 +99,15 @@ class CGS(Metaheuristic):
         ##############
         # PARAMETERS #
         ##############
+        super().__init__(search_space, f_calls, verbose)
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        assert hasattr(search_space, "to_continuous") or isinstance(
+            search_space, ContinuousSearchspace
+        ), logger.error(
+            f"""If the `search_space` is not a `ContinuousSearchspace`,
+            the user must give a `Converter` to the :ref:`sp` object
+            with the kwarg `to_continuous`"""
+        )
 
         self.map = map.map
         self.level = level
@@ -111,20 +116,29 @@ class CGS(Metaheuristic):
         # VARIABLES #
         #############
 
-        self.up_bounds = np.array(
-            [1 for _ in range(self.search_space.n_variables)]
-        )
-        self.lo_bounds = np.array(
-            [0 for _ in range(self.search_space.n_variables)]
-        )
+        if isinstance(self.search_space, ContinuousSearchspace):
+            self.bounds = np.array(
+                [
+                    [v.low_bound for v in self.search_space.values],
+                    [v.up_bound for v in self.search_space.values],
+                ],
+                dtype=float,
+            )
+        else:
+            self.bounds = np.array(
+                [
+                    [0.0] * self.search_space.size,
+                    [1.0] * self.search_space.size,
+                ],
+                dtype=float,
+            )
 
         # Working attributes, saved to avoid useless computations.
-        self.up_plus_lo = self.up_bounds + self.lo_bounds
-        self.up_m_lo = self.up_bounds - self.lo_bounds
-
+        self.up_plus_lo = self.bounds[1] + self.bounds[0]
+        self.up_m_lo = self.bounds[1] - self.bounds[0]
         self.center = np.multiply(0.5, self.up_plus_lo)
         self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.lo_bounds
+        self.center_m_lo_bounds = self.center - self.bounds[0]
 
     def run(self, shift=1, H=None, n_process=1):
 
@@ -136,7 +150,7 @@ class CGS(Metaheuristic):
             Determines the starting point of the chaotic map.
 
         H : Fractal, default=None
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
 
         n_process : int, default=1
             Determines the number of best solution found to return.
@@ -144,10 +158,10 @@ class CGS(Metaheuristic):
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -159,9 +173,9 @@ class CGS(Metaheuristic):
 
         # For each level of chaos
         shift_map = (self.k - 1) * self.level
-        points = np.empty((0, self.search_space.n_variables), dtype=float)
+        points = np.empty((0, self.search_space.size), dtype=float)
 
-        n_points = self.loss_func.calls
+        n_points = self.search_space.loss.calls
         l = 0
 
         logger.info("CGS computing chaotic points")
@@ -169,12 +183,12 @@ class CGS(Metaheuristic):
         while l < self.level and n_points < self.f_calls:
 
             # Randomly select a parameter index of a solution
-            d = np.random.randint(self.search_space.n_variables)
+            d = np.random.randint(self.search_space.size)
 
             # Apply 3 transformations on the selected chaotic variables
             r_mul_y = np.multiply(self.up_m_lo, self.map[l + shift_map])
 
-            # xx = [np.add(self.center,r_mul_y), np.add(self.center,np.multiply(self.radius,np.multiply(2,y)-1)), np.subtract(self.up_bounds,r_mul_y)]
+            # xx = [np.add(self.center,r_mul_y), np.add(self.center,np.multiply(self.radius,np.multiply(2,y)-1)), np.subtract(self.bounds[1],r_mul_y)]
 
             # for each transformation of the chaotic variable
             # for x in xx:
@@ -186,7 +200,7 @@ class CGS(Metaheuristic):
             #     points = np.append(points,sym,axis=0)
             #     n_points += 4
 
-            xx = [self.lo_bounds + r_mul_y, self.up_bounds - r_mul_y]
+            xx = [self.bounds[0] + r_mul_y, self.bounds[1] - r_mul_y]
 
             # for each transformation of the chaotic variable
             sym = np.array([xx[0], xx[1], xx[0], xx[1]])
@@ -203,28 +217,23 @@ class CGS(Metaheuristic):
         self.pending_pb(len(points))
 
         logger.info("CGS evaluating chaotic points")
-        ys = self.loss_func(
-            self.search_space.convert_to_continuous(points, True),
-            algorithm="CGS",
-        )
+        if isinstance(self.search_space, ContinuousSearchspace):
+            ys = self.search_space.loss(points, algorithm="CGS")
+        else:
+            ys = self.search_space.loss(
+                self.search_space.to_continuous.reverse(points), algorithm="CGS"
+            )
 
         # Update progress bar
         self.update_main_pb(
-            len(points), explor=True, best=self.loss_func.new_best
+            len(points), explor=True, best=self.search_space.loss.new_best
         )
-
-        ys = np.array(ys)
-        idx = np.array(np.argsort(ys))[:n_process]
-
-        # best solution found
-        best_sol = points[idx]
-        best_scores = ys[idx]
 
         self.close_bar()
 
         logger.info("CGS ending")
 
-        return best_sol, best_scores
+        return self.search_space.loss.get_best(n_process)
 
 
 class CLS(Metaheuristic):
@@ -264,31 +273,27 @@ class CLS(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import Searchspace
-    >>> from zellij.strategies.chaos_algorithm import CLS
-    >>> from zellij.strategies.utils.chaos_map import Henon
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
+    >>> from zellij.strategies import CLS
+    >>> from zellij.strategies.tools import Henon
     >>> from zellij.utils.benchmark import himmelblau
     ...
-    >>> labels = ["a","b","c"]
-    >>> types = ["R","R","R"]
-    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
-    >>> sp = Searchspace(labels,types,values)
     >>> lf = Loss()(himmelblau)
+    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
     ...
     ...          # Henon(map size, dimensions)
-    >>> chaosmap = Henon(50,3)
+    >>> chaosmap = Henon(50,sp.size)
     ...                  # 2xpolygon points/iterations: 2x10x50=1000
-    >>> cls = CLS(lf, sp, 1000, 50, 10, chaosmap)
-    >>> point = sp.random_point()[0]
+    >>> cls = CLS(sp, 1000, 50, 10,chaosmap)
+    >>> point = sp.random_point()
     >>> cls.run(point, lf([point])[0])
-    >>> cls.show()
 
     """
 
     def __init__(
         self,
-        loss_func,
         search_space,
         f_calls,
         level,
@@ -297,18 +302,16 @@ class CLS(Metaheuristic):
         verbose=True,
     ):
 
-        """__init__(loss_func, search_space, f_calls, level, polygon, map, red_rate=0.5, verbose=True)
+        """__init__(self,search_space,f_calls,level,polygon,map,verbose=True)
 
         Initialize CLS class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
         search_space : Searchspace
             Search space object containing bounds of the search space
         f_calls : int
-            Maximum number of loss_func calls
+            Maximum number of :ref:`lf` calls
         level : int
             Chaotic level corresponds to the number of iteration of the chaotic map
         polygon : int
@@ -323,8 +326,15 @@ class CLS(Metaheuristic):
         ##############
         # PARAMETERS #
         ##############
+        super().__init__(search_space, f_calls, verbose)
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        assert hasattr(search_space, "to_continuous") or isinstance(
+            search_space, ContinuousSearchspace
+        ), logger.error(
+            f"""If the `search_space` is not a `ContinuousSearchspace`,
+            the user must give a `Converter` to the :ref:`sp` object
+            with the kwarg `to_continuous`"""
+        )
 
         self.level = level
         self.polygon = polygon
@@ -335,15 +345,29 @@ class CLS(Metaheuristic):
         # VARIABLES #
         #############
 
-        self.up_bounds = np.array([1 for _ in self.search_space.values])
-        self.lo_bounds = np.array([0 for _ in self.search_space.values])
+        if isinstance(self.search_space, ContinuousSearchspace):
+            self.bounds = np.array(
+                [
+                    [v.low_bound for v in self.search_space.values],
+                    [v.up_bound for v in self.search_space.values],
+                ],
+                dtype=float,
+            )
+        else:
+            self.bounds = np.array(
+                [
+                    [0.0] * self.search_space.size,
+                    [1.0] * self.search_space.size,
+                ],
+                dtype=float,
+            )
 
-        self.up_plus_lo = self.up_bounds + self.lo_bounds
-        self.up_m_lo = self.up_bounds - self.lo_bounds
+        self.up_plus_lo = self.bounds[1] + self.bounds[0]
+        self.up_m_lo = self.bounds[1] - self.bounds[0]
 
         self.center = np.multiply(0.5, self.up_plus_lo)
         self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.lo_bounds
+        self.center_m_lo_bounds = self.center - self.bounds[0]
 
         trigo_val = 2 * np.pi / self.polygon
         self.H = [np.zeros(self.polygon), np.zeros(self.polygon)]
@@ -370,17 +394,17 @@ class CLS(Metaheuristic):
         shift : int, default=1
             Determines the starting point of the chaotic map.
         H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
         n_process : int, default=1
             Determines the number of best solution found to return.
 
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -389,21 +413,28 @@ class CLS(Metaheuristic):
         self.build_bar(self.level)
 
         if X0:
-            self.X0 = np.array(
-                self.search_space.convert_to_continuous([X0])[0], dtype=float
-            )
+            if isinstance(self.search_space, ContinuousSearchspace):
+                self.X0 = np.array(X0)
+            else:
+                self.X0 = np.array(
+                    self.search_space.to_continuous.convert([X0])[0]
+                )
         elif H:
             self.X0 = H.center
         else:
-            raise ValueError("No starting point given to Simulated Annealing")
+            raise ValueError("No starting point given to CLS")
 
         if Y0:
             self.Y0 = Y0
         else:
             logger.info("CLS evaluating initial solution")
-            self.Y0 = self.loss_func(
-                self.search_space.convert_to_continuous([self.X0], True)
-            )[0]
+            if isinstance(self.search_space, ContinuousSearchspace):
+                self.Y0 = self.search_space.loss([self.X0], algorithm="CLS")[0]
+            else:
+                self.Y0 = self.search_space.loss(
+                    self.search_space.to_continuous.reverse([self.X0]),
+                    algorithm="CLS",
+                )[0]
 
         self.k = shift
         self.chaos_level = chaos_level
@@ -411,12 +442,12 @@ class CLS(Metaheuristic):
         # Initialization
         shift = self.chaos_level * (self.k - 1) * self.level
         # Limits of the search space, if parameter greater than center, then = 1 else = -1, used to avoid overflow
-        db = np.minimum(self.up_bounds - self.X0, self.X0 - self.lo_bounds)
+        db = np.minimum(self.bounds[1] - self.X0, self.X0 - self.bounds[0])
 
         center_m_solution = self.center - self.X0
-        points = np.empty((0, self.search_space.n_variables), dtype=float)
+        points = np.empty((0, self.search_space.size), dtype=float)
 
-        n_points = self.loss_func.calls
+        n_points = self.search_space.loss.calls
         l = 0
 
         logger.info("CLS computing chaotic points")
@@ -429,7 +460,7 @@ class CLS(Metaheuristic):
             Rl = self.radius * self.red_rate
 
             # Decomposition vector
-            d = np.random.randint(self.search_space.n_variables)
+            d = np.random.randint(self.search_space.size)
 
             # zoom speed
             gamma = 10 ** (-2 * self.red_rate * l) / (l + 1)
@@ -459,15 +490,16 @@ class CLS(Metaheuristic):
         self.pending_pb(len(points))
 
         logger.info("CLS evaluating chaotic points")
-        print(points)
-        ys = self.loss_func(
-            self.search_space.convert_to_continuous(points, True),
-            algorithm="CLS",
-        )
+        if isinstance(self.search_space, ContinuousSearchspace):
+            ys = self.search_space.loss(points, algorithm="CLS")
+        else:
+            ys = self.search_space.loss(
+                self.search_space.to_continuous.reverse(points), algorithm="CLS"
+            )
 
         # Update progress bar
         self.update_main_pb(
-            len(points), explor=True, best=self.loss_func.new_best
+            len(points), explor=True, best=self.search_space.loss.new_best
         )
 
         ys = np.array(ys)
@@ -481,7 +513,7 @@ class CLS(Metaheuristic):
 
         logger.info("CLS ending")
 
-        return best_sol, best_scores
+        return self.search_space.loss.get_best(n_process)
 
 
 class CFS(Metaheuristic):
@@ -521,31 +553,27 @@ class CFS(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import Searchspace
-    >>> from zellij.strategies.chaos_algorithm import CFS
-    >>> from zellij.strategies.utils.chaos_map import Henon
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core.variables import FloatVar, ArrayVar
+    >>> from zellij.strategies import CFS
+    >>> from zellij.strategies.tools import Henon
     >>> from zellij.utils.benchmark import himmelblau
     ...
-    >>> labels = ["a","b","c"]
-    >>> types = ["R","R","R"]
-    >>> values = [[-5, 5],[-5, 5],[-5, 5]]
-    >>> sp = Searchspace(labels,types,values)
     >>> lf = Loss()(himmelblau)
+    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
     ...
     ...          # Henon(map size, dimensions)
-    >>> chaosmap = Henon(50,3)
+    >>> chaosmap = Henon(50,sp.size)
     ...                  # 2xpolygon points/iterations: 2x10x50=1000
-    >>> cfs = CFS(lf, sp, 1000, 50, 10, chaosmap)
-    >>> point = sp.random_point()[0]
+    >>> cfs = CFS(sp, 1000, 50, 10, chaosmap)
+    >>> point = sp.random_point()
     >>> cfs.run(point, lf([point])[0])
-    >>> cfs.show()
 
     """
 
     def __init__(
         self,
-        loss_func,
         search_space,
         f_calls,
         level,
@@ -554,24 +582,22 @@ class CFS(Metaheuristic):
         verbose=True,
     ):
 
-        """__init__(loss_func, search_space, f_calls, level, polygon, map, red_rate=0.5, verbose=True)
+        """__init__(self,search_space,f_calls,level,polygon,map,verbose=True,converter=None)
 
         Initialize CLS class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
         search_space : Searchspace
             Search space object containing bounds of the search space
         f_calls : int
-            Maximum number of loss_func calls
+            Maximum number of :ref:`lf` calls
         level : int
             Chaotic level corresponds to the number of iteration of the chaotic map
         polygon : int
             Vertex number of the rotating polygon (has an influence on the number of evaluated points)
         map : Chaos_map
-            Chaotic map used to sample points. See Chaos_map object.
+            Chaotic map used to sample points. See Chaos_Simulated Annealingmap object.
         verbose : boolean, default=True
             Algorithm verbosity
 
@@ -580,8 +606,15 @@ class CFS(Metaheuristic):
         ##############
         # PARAMETERS #
         ##############
+        super().__init__(search_space, f_calls, verbose)
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        assert hasattr(search_space, "to_continuous") or isinstance(
+            search_space, ContinuousSearchspace
+        ), logger.error(
+            f"""If the `search_space` is not a `ContinuousSearchspace`,
+            the user must give a `Converter` to the :ref:`sp` object
+            with the kwarg `to_continuous`"""
+        )
 
         self.level = level
         self.polygon = polygon
@@ -592,15 +625,29 @@ class CFS(Metaheuristic):
         # VARIABLES #
         #############
 
-        self.up_bounds = np.array([1 for _ in self.search_space.values])
-        self.lo_bounds = np.array([0 for _ in self.search_space.values])
+        if isinstance(self.search_space, ContinuousSearchspace):
+            self.bounds = np.array(
+                [
+                    [v.low_bound for v in self.search_space.values],
+                    [v.up_bound for v in self.search_space.values],
+                ],
+                dtype=float,
+            )
+        else:
+            self.bounds = np.array(
+                [
+                    [0.0] * self.search_space.size,
+                    [1.0] * self.search_space.size,
+                ],
+                dtype=float,
+            )
 
-        self.up_plus_lo = self.up_bounds + self.lo_bounds
-        self.up_m_lo = self.up_bounds - self.lo_bounds
+        self.up_plus_lo = self.bounds[1] + self.bounds[0]
+        self.up_m_lo = self.bounds[1] - self.bounds[0]
 
         self.center = np.multiply(0.5, self.up_plus_lo)
         self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.lo_bounds
+        self.center_m_lo_bounds = self.center - self.bounds[0]
 
         trigo_val = 2 * np.pi / self.polygon
         self.H = [np.zeros(self.polygon), np.zeros(self.polygon)]
@@ -611,10 +658,10 @@ class CFS(Metaheuristic):
             self.H[1][i - 1] = np.sin(trigo_val * i)
 
     def stochastic_round(self, solution, k):
-        print(solution)
-        r = np.random.uniform(-1, 1, len(solution))
+        s = np.array(solution)
+        r = np.random.uniform(-1, 1, len(s))
         # perturbation on CFS zoom
-        z = np.round(solution.astype(float)) + (k % 2) * r
+        z = np.round(s.astype(float)) + (k % 2) * r
 
         return z
 
@@ -635,17 +682,17 @@ class CFS(Metaheuristic):
         shift : int, default=1
             Determines the starting point of the chaotic map.
         H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
         n_process : int, default=1
             Determines the number of best solution found to return.
 
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -654,21 +701,29 @@ class CFS(Metaheuristic):
         self.build_bar(self.level)
 
         if X0:
-            self.X0 = np.array(
-                self.search_space.convert_to_continuous([X0])[0], dtype=float
-            )
+            if isinstance(self.search_space, ContinuousSearchspace):
+                self.X0 = np.array(X0)
+            else:
+                self.X0 = np.array(
+                    self.search_space.to_continuous.convert([X0])[0]
+                )
+
         elif H:
             self.X0 = H.center
         else:
-            raise ValueError("No starting point given to Simulated Annealing")
+            raise ValueError("No starting point given to CFS")
 
         if Y0:
             self.Y0 = Y0
         else:
             logger.info("CLS evaluating initial solution")
-            self.Y0 = self.loss_func(
-                self.search_space.convert_to_continuous([self.X0], True)
-            )[0]
+            if isinstance(self.search_space, ContinuousSearchspace):
+                self.Y0 = self.search_space.loss([self.X0], algorithm="CFS")[0]
+            else:
+                self.Y0 = self.search_space.loss(
+                    self.search_space.to_continuous.reverse([self.X0]),
+                    algorithm="CFS",
+                )[0]
 
         self.k = shift
         self.chaos_level = chaos_level
@@ -677,9 +732,9 @@ class CFS(Metaheuristic):
 
         y = self.map[shift]
         # Limits of the search area, if parameter greater than center, then = 1 else = -1, used to avoid overflow
-        db = np.minimum(self.up_bounds - self.X0, self.X0 - self.lo_bounds)
+        db = np.minimum(self.bounds[1] - self.X0, self.X0 - self.bounds[0])
 
-        r_g = np.zeros(self.search_space.n_variables)
+        r_g = np.zeros(self.search_space.size)
 
         # Randomly select the reduction rate
         # red_rate = random.random()*0.5
@@ -688,9 +743,9 @@ class CFS(Metaheuristic):
         zc = self.Y0
 
         center_m_solution = self.center - self.X0
-        points = np.empty((0, self.search_space.n_variables), dtype=float)
+        points = np.empty((0, self.search_space.size), dtype=float)
 
-        n_points = self.loss_func.calls
+        n_points = self.search_space.loss.calls
         l = 0
 
         logger.info("CFS computing chaotic points")
@@ -703,7 +758,7 @@ class CFS(Metaheuristic):
             Rl = self.radius * self.red_rate
 
             # Decomposition vector
-            d = np.random.randint(self.search_space.n_variables)
+            d = np.random.randint(self.search_space.size)
 
             # Exponential Zoom factor on the search window
             pc = 10 ** (l + 1)
@@ -716,7 +771,7 @@ class CFS(Metaheuristic):
             r = np.random.random()
 
             # for each parameter of a solution determines the improved radius
-            r_g = np.minimum((Rl * error_g) / (l ** 2 + 1), db)
+            r_g = np.minimum((Rl * error_g) / (l**2 + 1), db)
 
             # Compute both chaotic variable of the polygonal model thanks to a chaotic map
             xv = [np.multiply(r_g, y), np.multiply(r_g, y)]
@@ -737,14 +792,16 @@ class CFS(Metaheuristic):
         self.pending_pb(len(points))
 
         logger.info("CFS evaluating chaotic points")
-        ys = self.loss_func(
-            self.search_space.convert_to_continuous(points, True),
-            algorithm="CFS",
-        )
+        if isinstance(self.search_space, ContinuousSearchspace):
+            ys = self.search_space.loss(points, algorithm="CFS")
+        else:
+            ys = self.search_space.loss(
+                self.search_space.to_continuous.reverse(points), algorithm="CFS"
+            )
 
         # Update progress bar
         self.update_main_pb(
-            len(points), explor=True, best=self.loss_func.new_best
+            len(points), explor=True, best=self.search_space.loss.new_best
         )
 
         ys = np.array(ys)
@@ -758,15 +815,14 @@ class CFS(Metaheuristic):
 
         logger.info("CFS ending")
 
-        return best_sol, best_scores
+        return self.search_space.loss.get_best(n_process)
 
 
 class Chaotic_optimization(Metaheuristic):
 
     """Chaotic_optimization
 
-    Chaotic optimization combines CGS, CLS and CFS. Using a unique chaos map. You can determine the number of outer and inner iteration is determine using an exploration ratio,\
-     and according to chaotic levels associated to CGS, CLS and CFS. The best solution found by CGS is used as a starting for CLS, and the best solution found by CLS is used by CFS.
+    Chaotic optimization combines CGS, CLS and CFS.
 
     Attributes
     ----------
@@ -802,23 +858,34 @@ class Chaotic_optimization(Metaheuristic):
     run(self, n_process=1)
         Runs Chaotic_optimization
 
-    show(filename=None)
-        Plots results
-
     See Also
     --------
     :ref:`meta` : Parent class defining what a Metaheuristic is
     CGS : Chaotic Global Search
     CLS : Chaotic Local Search
     CFS : Chaotic Fine Search
+
+    Examples
+    --------
+
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
+    >>> from zellij.strategies import Chaotic_optimization
+    >>> from zellij.utils.benchmark import himmelblau
+    ...
+    >>> lf = Loss()(himmelblau)
+    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
+    >>> co = Chaotic_optimization(sp, 1000)
+    >>> co.run()
+
     """
 
     def __init__(
         self,
-        loss_func,
         search_space,
         f_calls,
-        chaos_map="henon",
+        chaos_map=Henon,
         exploration_ratio=0.30,
         levels=(32, 6, 2),
         polygon=4,
@@ -826,18 +893,16 @@ class Chaotic_optimization(Metaheuristic):
         verbose=True,
     ):
 
-        """__init__(loss_func, search_space, f_calls,chaos_map="henon", exploration_ratio = 0.70, levels = (32,6,2), polygon=4, red_rate=0.5, verbose=True)
+        """__init__(search_space, f_calls,chaos_map="henon", exploration_ratio = 0.70, levels = (32,6,2), polygon=4, red_rate=0.5, verbose=True)
 
         Initialize CGS class
 
         Parameters
         ----------
-        loss_func : Loss
-            Loss function to optimize. must be of type f(x)=y
         search_space : Searchspace
             Search space object containing bounds of the search space
         f_calls : int
-            Maximum number of loss_func calls
+            Maximum number of :ref:`lf` calls
         chaos_map : {'henon', 'kent', 'tent', 'logistic', 'random', Chaos_map}
             If a string is given, the algorithm will select the corresponding map. The chaotic map is used to sample points.\
              If it is a map, it will directly use it. Be carefull, the map size must be sufficient according to the parametrization.
@@ -852,14 +917,20 @@ class Chaotic_optimization(Metaheuristic):
             Reduction rate of the progressive zoom on the best solution found
         verbose : boolean, default=True
             Algorithm verbosity
-
         """
 
         ##############
         # PARAMETERS #
         ##############
+        super().__init__(search_space, f_calls, verbose)
 
-        super().__init__(loss_func, search_space, f_calls, verbose)
+        assert hasattr(search_space, "to_continuous") or isinstance(
+            search_space, ContinuousSearchspace
+        ), logger.error(
+            f"""If the `search_space` is not a `ContinuousSearchspace`,
+            the user must give a `Converter` to the :ref:`sp` object
+            with the kwarg `to_continuous`"""
+        )
 
         self.chaos_map = chaos_map
         self.exploration_ratio = exploration_ratio
@@ -926,9 +997,7 @@ class Chaotic_optimization(Metaheuristic):
                 )
             )
 
-        self.map = chaos_map_name[self.chaos_map](
-            self.map_size, self.search_space.n_variables
-        )
+        self.map = self.chaos_map(self.map_size, self.search_space.size)
 
         logging.info(str(self))
 
@@ -941,7 +1010,7 @@ class Chaotic_optimization(Metaheuristic):
         Parameters
         ----------
         H : Fractal, default=None
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
 
         n_process : int, default=1
             Determine the number of best solution found to return.
@@ -949,10 +1018,10 @@ class Chaotic_optimization(Metaheuristic):
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -963,7 +1032,6 @@ class Chaotic_optimization(Metaheuristic):
 
         # Initialize CGS/CLS/CFS
         cgs = CGS(
-            self.loss_func,
             self.search_space,
             self.f_calls,
             self.CGS_level,
@@ -971,23 +1039,19 @@ class Chaotic_optimization(Metaheuristic):
             verbose=self.verbose,
         )
         cls = CLS(
-            self.loss_func,
             self.search_space,
             self.f_calls,
             self.CLS_level,
             self.polygon,
             self.map,
-            self.red_rate,
             verbose=self.verbose,
         )
         cfs = CFS(
-            self.loss_func,
             self.search_space,
             self.f_calls,
             self.CFS_level,
             self.polygon,
             self.map,
-            self.red_rate,
             verbose=self.verbose,
         )
 
@@ -1004,22 +1068,24 @@ class Chaotic_optimization(Metaheuristic):
         k = 1
 
         # Outer loop (exploration)
-        while k <= self.iterations and self.loss_func.calls < self.f_calls:
+        while (
+            k <= self.iterations and self.search_space.loss.calls < self.f_calls
+        ):
 
             logger.info("Chaotic optimization: Exploration phase")
 
             # If there is CGS
             if self.CGS_level > 0:
 
-                prec_calls = self.loss_func.calls
+                prec_calls = self.search_space.loss.calls
                 self.pending_pb(self.CGS_level * 4)
 
                 x_inter, loss_value = cgs.run(k)
 
                 self.update_main_pb(
-                    self.loss_func.calls - prec_calls,
+                    self.search_space.loss.calls - prec_calls,
                     explor=True,
-                    best=self.loss_func.new_best,
+                    best=self.search_space.loss.new_best,
                 )
 
                 # Store to return best solution found
@@ -1033,14 +1099,14 @@ class Chaotic_optimization(Metaheuristic):
                     "Chaotic optimization: using random instead of CGS"
                 )
 
-                x_inter = [np.random.random(self.search_space.n_variables)]
+                x_inter = [np.random.random(self.search_space.size)]
 
                 self.pending_pb(1)
 
-                loss_value = self.loss_func(x_inter)
+                loss_value = self.search_space.loss(x_inter, algorithm="CO")
 
                 self.update_main_pb(
-                    1, explor=True, best=self.loss_func.new_best
+                    1, explor=True, best=self.search_space.loss.new_best
                 )
 
                 # Store to return best solution found
@@ -1051,23 +1117,25 @@ class Chaotic_optimization(Metaheuristic):
                 f"Iterations | Loss function calls | Best value from CGS"
             )
             logger.debug(
-                f"{k} < {self.iterations} | {self.loss_func.calls} < {self.f_calls} | {loss_value}"
+                f"{k} < {self.iterations} | {self.search_space.loss.calls} < {self.f_calls} | {loss_value}"
             )
-            logger.debug(f"New best solution found {self.loss_func.new_best}")
+            logger.debug(
+                f"New best solution found {self.search_space.loss.new_best}"
+            )
 
             inner = 0
 
             # Inner loop (exploitation)
             while (
                 inner < self.inner_iterations
-                and self.loss_func.calls < self.f_calls
+                and self.search_space.loss.calls < self.f_calls
             ):
 
                 logger.info("Chaotic optimization: Exploitation phase")
 
                 if self.CLS_level > 0:
 
-                    prec_calls = self.loss_func.calls
+                    prec_calls = self.search_space.loss.calls
                     self.pending_pb(self.CLS_level * self.polygon * 2)
 
                     x_inter, loss_value = cls.run(
@@ -1075,9 +1143,9 @@ class Chaotic_optimization(Metaheuristic):
                     )
 
                     self.update_main_pb(
-                        self.loss_func.calls - prec_calls,
+                        self.search_space.loss.calls - prec_calls,
                         explor=False,
-                        best=self.loss_func.new_best,
+                        best=self.search_space.loss.new_best,
                     )
 
                     # Store to return best solution found
@@ -1086,7 +1154,7 @@ class Chaotic_optimization(Metaheuristic):
 
                 if self.CFS_level > 0:
 
-                    prec_calls = self.loss_func.calls
+                    prec_calls = self.search_space.loss.calls
                     self.pending_pb(self.CFS_level * self.polygon * 2)
 
                     x_inter, loss_value = cfs.run(
@@ -1094,9 +1162,9 @@ class Chaotic_optimization(Metaheuristic):
                     )
 
                     self.update_main_pb(
-                        self.loss_func.calls - prec_calls,
+                        self.search_space.loss.calls - prec_calls,
                         explor=False,
-                        best=self.loss_func.new_best,
+                        best=self.search_space.loss.new_best,
                     )
 
                     # Store to return best solution found
@@ -1107,10 +1175,10 @@ class Chaotic_optimization(Metaheuristic):
                     f"Iterations | Loss function calls | Best value from CGS"
                 )
                 logger.debug(
-                    f"{k} < {self.iterations} | {self.loss_func.calls} < {self.f_calls} | {loss_value}"
+                    f"{k} < {self.iterations} | {self.search_space.loss.calls} < {self.f_calls} | {loss_value}"
                 )
                 logger.debug(
-                    f"New best solution found {self.loss_func.new_best}"
+                    f"New best solution found {self.search_space.loss.new_best}"
                 )
 
                 inner += 1
@@ -1127,24 +1195,7 @@ class Chaotic_optimization(Metaheuristic):
 
         logger.info("Chaotic optimization ending")
 
-        return best_sol, best_scores
-
-    def show(self, filepath="", save=False):
-
-        """show(filename="")
-
-        Plots solutions and scores evaluated during the optimization
-
-        Parameters
-        ----------
-        filename : str, default=None
-            If a filepath is given, the method will read the file and will try to plot contents.
-
-        save : boolean, default=False
-            Save figures
-        """
-
-        super().show(filepath, save)
+        return self.search_space.loss.get_best(n_process)
 
     def __str__(self):
-        return f"Max Loss function calls:{self.f_calls}\nDimensions:{self.search_space.n_variables}\nExploration/Exploitation:{self.exploration_ratio}|{1-self.exploration_ratio}\nRegular polygon:{self.polygon}\nZoom:{self.red_rate}\nIterations:\n\tGlobal:{self.iterations}\n\tInner:{self.inner_iterations}\nChaos Levels:\n\tCGS:{self.CGS_level}\n\tCLS:{self.CLS_level}\n\tCFS:{self.CFS_level}\nMap size:{self.map_size}x{self.search_space.n_variables}"
+        return f"Max Loss function calls:{self.f_calls}\nDimensions:{self.search_space.size}\nExploration/Exploitation:{self.exploration_ratio}|{1-self.exploration_ratio}\nRegular polygon:{self.polygon}\nZoom:{self.red_rate}\nIterations:\n\tGlobal:{self.iterations}\n\tInner:{self.inner_iterations}\nChaos Levels:\n\tCGS:{self.CGS_level}\n\tCLS:{self.CLS_level}\n\tCFS:{self.CFS_level}\nMap size:{self.map_size}x{self.search_space.size}"

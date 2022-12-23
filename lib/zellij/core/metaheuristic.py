@@ -2,11 +2,9 @@
 # @Date:   2022-05-03T15:41:48+02:00
 # @Email:  thomas.firmin@univ-lille.fr
 # @Project: Zellij
-# @Last modified by:   ThomasFirmin
-# @Last modified time: 2022-05-03T15:44:16+02:00
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-11-09T10:55:33+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-# @Copyright: Copyright (C) 2022 Thomas Firmin
-
 
 import zellij.utils.progress_bar as pb
 from abc import abstractmethod
@@ -17,33 +15,26 @@ import enlighten
 
 import logging
 
-logger = logging.getLogger("zellij.Meta")
+logger = logging.getLogger("zellij.meta")
 
 
 class Metaheuristic(object):
 
     """Metaheuristic
 
-    Metaheuristic is a core object which defines the structure of a metaheuristic in Zellij.
-    It is an abtract class.
+    :ref:`meta` is a core object which defines the structure
+    of a metaheuristic in Zellij. It is an abtract class.
 
     Attributes
     ----------
-    loss_func : LossFunc
-        Loss function to optimize. must be of type :math:`f(x)=y` or :math:`f(x)=results,model`
-        See :ref:`lf` for more information.
-
     search_space : Searchspace
-        :ref:`sp` object containing bounds of all decision variables.
+        :ref:`sp` object containing decision variables and the loss function.
 
     f_calls : int
-        Maximum number of calls to loss_func.
+        Maximum number of calls to search.space_space.loss.
 
     save : boolean, optional
         If True save results into a file
-
-    H : Fractal, optional
-        If a :ref:`frac` is given, allows to use it.
 
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
@@ -54,13 +45,11 @@ class Metaheuristic(object):
     :ref:`sp` : Defines what a search space is in Zellij.
     """
 
-    def __init__(self, loss_func, search_space, f_calls, verbose=True):
+    def __init__(self, search_space, f_calls, verbose=True):
 
         ##############
         # PARAMETERS #
         ##############
-
-        self.loss_func = loss_func
         self.search_space = search_space
         self.f_calls = f_calls
 
@@ -69,11 +58,6 @@ class Metaheuristic(object):
         #############
         # VARIABLES #
         #############
-
-        # Modify labels in loss func according to SearchSpace labels
-        self.loss_func.labels = self.search_space.labels
-        # Index of the historic in loss function.
-        self.lf_idx = len(self.loss_func.all_scores)
 
         if self.verbose:
             self.manager = enlighten.get_manager()
@@ -111,7 +95,7 @@ class Metaheuristic(object):
                     self.calls_pb_pending,
                 ) = pb.calls_counter(self.manager, self.f_calls)
 
-                self.loss_func.manager = self.manager
+                self.search_space.loss.manager = self.manager
 
             else:
                 self.main_pb = False
@@ -132,10 +116,11 @@ class Metaheuristic(object):
         Parameters
         ----------
         nb : int
-            Length of the update. e.g. if the progress bar measure the number of iterations,
-            at each iteration `nb=1`.
+            Length of the update. e.g. if the progress bar measure
+            the number of iterations, at each iteration `nb=1`.
         explor : bool, default=True
-            If True the color associated to the update will be blue. Orange, otherwise.
+            If True the color associated to the update will be blue.
+            Orange, otherwise.
         best : bool default=False
             If True the score of the current solution will be displayed.
 
@@ -151,7 +136,8 @@ class Metaheuristic(object):
     def pending_pb(self, nb):
         """pending_pb(nb)
 
-        Update the progress bar with a pending property (white). This update will be replaced when using
+        Update the progress bar with a pending property (white).
+        This update will be replaced when using
         `update_main_pb`.
 
         Parameters
@@ -182,36 +168,7 @@ class Metaheuristic(object):
     def run(self):
         """run()
 
-        Abstract method, describe how to run a metaheuristic
+        Abstract method, describes how to run a metaheuristic
 
         """
         pass
-
-    def show(self, filepath="", save=False):
-        """show(filepath="", save=False)
-
-        Basic plots for all metaheuristic. uses :ref:`sp` plotting.
-
-        Parameters
-        ----------
-        filepath : string, default=""
-            If a filepath to a file containing points is given, it will read those points and plot them.
-        save : bool, default=False
-            If true, it saves the plots.
-
-        """
-
-        if filepath:
-            all = os.path.join(filepath, "outputs", "all_evaluations.csv")
-
-            all_data = pd.read_table(all, sep=",", decimal=".")
-            all_scores = all_data["loss"].to_numpy()
-        else:
-            all_data = self.loss_func.all_solutions
-            all_scores = np.array(self.loss_func.all_scores)
-
-        self.search_space.show(
-            all_data, all_scores, save, self.loss_func.plots_path
-        )
-
-        return all_data, all_scores

@@ -8,13 +8,21 @@
  <!-- @Copyright: Copyright (C) 2022 Thomas Firmin -->
 
 
-![alt text](./sources/logo_5st.png)
+![alt text](./sources/zellij_logo.png)
+[![PyPI version shields.io](https://img.shields.io/pypi/v/ansicolortags.svg)](https://pypi.org/project/zellij/)
+[![PyPI license](https://img.shields.io/pypi/l/ansicolortags.svg)](https://pypi.org/project/zellij/)
+[![Documentation Status](https://readthedocs.org/projects/zellij/badge/?version=latest)](https://zellij.readthedocs.io/en/latest/?badge=latest)
+[![GitHub latest commit](https://badgen.net/github/last-commit/Naereen/Strapdown.js)](https://GitHub.com/Naereen/StrapDown.js/commit/)
+![Maintainer](https://img.shields.io/badge/maintainer-T.Firmin-blue)
+
 
 **Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Fractal Decomposition based algorithms* [[1]](#1) [[2]](#2).
 It includes tools to define mixed search space, manage objective functions, and a few algorithms.
 To implements metaheuristics and other optimization methods, **Zellij** uses [DEAP](https://deap.readthedocs.io/)[[3]](#3) for the *Evolutionary Algorithms* part
 and [BoTorch](https://botorch.org/) [[4]](#4) for *Bayesian Optimization*.
 **Zellij** is defined as an easy to use and modular framework, based on Python object oriented paradigm.
+
+See [documentation](https://zellij.readthedocs.io/en/latest/).
 
 ## Install Zellij
 
@@ -25,7 +33,7 @@ $ pip install zellij
 
 #### Distributed Zellij
 
-This version requires MPI, such as [MPICH](https://www.mpich.org/) or [Open MPI](https://www.open-mpi.org/).
+This version requires a MPI library, such as [MPICH](https://www.mpich.org/) or [Open MPI](https://www.open-mpi.org/).
 It is based on [mpi4py](https://mpi4py.readthedocs.io/en/stable/intro.html#what-is-mpi)
 
 ```
@@ -41,44 +49,6 @@ Then the python script must be executed using `mpiexec`:
 $ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path/to/python/script>
 ```
 
-Be carefull, before using this version, one must be familiar to MPI.
-
-## Quickstart
-
-#### Define your search space
-```python
-
-from zellij.core.search_space import Searchspace
-
-labels = ["a","b"]
-types = ["R","R"]
-values = [[-5, 5],[-5, 5]]
-neighborhood = [0.5,0.5]
-sp = Searchspace(labels,types,values, neighborhood)
-```
-
-#### Define your loss function
-```python
-import numpy as np
-from zellij.core.loss_func import Loss
-
-@Loss(save=False, verbose=True)
-def himmelblau(x):
-  x_ar = np.array(x)
-  return np.sum(x_ar**4 -16*x_ar**2 + 5*x_ar) * (1/len(x_ar))
-
-print(himmelblau)
-```
-
-#### Choose an optimization algorithm
-
-```python
-from zellij.strategies.genetic_algorithm import Genetic_algorithm
-ga = Genetic_algorithm(himmelblau, sp, 1000, pop_size=25, generation=40)
-ga.run()
-ga.show()
-```
-
 ## Dependencies
 
 #### Original version
@@ -88,9 +58,8 @@ ga.show()
 * [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
 * [botorch](https://botorch.org/)>=0.6.3.1
 * [gpytorch](https://gpytorch.ai/)>=1.6.0
-* [matplotlib](https://matplotlib.org/)>=3.5.0
-* [seaborn](https://seaborn.pydata.org/)>=0.11.2
 * [pandas](https://pandas.pydata.org/)>=1.3.4
+* [enlighten](https://python-enlighten.readthedocs.io/en/stable/)>=1.10.2
 
 #### MPI version
 * **Python** >=3.6
@@ -98,13 +67,11 @@ ga.show()
 * [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
 * [botorch](https://botorch.org/)>=0.6.3.1
 * [gpytorch](https://gpytorch.ai/)>=1.6.0
-* [matplotlib](https://matplotlib.org/)>=3.5.0
-* [seaborn](https://seaborn.pydata.org/)>=0.11.2
 * [pandas](https://pandas.pydata.org/)>=1.3.4
+* [enlighten](https://python-enlighten.readthedocs.io/en/stable/)>=1.10.2
 * [mpi4py](https://mpi4py.readthedocs.io/en/stable/)>=3.1.2
 
 ## Contributors
-
 ### Design
 * Thomas Firmin: thomas.firmin@univ-lille.fr
 * El-Ghazali Talbi: el-ghazali.talbi@univ-lille.fr

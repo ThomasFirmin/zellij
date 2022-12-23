@@ -1,3 +1,11 @@
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-05-11T16:12:13+02:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2022-10-03T22:39:31+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+
 import setuptools
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -19,7 +27,7 @@ docs_extras = [
 
 setuptools.setup(
     name="zellij",
-    version="0.0.5",
+    version="0.9.0",
     author="Thomas Firmin",
     author_email="thomas.firmin@univ-lille.fr",
     description="A software framework for HyperParameters Optimization",
@@ -49,12 +57,12 @@ setuptools.setup(
     packages=setuptools.find_packages("lib"),
     install_requires=[
         "numpy>=1.21.4",
+        "scipy>=1.7.3",
         "DEAP>=1.3.1",
         "botorch>=0.6.3.1",
         "gpytorch>=1.6.0",
-        "matplotlib>=3.5.0",
-        "seaborn>=0.11.2",
         "pandas>=1.3.4",
+        "enlighten>=1.10.2",
     ],
     extras_require={"mpi": ["mpi4py>=3.1.2"], "docs": docs_extras},
     python_requires=">=3.6",
