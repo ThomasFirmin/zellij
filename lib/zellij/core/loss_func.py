@@ -87,22 +87,23 @@ class LossFunc(ABC):
 
         Parameters
         ----------
-        model : function
-            Function of type :math:`f(x)=y` or :math:`f(x)=results,model.
-            :math:`x` must be a solution.
+        model : function, default=None
+            Function of type `f(x)=y`. `x` must be a solution.
             A solution can be a list of float, int...
-            It can also be of mixed types...
+            It can also be of mixed types, containing, strings, float, int...
         objective : Objective, default=Minimizer
             Objectve object determines what and and how to optimize.
             (minimization, maximization, ratio...)
-        save : string
-            Filename where to save the best found model
-            and the historic of the loss function.
-            Only one model is saved for memory issues.
-            Be carefull, if you want to save a model,
-            the object that you loss function returns,
-            must have a "save" method with a filename parameter.
-            (e.g. model.save(filename)).
+        save : string, optional
+            Filename where to save the best found model. Only one model is saved for memory issues.
+        MPI : boolean, optional
+            Wrap the function with MPILoss if True, with SerialLoss else.
+        only_score : boolean, optional
+            If a save is not False, then if True, only the objective values will
+            be saved.
+        kwargs_mode : boolean, optional
+            If True, then points will be passed as kwargs to the :code:`model`. Keys
+            will be the labels, if they are of the same size as the point.
 
         """
         ##############
@@ -877,14 +878,14 @@ def Loss(
     only_score=False,
     kwargs_mode=False,
 ):
-    """Loss(model=None, save=False, verbose=True, MPI=False)
+    """Loss(model=None, save=False, verbose=True, MPI=False, only_score=False, kwargs_mode=False)
 
     Wrap a function of type :math:`f(x)=y`. See :code:`LossFunc` for more info.
 
     Parameters
     ----------
     model : function, default=None
-        Function of type f(x)=y. x must be a solution.
+        Function of type `f(x)=y`. `x` must be a solution.
         A solution can be a list of float, int...
         It can also be of mixed types, containing, strings, float, int...
     objective : Objective, default=Minimizer
@@ -892,9 +893,14 @@ def Loss(
         (minimization, maximization, ratio...)
     save : string, optional
         Filename where to save the best found model. Only one model is saved for memory issues.
-
     MPI : boolean, optional
         Wrap the function with MPILoss if True, with SerialLoss else.
+    only_score : boolean, optional
+        If a save is not False, then if True, only the objective values will
+        be saved.
+    kwargs_mode : boolean, optional
+        If True, then points will be passed as kwargs to the :code:`model`. Keys
+        will be the labels, if they are of the same size as the point.
 
     Returns
     -------
