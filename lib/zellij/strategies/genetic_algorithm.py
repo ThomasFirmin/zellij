@@ -15,8 +15,6 @@ from deap import tools
 import numpy as np
 import os
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
 
 import logging
 
@@ -27,19 +25,9 @@ class Genetic_algorithm(Metaheuristic):
 
     """Genetic_algorithm
 
-    Genetic_algorithm (GA) implements a steady state genetic algorithm.
+    Genetic_algorithm (GA) implements a classic genetic algorithm.
 
-    Here the mutation operator is the neighborhood defined in the :ref:`sp` object.
-    Available crossover operator are those compatible with a mixed individual (
-    `1-point <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.cxOnePoint>`_,
-    `2-points <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.cxTwoPoint>`_
-    ...).
-    Same with the slection (
-    `Roulette <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.selRoulette>`_,
-    `Tournament <https://deap.readthedocs.io/en/master/api/tools.html#deap.tools.selTournament>`_
-    ).
-
-    It uses `DEAP <https://deap.readthedocs.io/>`_.
+    It uses `DEAP <https://deap.readthedocs.io/>`__.
     See :ref:`meta` for more info.
 
     Attributes
@@ -69,9 +57,9 @@ class Genetic_algorithm(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.core.search_space import ContinuousSearchspace
-    >>> from zellij.core.variables import FloatVar, ArrayVar
+    >>> from zellij.core import Loss
+    >>> from zellij.core import ContinuousSearchspace
+    >>> from zellij.core import FloatVar, ArrayVar
     >>> from zellij.utils.neighborhoods import FloatInterval, ArrayInterval, Intervals
     >>> from zellij.strategies.genetic_algorithm import Genetic_algorithm
     >>> from zellij.utils.operators import NeighborMutation, DeapTournament, DeapOnePoint
@@ -89,24 +77,6 @@ class Genetic_algorithm(Metaheuristic):
     ...
     >>> ga = Genetic_algorithm(sp, 1000, pop_size=25, generation=40,elitism=0.5)
     >>> ga.run()
-    >>> ga.show()
-
-
-    .. image:: ../_static/ga_sp_ex.png
-        :width: 924px
-        :align: center
-        :height: 487px
-        :alt: alternate text
-    .. image:: ../_static/ga_res1_ex.png
-        :width: 924px
-        :align: center
-        :height: 487px
-        :alt: alternate text
-    .. image:: ../_static/ga_res2_ex.png
-        :width: 924px
-        :align: center
-        :height: 487px
-        :alt: alternate text
     """
 
     def __init__(
@@ -134,8 +104,6 @@ class Genetic_algorithm(Metaheuristic):
 
         pop_size : int
             Population size of the GA.\
-            In a distributed environment (e.g. MPILoss), it has an influence on the parallelization quality.\
-            It must be tuned according the available hardware.
 
         generation : int
             Generation number of the GA.
@@ -232,7 +200,7 @@ class Genetic_algorithm(Metaheuristic):
         Parameters
         ----------
         H : Fractal, optional
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
 
         n_process : int, default=1
             Determine the number of best solution found to return.
@@ -240,10 +208,10 @@ class Genetic_algorithm(Metaheuristic):
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
 
@@ -452,96 +420,3 @@ class Genetic_algorithm(Metaheuristic):
 
         self.close_bar()
         return best, min
-
-    def show(self, filepath="", save=False):
-
-        """show(filepath="")
-
-        Plots solutions and scores evaluated during the optimization
-
-        Parameters
-        ----------
-        filename : str, default=None
-            If a filepath is given, the method will read the file and will try to plot contents.
-
-        save : boolean, default=False
-            Save figures
-        """
-
-        all_data, all_scores = super().show(filepath, save)
-
-        if filepath:
-            gapth = os.path.join(filepath, "outputs", "ga_population.csv")
-            data = pd.read_table(gapth, sep=",", decimal=".")
-            scores = data["loss"].to_numpy()
-        else:
-            data = self.pop_historic
-            scores = np.array(self.fitness_historic)
-
-        quantile = np.quantile(scores, 0.75)
-        argmin = np.argmin(scores)
-        min = scores[argmin]
-
-        # Padding missing individual for reshape
-        m, n = int(np.ceil(len(scores) / self.pop_size)), self.pop_size
-        scores = np.pad(
-            scores,
-            (0, m * n - scores.size),
-            mode="constant",
-            constant_values=np.nan,
-        )
-
-        heatmap = scores.reshape((m, n))
-
-        minimums = np.min(heatmap, axis=1)
-        means = np.mean(heatmap, axis=1)
-
-        heatmap.sort(axis=1)
-        heatmap = heatmap.transpose()
-
-        fig, ax = plt.subplots(figsize=(19.2, 14.4))
-        ax = sns.heatmap(
-            heatmap,
-            vmin=min,
-            vmax=quantile,
-            cmap="YlGnBu",
-            cbar_kws={"label": "Fitness"},
-        )
-        ax.invert_yaxis()
-        ax.set_title(f"Fitness of each individual through generations")
-        ax.set(xlabel="Generation number", ylabel="Individual number")
-
-        if save:
-            save_path = os.path.join(
-                self.search_space.loss.plots_path, f"heatmap_ga.png"
-            )
-            plt.savefig(save_path, bbox_inches="tight")
-            plt.close()
-        else:
-            plt.show()
-            plt.close()
-
-        fig, ax = plt.subplots(figsize=(19.2, 14.4))
-        plt.plot(
-            np.arange(len(minimums)),
-            minimums,
-            "-",
-            label="Best individual",
-            color="red",
-        )
-        plt.plot(np.arange(len(means)), means, ":", label="Mean", color="blue")
-        plt.title("Best individual and population's mean through generations")
-        plt.xlabel("Generations")
-        plt.ylabel("Score")
-        plt.legend()
-
-        if save:
-            save_path = os.path.join(
-                self.search_space.loss.plots_path, f"lineplot_ga.png"
-            )
-
-            plt.savefig(save_path, bbox_inches="tight")
-            plt.close()
-        else:
-            plt.show()
-            plt.close()
