@@ -9,7 +9,6 @@
 
 import numpy as np
 from zellij.core.metaheuristic import Metaheuristic
-from zellij.core.fractals import Hypersphere
 from zellij.core.search_space import ContinuousSearchspace
 
 import logging
@@ -32,19 +31,10 @@ class PHS(Metaheuristic):
         :ref:`sp` object containing decision variables and the loss function.
 
     f_calls : int
-        Maximum number of calls to search.space_space.loss.
-
-    save : boolean, optional
-        If True save results into a file
+        Maximum number of calls to :ref:`lf`.
 
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
-
-    center : float
-        List of floats containing the coordinates of the search space center converted to continuous.
-
-    radius : float
-        List of floats containing the radius for each dimensions of the search space converted to continuous.
 
     Methods
     -------
@@ -94,23 +84,19 @@ class PHS(Metaheuristic):
         Parameters
         ----------
         H : Fractal, default=None
-            When used by FDA, a fractal corresponding to the current subspace is given
+            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
         n_process : int, default=1
             Determine the number of best solution found to return.
 
         Returns
         -------
         best_sol : list[float]
-            Returns a list of the <n_process> best found points to the continuous format
+            Returns a list of the :code:`n_process` best found points to the continuous format
 
         best_scores : list[float]
-            Returns a list of the <n_process> best found scores associated to best_sol
+            Returns a list of the :code:`n_process` best found scores associated to best_sol
 
         """
-
-        assert isinstance(H, Hypersphere), logger.error(
-            f"PHS should use Hyperspheres, got {H.__class__.__name__}"
-        )
 
         self.build_bar(self.f_calls)
         points = np.tile(H.center, (3, 1))
@@ -151,20 +137,3 @@ class PHS(Metaheuristic):
 
         idx = np.argmin(scores)
         return points[idx], scores[idx]
-
-    def show(self, filepath="", save=False):
-
-        """show(filename="")
-
-        Plots solutions and scores evaluated during the optimization
-
-        Parameters
-        ----------
-        filename : str, default=None
-            If a filepath is given, the method will read the file and will try to plot contents.
-
-        save : boolean, default=False
-            Save figures
-        """
-
-        super().show(filepath, save)
