@@ -1,10 +1,5 @@
 Zellij Documentation
 ====================
-[![PyPI version shields.io](https://img.shields.io/pypi/v/zellij.svg)](https://pypi.org/project/zellij/)
-[![PyPI license](https://img.shields.io/pypi/l/zellij.svg)](https://pypi.org/project/zellij/)
-[![Documentation Status](https://readthedocs.org/projects/zellij/badge/?version=latest)](https://zellij.readthedocs.io/en/latest/?badge=latest)
-[![GitHub latest commit](https://badgen.net/github/last-commit/ThomasFirmin/zellij/)](https://github.com/ThomasFirmin/zellij/commit/)
-![Maintainer](https://img.shields.io/badge/maintainer-T.Firmin-blue)
 
 **Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Decomposition based algorithms* [1]_ [2]_ .
 It includes tools to define mixed search space, manage objective functions, and a few algorithms.
