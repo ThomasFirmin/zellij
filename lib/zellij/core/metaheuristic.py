@@ -15,7 +15,7 @@ import enlighten
 
 import logging
 
-logger = logging.getLogger("zellij.Meta")
+logger = logging.getLogger("zellij.meta")
 
 
 class Metaheuristic(object):
@@ -172,46 +172,3 @@ class Metaheuristic(object):
 
         """
         pass
-
-    def show(self, filepath="", save=False):
-        """show(filepath="", save=False)
-
-        Basic plots for all metaheuristic. uses :ref:`sp` plotting.
-
-        Parameters
-        ----------
-        filepath : string, default=""
-            If a filepath to a file containing points is given,
-            it will read those points and plot them.
-        save : bool, default=False
-            If true, it saves the plots.
-
-        """
-
-        if filepath:
-            all = os.path.join(filepath, "outputs", "all_evaluations.csv")
-
-            all_data = pd.read_table(all, sep=",", decimal=".")
-            all_scores = all_data["loss"].to_numpy()
-
-            self.search_space.show(
-                all_data,
-                all_scores,
-                save,
-                self.search_space.loss.plots_path,
-            )
-
-            return all_data, all_scores
-
-        elif self.search_space.loss.historic:
-            all_data = self.search_space.loss.all_solutions
-            all_scores = np.array(self.search_space.loss.all_scores)
-
-            self.search_space.show(
-                all_data,
-                all_scores,
-                save,
-                self.search_space.loss.plots_path,
-            )
-
-            return all_data, all_scores
