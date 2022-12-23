@@ -99,7 +99,8 @@ class Variable(ABC):
 class IntVar(Variable):
     """IntVar
 
-    `IntVar` is a :ref:`var` discribing an Integer variable.
+    `IntVar` is a :ref:`var` discribing an Integer variable. T
+    he :code:`lower` and :code:`upper` bounds are included.
 
     Parameters
     ----------
@@ -109,6 +110,8 @@ class IntVar(Variable):
         Lower bound of the variable
     upper : int
         Upper bound of the variable
+    sampler : Callable, default=np.random.randint
+        Function that takes lower bound, upper bound and a size as parameters.
 
     Attributes
     ----------
@@ -128,7 +131,9 @@ class IntVar(Variable):
 
     """
 
-    def __init__(self, label, lower, upper, **kwargs):
+    def __init__(
+        self, label, lower, upper, sampler=np.random.randint, **kwargs
+    ):
         super(IntVar, self).__init__(label, **kwargs)
 
         assert isinstance(
@@ -150,6 +155,7 @@ class IntVar(Variable):
 
         self.low_bound = lower
         self.up_bound = upper + 1
+        self.sampler = sampler
 
     def random(self, size=None):
         """random(size=None)
@@ -162,10 +168,10 @@ class IntVar(Variable):
         Returns
         -------
         out: int or list[int]
-            Return an int if *size*=1, a list[int] else.
+            Return an int if :code:`size`=1, a :code:`list[int]` else.
 
         """
-        return np.random.randint(self.low_bound, self.up_bound, size, dtype=int)
+        return self.sampler(self.low_bound, self.up_bound, size, dtype=int)
 
     def isconstant(self):
         """isconstant()
@@ -173,7 +179,8 @@ class IntVar(Variable):
         Returns
         -------
         out: boolean
-            Return True, if this :ref:`var` is a constant (lower==upper),\
+            Return True, if this :ref:`var` is a constant
+            (:code:`lower`==:code:`upper`),\
             False otherwise.
 
         """
@@ -205,6 +212,9 @@ class IntVar(Variable):
         else:
             return IntVar(self.label, lower, upper)
 
+    def __len__(self):
+        return 1
+
     def __repr__(self):
         return (
             super(IntVar, self).__repr__()
@@ -226,7 +236,7 @@ class FloatVar(Variable):
         Lower bound of the variable
     upper : {int,float}
         Upper bound of the variable
-    sampler : Callable, deufaul=np.random.uniform
+    sampler : Callable, default=np.random.uniform
         Function that takes lower bound, upper bound and a size as parameters.
 
     Attributes
@@ -289,7 +299,7 @@ class FloatVar(Variable):
         Returns
         -------
         out: float or list[float]
-            Return a float if *size*=1, a list[float] else.
+            Return a float if :code:`size`=1, a :code:`list[float]` else.
 
         """
         return self.sampler(self.low_bound, self.up_bound, size)
@@ -300,7 +310,8 @@ class FloatVar(Variable):
         Returns
         -------
         out: boolean
-            Return True, if this :ref:`var` is a constant (lower==upper),\
+            Return True, if this :ref:`var` is a constant
+            (:code:`lower`==:code:`upper`),\
             False otherwise.
 
         """
@@ -347,6 +358,9 @@ class FloatVar(Variable):
                 **self.kwargs,
             )
 
+    def __len__(self):
+        return 1
+
     def __repr__(self):
         return (
             super(FloatVar, self).__repr__()
@@ -367,7 +381,7 @@ class CatVar(Variable):
     features : list
         List of all choices.
     weights : list[float]
-        Weights associated to each elements of `features`. The sum of all
+        Weights associated to each elements of :code:`features`. The sum of all
         positive elements of this list, must be equal to 1.
 
     Attributes
@@ -424,7 +438,7 @@ class CatVar(Variable):
         Returns
         -------
         out: float or list[float]
-            Return a feature if size=1, a list[features] else.
+            Return a feature if :code:`size`=1, a :code:`list[features]` else.
             Features can be :ref:`var`. When seleted, it will return
             a random point from this :ref:`var`.
 
@@ -449,7 +463,8 @@ class CatVar(Variable):
         Returns
         -------
         out: boolean
-            Return True, if this :ref:`var` is a constant (len(feature)==1),\
+            Return True, if this :ref:`var` is a constant
+            (:code:`len(feature)==1`),\
             False otherwise.
 
         """
@@ -482,6 +497,9 @@ class CatVar(Variable):
             else:
                 return CatVar(self.label, self.features[lo_idx : up_idx + 1])
 
+    def __len__(self):
+        return 1
+
     def __repr__(self):
         return super(CatVar, self).__repr__() + f"{self.features})"
 
@@ -490,7 +508,7 @@ class CatVar(Variable):
 class ArrayVar(Variable):
     """ArrayVar(Variable)
 
-    `ArrayVar` is a :ref:`var` describing a list of :ref:`var`. This class is
+    :code:`ArrayVar` is a :ref:`var` describing a list of :ref:`var`. This class is
     iterable.
 
     Parameters
@@ -498,7 +516,7 @@ class ArrayVar(Variable):
     label : str
         Name of the variable.
     *args : list[Variable]
-        Elements of the `ArrayVar`. All elements must be of type :ref:`var`
+        Elements of the :code:`ArrayVar`. All elements must be of type :ref:`var`
 
     Examples
     --------
@@ -526,7 +544,7 @@ class ArrayVar(Variable):
             got {args}
             """
 
-            self.values = args
+            self.values = list(args)
             for idx, v in enumerate(self.values):
                 setattr(v, "_idx", idx)
         else:
@@ -546,7 +564,7 @@ class ArrayVar(Variable):
         -------
         out: float or list[float]
             Return a list composed of the values returned by each :ref:`var` of
-            `ArrayVar`. If size>1, return a list of list
+            :code:`ArrayVar`. If :code:`size`>1, return a list of list
 
         """
 
@@ -576,14 +594,14 @@ class ArrayVar(Variable):
             len(lower) == len(self)
         ), f"""
             Lower bound must be a list containing lower bound of each
-            :ref:`var` composing `ArrayVar`, got {lower}
+            :ref:`var` composing :code:`ArrayVar`, got {lower}
             """
 
         assert isinstance(upper, (list, np.ndarray)) and (
             len(upper) == len(self)
         ), f"""
         Upper bound must be a list containing lower bound of each
-        :ref:`var` composing `ArrayVar`, got {upper}
+        :ref:`var` composing :code:`ArrayVar`, got {upper}
         """
 
         new_values = []
@@ -593,9 +611,34 @@ class ArrayVar(Variable):
         return ArrayVar(*new_values, label=self.label, **self.kwargs)
 
     def index(self, value):
+        """index(value)
+
+        Return the index inside the :code::code:`ArrayVar` of a given :code:`value`.
+
+        Parameters
+        ----------
+        value : Variable
+            Targeted Variable in the ArrayVar
+
+        Returns
+        -------
+        int
+            Index of :code:`value`.
+
+        """
         return value._idx
 
     def append(self, v):
+        """append(v)
+
+        Append a :ref:`Variables` to the :code::code:`ArrayVar`.
+
+        Parameters
+        ----------
+        v : Variable
+            Variable to be added to the :code:`ArrayVar`
+
+        """
         if isinstance(v, Variable):
             setattr(v, "_idx", len(self.values))
             self.values.append(v)
@@ -836,7 +879,7 @@ class DynamicBlock(Block):
 class Constant(Variable):
     """Constant
 
-    `Constant` is a :ref:`var` discribing a constant of any type.
+    :code:`Constant` is a :ref:`var` discribing a constant of any type.
 
     Parameters
     ----------
@@ -865,7 +908,9 @@ class Constant(Variable):
 
     def __init__(self, label, value, **kwargs):
         super(Constant, self).__init__(label, **kwargs)
-
+        assert not isinstance(
+            value, Variable
+        ), f"Element must not be of Variable type, got {value}"
         self.value = value
 
     def random(self, size=1):
@@ -879,7 +924,7 @@ class Constant(Variable):
         Returns
         -------
         out: int or list[int]
-            Return an int if *size*=1, a list[int] else.
+            Return an int if :code:`size`=1, a :code:`list[self.value]` else.
 
         """
         if size > 1:
