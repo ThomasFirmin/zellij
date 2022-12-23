@@ -16,8 +16,9 @@ from zellij.core.variables import (
     ArrayVar,
 )
 import numpy as np
-import logging
 import copy
+
+import logging
 
 logger = logging.getLogger("zellij.neighborhoods")
 
@@ -196,7 +197,7 @@ class IntInterval(VarNeighborhood):
 
     def __call__(self, value, size=1):
 
-        upper = np.min([value + self.neighborhood, self.target.up_bound])
+        upper = np.min([value + self.neighborhood + 1, self.target.up_bound])
         lower = np.max([value - self.neighborhood, self.target.low_bound])
 
         if size > 1:
@@ -318,7 +319,10 @@ class ConstantInterval(VarNeighborhood):
 
     def __call__(self, value, size=1):
         logger.warning("Calling `neighbor` of a constant is useless")
-        return self.target.value
+        if size > 1:
+            return [self.target.value for _ in range(size)]
+        else:
+            return self.target.value
 
     @VarNeighborhood.neighborhood.setter
     def neighborhood(self, neighborhood=None):
@@ -381,9 +385,9 @@ class Intervals(Neighborhood):
                 f"To use `Intervals`, values in Searchspace must have a `neighbor` method. Use `neighbor` kwarg when defining a variable"
             )
 
-    def get_neighbor(self, point, size=1):
+    def __call__(self, point, size=1):
 
-        """get_neighbor(point, size=1)
+        """__call__(point, size=1)
 
         Draw a neighbor of a solution, according to the :ref:`var` neighbor
         function.
