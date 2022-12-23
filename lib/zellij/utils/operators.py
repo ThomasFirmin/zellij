@@ -7,7 +7,6 @@
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
 from zellij.core.addons import Mutator, Crossover, Selector
-from zellij.core.search_space import Searchspace
 from zellij.core.variables import Constant
 import numpy as np
 from deap import tools
@@ -46,10 +45,10 @@ class NeighborMutation(Mutator):
     def target(self, search_space):
 
         if search_space:
-            assert isinstance(
-                search_space, Searchspace
-            ), f""" Target object must be a :ref:`sp`
-            for {self.__class__.__name__}, got {search_space}"""
+            # assert isinstance(
+            #     search_space, Searchspace
+            # ), f""" Target object must be a :ref:`sp`
+            # for {self.__class__.__name__}, got {search_space}"""
 
             assert all(
                 hasattr(val, "neighbor") for val in search_space.values
@@ -71,7 +70,6 @@ class NeighborMutation(Mutator):
             if np.random.random() < self.probability and not isinstance(
                 val, Constant
             ):
-                print(individual)
                 # Get a neighbor of the selected attribute
                 individual[val._idx] = val.neighbor(individual[val._idx])
 
@@ -107,10 +105,10 @@ class DeapTournament(Selector):
     def target(self, search_space):
 
         if search_space:
-            assert isinstance(
-                search_space, Searchspace
-            ), f""" Target object must be a :ref:`sp`
-            for {self.__class__.__name__}, got {search_space}"""
+            # assert isinstance(
+            #     search_space, Searchspace
+            # ), f""" Target object must be a :ref:`sp`
+            # for {self.__class__.__name__}, got {search_space}"""
 
             assert all(
                 hasattr(val, "neighbor") for val in search_space.values
@@ -155,10 +153,10 @@ class DeapOnePoint(Crossover):
     def target(self, search_space):
 
         if search_space:
-            assert isinstance(
-                search_space, Searchspace
-            ), f""" Target object must be a :ref:`sp`
-            for {self.__class__.__name__}, got {search_space}"""
+            # assert isinstance(
+            #     search_space, Searchspace
+            # ), f""" Target object must be a :ref:`sp`
+            # for {self.__class__.__name__}, got {search_space}"""
 
             assert all(
                 hasattr(val, "neighbor") for val in search_space.values
