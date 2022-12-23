@@ -127,7 +127,7 @@ Implements all functions from the SOCO2011 and CEC2020 benchmarks.
 
 # Documentation update
 
-All the documentation has been rewritten and the template has been changed.
+All the documentation and README has been rewritten. The template has been changed.
 
 # Bug fixes
 
@@ -135,6 +135,7 @@ As many modules were rewrote, many bugs were corrected.
 
 - LossFunc save() method: Fixed an issue where the header was not properly written in the save file.
 - LossFunc save() method: Fixed an issue where the objective was saved twice.
+- Searchspace: Fixed a bug where _exclude_ was not working.
 - MulLogarithmic iteration() method: Fixed a bug where the number of iteration was wrongly computed
 - Bayesian Optimization: Fixed an issue were wrong kwargs were passed to the acquisition function
 - Genetic Algorithm: Fixed a bug when a filename was given to initalize the population.

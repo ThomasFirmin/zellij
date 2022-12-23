@@ -12,9 +12,6 @@ from zellij.core.loss_func import LossFunc
 from zellij.utils.distances import Distance, Mixed, Euclidean
 from zellij.core.addons import SearchspaceAddon
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import pandas as pd
 import copy
 import os
 from abc import ABC, abstractmethod
@@ -53,12 +50,12 @@ class Searchspace(ABC):
         ----------
 
         values : ArrayVar
-            Determines the decision space. See `MixedSearchspace`, `ContinuousSearchspace`,
-            `DiscreteSearchspace` for more info.
+            Determines the decision space. See :code:`MixedSearchspace`, :code:`ContinuousSearchspace`,
+            :code:`DiscreteSearchspace` for more info.
 
         loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
+            Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
+            :code:`loss` will be used by the :ref:`sp` object and by optimization
             algorithms.
 
         **kwargs : dict
@@ -99,7 +96,7 @@ class Searchspace(ABC):
     def _add_addons(self, **kwargs):
         for k in kwargs:
             assert isinstance(kwargs[k], SearchspaceAddon), logger.error(
-                f"Kwargs must be of type `VarAddon`, got {k}:{kwargs[k]}"
+                f"Kwargs must be of type `SearchspaceAddon`, got {k}:{kwargs[k]}"
             )
 
             if kwargs[k]:
@@ -146,26 +143,26 @@ class Searchspace(ABC):
 
         if exclude:
             if isinstance(exclude, int):
-                index = exclude
+                index = [exclude]
             elif isinstance(exclude, Variable):
-                index = exclude.idx
+                index = [exclude._idx]
             elif isinstance(exclude, type):
                 index = []
                 for elem in self.values.values:
                     if isinstance(elem, exclude):
-                        index.append(elem.idx)
-            elif isinstance(exclude, list):
+                        index.append(elem._idx)
+            elif isinstance(exclude, list) or isinstance(exclude, tuple):
                 if all(isinstance(elem, int) for elem in exclude):
                     index = exclude
                 elif all(isinstance(elem, Variable) for elem in exclude):
                     index = []
                     for elem in exclude:
-                        index.append(elem.idx)
+                        index.append(elem._idx)
                 elif all(isinstance(elem, type) for elem in exclude):
                     index = []
                     for elem in self.values.values:
                         if isinstance(elem, tuple(exclude)):
-                            index.append(elem.idx)
+                            index.append(elem._idx)
 
             p = np.full(self.size, 1 / (self.size - len(index)))
             p[index] = 0
@@ -242,214 +239,12 @@ class Searchspace(ABC):
     def __len__(self):
         return len(self.values)
 
-    def show(self, X, Y, save=False, path=""):
-
-        """show(X, Y, save=False, path="")
-
-        Show solutions X associated to their values Y, according to the Searchspace
-
-        Parameters
-        ----------
-
-        X : list[list[{int, float, str}, {int, float, str}...], ...]
-            List of points to plot
-        Y : list[{float, int}]
-            Scores associated to X.
-
-        Examples
-        --------
-
-        >>> import numpy as np
-        >>> sp.show(sp.random_point(100), np.random.random(100))
-
-
-        .. image:: ../_static/sp_show_ex.png
-            :width: 924px
-            :align: center
-            :height: 487px
-            :alt: alternate text
-        """
-
-        # if not isinstance(X, pd.DataFrame):
-        #     X = pd.DataFrame(X, columns=[v.label for v in self.values])
-        #
-        # argmin = np.argmin(Y)
-        # logger.info("Best individual")
-        # logger.info(X.iloc[argmin, :])
-        # logger.info(np.array(Y)[argmin])
-        #
-        # f, plots = plt.subplots(self.size, self.size, figsize=(19.2, 14.4))
-        # f.suptitle("All evaluated solutions", fontsize=11)
-        #
-        # if len(X) < 100:
-        #     s = 40
-        # else:
-        #     s = 10000 / len(X)
-        #
-        # if self.types[0] == "C":
-        #     X.iloc[:, 0].value_counts().plot(kind="bar", ax=plots[0, 0])
-        #     plots[0, 0].set_yticks([])
-        #     plots[0, 0].xaxis.tick_top()
-        #     plots[0, 0].tick_params(axis="x", labelsize=7 / len(self.types[0]))
-        # else:
-        #     plots[0, 0].hist(
-        #         X.iloc[:, 0], 20, density=True, facecolor="g", alpha=0.75
-        #     )
-        #     plots[0, 0].set_yticks([])
-        #     plots[0, 0].xaxis.tick_top()
-        #     plots[0, 0].tick_params(axis="x", labelsize=7)
-        #     plots[0, 0].set_xlim((self.values[0][0], self.values[0][1]))
-        #
-        # def onpick(event):
-        #     ind = event.ind
-        #     print("Selected point:\n", X.iloc[ind, :], Y[ind])
-        #
-        # for i in range(self.size):
-        #
-        #     if i > 0:
-        #
-        #         if self.types[i] == "C":
-        #
-        #             sorter = self.values[i]
-        #             sorterIndex = dict(zip(sorter, range(len(sorter))))
-        #
-        #             new = (
-        #                 X.iloc[:, i]
-        #                 .value_counts()
-        #                 .rename_axis("unique_values")
-        #                 .reset_index(name="counts")
-        #             )
-        #             new["Rank"] = new["unique_values"].map(sorterIndex)
-        #             new.sort_values("Rank", inplace=True)
-        #             new.drop("Rank", 1, inplace=True)
-        #             new = new.set_index("unique_values")
-        #
-        #             new["counts"].plot.barh(ax=plots[i, i], facecolor="g")
-        #             plots[i, i].yaxis.tick_right()
-        #             plots[i, i].tick_params(
-        #                 axis="y", labelsize=7 / len(self.types[i])
-        #             )
-        #             plots[i, i].set_ylabel("")
-        #
-        #         else:
-        #             plots[i, i].hist(
-        #                 X.iloc[:, i],
-        #                 20,
-        #                 density=True,
-        #                 facecolor="g",
-        #                 alpha=0.75,
-        #                 orientation="horizontal",
-        #             )
-        #             plots[i, i].yaxis.tick_right()
-        #             plots[i, i].tick_params(axis="y", labelsize=7)
-        #             plots[i, i].set_ylim((self.values[i][0], self.values[i][1]))
-        #
-        #     for j in range(i + 1, self.n_variables):
-        #
-        #         plots[i, j].axis("off")
-        #
-        #         if self.types[i] == "C" or self.types[j] == "C":
-        #
-        #             if self.types[i] == self.types[j]:
-        #                 pass
-        #             else:
-        #                 if self.types[i] == "C":
-        #                     idx = i
-        #                     idx2 = j
-        #                     vert = True
-        #                 else:
-        #                     idx = j
-        #                     idx2 = i
-        #                     vert = False
-        #
-        #                 data = []
-        #                 for val in self.values[idx]:
-        #                     data.append(
-        #                         X.iloc[:, idx2].loc[X.iloc[:, idx] == val]
-        #                     )
-        #
-        #                 plots[j, i].boxplot(
-        #                     data,
-        #                     vert=vert,
-        #                     flierprops=dict(
-        #                         marker="o",
-        #                         markerfacecolor="green",
-        #                         markersize=0.1,
-        #                         markeredgecolor="green",
-        #                     ),
-        #                     labels=self.values[idx],
-        #                 )
-        #
-        #         else:
-        #             try:
-        #                 plots[j, i].tricontourf(
-        #                     X.iloc[:, i], X.iloc[:, j], Y, 10, cmap="Greys_r"
-        #                 )
-        #             except:
-        #                 logger.warning("Triangularisation failed")
-        #             plots[j, i].scatter(
-        #                 X.iloc[:, i],
-        #                 X.iloc[:, j],
-        #                 c=Y,
-        #                 s=s,
-        #                 alpha=0.4,
-        #                 cmap="coolwarm_r",
-        #                 picker=True,
-        #             )
-        #             plots[j, i].set_xlim((self.values[i][0], self.values[i][1]))
-        #             plots[j, i].set_ylim((self.values[j][0], self.values[j][1]))
-        #
-        #             plots[j, i].scatter(
-        #                 X.iloc[argmin, i],
-        #                 X.iloc[argmin, j],
-        #                 c="cyan",
-        #                 marker=(5, 2),
-        #                 alpha=0.8,
-        #                 s=150,
-        #             )
-        #
-        #         if i == 0:
-        #             plots[j, i].set_ylabel([v.label for v in self.values])
-        #
-        #         if j == self.n_variables - 1:
-        #             plots[j, i].set_xlabel([v.label for v in self.values])
-        #
-        #         plots[j, i].set_xticks([])
-        #         plots[j, i].set_yticks([])
-        #
-        # plt.subplots_adjust(
-        #     left=0.050, bottom=0.050, right=0.970, top=0.970, wspace=0, hspace=0
-        # )
-        #
-        # if save:
-        #     save_path = os.path.join(path, f"matrix_sp.png")
-        #
-        #     plt.savefig(save_path, bbox_inches="tight")
-        #     plt.close()
-        # else:
-        #     f.canvas.mpl_connect("pick_event", onpick)
-        #     plt.show()
-        #
-        # # for i in range(self.n_variables):
-        # #     if self.types[i] == "C":
-        # #         inter = X[self.labels[i]].astype("category").cat.codes
-        # #         X.drop(self.labels[i], axis=1)
-        # #         X[self.labels[i]] = (inter - inter.min()) / (inter.max() - inter.min())
-        # #     else:
-        # #         X[self.labels[i]] = (X[self.labels[i]] - self.values[i][0]) / (self.values[i][1] - self.values[i][0])
-        # #
-        # # dataf = X.iloc[:, : self.n_variables]
-        # # dataf["loss_value"] = Y
-        # # parallel_coordinates(dataf, "loss_value", colormap="viridis_r")
-        # # plt.show()
-        pass
-
 
 class MixedSearchspace(Searchspace):
 
     """MixedSearchspace
 
-    `MixedSearchspace` is a search space made for HyperParameter Optimization (HPO).
+    :code:`MixedSearchspace` is a search space made for HyperParameter Optimization (HPO).
     The decision space can be made of various `Variable` types.
 
     Attributes
@@ -478,10 +273,6 @@ class MixedSearchspace(Searchspace):
     subspace(self,lo_bounds,up_bounds)
         Build a sub space according to the actual Searchspace using two vectors
         containing lower and upper bounds of the subspace.
-
-    show(self,X,Y)
-        Show solutions X associated to their values Y,
-        according to the Searchspace
 
     See Also
     --------
@@ -518,13 +309,13 @@ class MixedSearchspace(Searchspace):
 
         values : ArrayVar
             Determines the bounds of the search space.
-            For `ContinuousSearchspace` the `values` must be an `ArrayVar`
-            of `FloatVar`, `IntVar`, `CatVar`.
+            For :code:`ContinuousSearchspace` the :code:`values` must be an :code:`ArrayVar`
+            of :code:`FloatVar`, :code:`IntVar`, :code:`CatVar`.
             The :ref:`sp` will then manipulate this array.
 
         loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
+            Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
+            :code:`loss` will be used by the :ref:`sp` object and by optimization
             algorithms.
 
         **kwargs : dict
@@ -565,7 +356,7 @@ class ContinuousSearchspace(Searchspace):
 
     """ContinuousSearchspace
 
-    `ContinuousSearchspace` is a search space made for continuous optimization.
+    :code:`ContinuousSearchspace` is a search space made for continuous optimization.
     The decision space is made of `FloatVar`.
 
     Attributes
@@ -573,13 +364,13 @@ class ContinuousSearchspace(Searchspace):
 
     values : ArrayVar
         Determines the bounds of the search space.
-        For `ContinuousSearchspace` the `values` must be an `ArrayVar`
-        of `FloatVar`.
+        For :code:`ContinuousSearchspace` the :code:`values` must be an :code:`ArrayVar`
+        of :code:`FloatVar`.
         The :ref:`sp` will then manipulate this array.
 
     loss : LossFunc
-        Callable of type `LossFunc`. See :ref:`lf` for more information.
-        `loss` will be used by the :ref:`sp` object and by optimization
+        Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
+        :code:`loss` will be used by the :ref:`sp` object and by optimization
 
 
     Methods
@@ -594,10 +385,6 @@ class ContinuousSearchspace(Searchspace):
     subspace(self,lo_bounds,up_bounds)
         Build a sub space according to the actual Searchspace using two vectors
         containing lower and upper bounds of the subspace.
-
-    show(self,X,Y)
-        Show solutions X associated to their values Y,
-        according to the Searchspace
 
     See Also
     --------
@@ -654,6 +441,7 @@ class ContinuousSearchspace(Searchspace):
             * And other operators linked to the optimization algorithms (crossover, mutation,...)
 
         """
+        super(ContinuousSearchspace, self).__init__(values, loss, **kwargs)
 
         ##############
         # ASSERTIONS #
@@ -671,28 +459,26 @@ class ContinuousSearchspace(Searchspace):
         )
         self.distance.target = self
 
-        super(ContinuousSearchspace, self).__init__(values, loss, **kwargs)
-
 
 class DiscreteSearchspace(Searchspace):
 
     """DiscreteSearchspace
 
-    `DiscreteSearchspace` is a search space made for continuous optimization.
-    The decision space is made of `IntVar`.
+    :code:`DiscreteSearchspace` is a search space made for continuous optimization.
+    The decision space is made of :code:`IntVar`.
 
     Attributes
     ----------
 
     values : ArrayVar
         Determines the bounds of the search space.
-        For `DiscreteSearchspace` the `values` must be an `ArrayVar`
-        of `IntVar`.
+        For :code:`DiscreteSearchspace` the :code:`values` must be an :code:`ArrayVar`
+        of :code:`IntVar`.
         The :ref:`sp` will then manipulate this array.
 
     loss : LossFunc
-        Callable of type `LossFunc`. See :ref:`lf` for more information.
-        `loss` will be used by the :ref:`sp` object and by optimization
+        Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
+        :code:`loss` will be used by the :ref:`sp` object and by optimization
 
 
     Methods
@@ -707,10 +493,6 @@ class DiscreteSearchspace(Searchspace):
     subspace(self,lo_bounds,up_bounds)
         Build a sub space according to the actual Searchspace using two vectors
         containing lower and upper bounds of the subspace.
-
-    show(self,X,Y)
-        Show solutions X associated to their values Y,
-        according to the Searchspace
 
     See Also
     --------
@@ -744,13 +526,13 @@ class DiscreteSearchspace(Searchspace):
 
         values : ArrayVar
             Determines the bounds of the search space.
-            For `DiscreteSearchspace` the `values` must be an `ArrayVar`
-            of `IntVar`.
+            For :code:`DiscreteSearchspace` the :code:`values` must be an :code:`ArrayVar`
+            of :code:`IntVar`.
             The :ref:`sp` will then manipulate this array.
 
         loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
+            Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
+            :code:`loss` will be used by the :ref:`sp` object and by optimization
             algorithms.
 
         **kwargs : dict
@@ -767,6 +549,7 @@ class DiscreteSearchspace(Searchspace):
             * And other operators linked to the optimization algorithms (crossover, mutation,...)
 
         """
+        super(DiscreteSearchspace, self).__init__(values, loss, **kwargs)
 
         ##############
         # ASSERTIONS #
@@ -783,5 +566,3 @@ class DiscreteSearchspace(Searchspace):
             f"Kwargs `distance` must be of type `Distance`, got {self.distance}"
         )
         self.distance.target = self
-
-        super(ContinuousSearchspace, self).__init__(values, loss, **kwargs)
