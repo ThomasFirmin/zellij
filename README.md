@@ -18,8 +18,6 @@
 
 **Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Fractal Decomposition based algorithms* [[1]](#1) [[2]](#2).
 It includes tools to define mixed search space, manage objective functions, and a few algorithms.
-To implements metaheuristics and other optimization methods, **Zellij** uses [DEAP](https://deap.readthedocs.io/)[[3]](#3) for the *Evolutionary Algorithms* part
-and [BoTorch](https://botorch.org/) [[4]](#4) for *Bayesian Optimization*.
 **Zellij** is defined as an easy to use and modular framework, based on Python object oriented paradigm.
 
 See [documentation](https://zellij.readthedocs.io/en/latest/).
