@@ -5,7 +5,7 @@
 # @Last modified by:   tfirmin
 # @Last modified time: 2022-10-03T22:38:18+02:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
-
+import random
 
 from zellij.core.metaheuristic import Metaheuristic
 from zellij.core.addons import Mutator, Selector, Crossover
@@ -63,7 +63,7 @@ class Genetic_algorithm(Metaheuristic):
     >>> from zellij.utils.neighborhoods import FloatInterval, ArrayInterval, Intervals
     >>> from zellij.strategies.genetic_algorithm import Genetic_algorithm
     >>> from zellij.utils.operators import NeighborMutation, DeapTournament, DeapOnePoint
-    >>> from zellij.utils.benchmark import himmelblau
+    >>> from zellij.utils.benchmarks import himmelblau
     ...
     >>> lf = Loss()(himmelblau)
     >>> sp = ContinuousSearchspace(ArrayVar(
@@ -141,6 +141,16 @@ class Genetic_algorithm(Metaheuristic):
         ex:\n
         >>> ContinuousSearchspace(values, loss, crossover=...)"""
 
+        if hasattr(search_space, "bestSel"):
+            self.best_selection = search_space.bestSel
+        else:
+            self.best_selection = tools.selBest
+
+        if hasattr(search_space, "random"):
+            self.random = search_space.random
+        else:
+            self.random = False
+
         self.pop_size = pop_size
         self.generation = generation
         self.elitism = elitism
@@ -186,7 +196,7 @@ class Genetic_algorithm(Metaheuristic):
             decimal=".",
             usecols=self.search_space.size,
         )
-        contents = data.tail(pop_size)
+        contents = data.tail(self.pop_size)
 
         return pcls(ind_init(c) for index, c in contents.iterrows())
 
@@ -278,7 +288,7 @@ class Genetic_algorithm(Metaheuristic):
 
             # Build the population
             pop = toolbox.population(n=self.pop_size)
-
+        toolbox.register("generation", lambda: g)
         # Create operators
         self.search_space.mutation._build(toolbox)
         self.search_space.selection._build(toolbox)
@@ -287,25 +297,24 @@ class Genetic_algorithm(Metaheuristic):
         # Create a tool to select best individuals from a population
         bpn = int(self.pop_size * self.elitism)
         bcn = self.pop_size - bpn
-        toolbox.register("best_p", tools.selBest, k=bpn)
-        toolbox.register("best_c", tools.selBest, k=bcn)
+
+        toolbox.register("best_p", self.best_selection, k=bpn)
+        toolbox.register("best_c", self.best_selection, k=bcn)
+        if self.random:
+            toolbox.register("best_pop", self.best_selection)
 
         best_of_all = tools.HallOfFame(n_process)
 
         # Ga initialization
-
         logger.info("Evaluating the initial population...")
         # Compute dynamically fitnesses
-        solutions = []
         solutions = [p[0] for p in pop]
 
         # Progress bar
         self.pending_pb(len(solutions))
         fitnesses = self.search_space.loss(solutions, generation=0)
 
-        self.update_main_pb(
-            len(solutions), explor=True, best=self.search_space.loss.new_best
-        )
+        self.update_main_pb(len(solutions), best=self.search_space.loss.new_best)
 
         # Map computed fitness to individual fitness value
         for ind, fit in zip(pop, fitnesses):
@@ -339,12 +348,16 @@ class Genetic_algorithm(Metaheuristic):
 
             offspring = self.search_space.selection(pop, k=len(pop))
 
+            if self.random:
+                rcn = int(self.pop_size * self.random())
+                offspring = toolbox.best_pop(offspring, k=self.pop_size - rcn) + toolbox.population(n=rcn)
+            random.shuffle(offspring)
+
             children = []
 
             # Crossover operator
             logger.debug("Crossover...")
 
-            i = 0
             for child1, child2 in zip(offspring[::2], offspring[1::2]):
 
                 # Clone individuals from crossover
@@ -370,7 +383,6 @@ class Genetic_algorithm(Metaheuristic):
             logger.debug("Evaluating population n°" + str(g))
 
             # Compute dynamically fitnesses
-            solutions = []
             solutions = [p[0] for p in children]
 
             # progress bar
@@ -379,11 +391,7 @@ class Genetic_algorithm(Metaheuristic):
             fitnesses = self.search_space.loss(solutions, generation=g)
 
             # Progress bar
-            self.update_main_pb(
-                len(solutions),
-                explor=True,
-                best=self.search_space.loss.new_best,
-            )
+            self.update_main_pb(len(solutions), best=self.search_space.loss.new_best)
 
             # Map computed fitness to individual fitness value
             for ind, fit in zip(children, fitnesses):
