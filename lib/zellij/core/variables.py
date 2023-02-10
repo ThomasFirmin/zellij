@@ -402,7 +402,6 @@ class CatVar(Variable):
     """
 
     def __init__(self, label, features, weights=None, **kwargs):
-        super(CatVar, self).__init__(label, **kwargs)
 
         assert isinstance(
             features, list
@@ -422,6 +421,7 @@ class CatVar(Variable):
         assert (
             isinstance(weights, (list, np.ndarray)) or weights == None
         ), f"""`weights` must be a list or equal to None, got {weights}"""
+        super(CatVar, self).__init__(label, **kwargs)
 
         if weights:
             self.weights = weights
