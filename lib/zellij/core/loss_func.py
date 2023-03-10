@@ -489,6 +489,7 @@ class MPILoss(LossFunc):
         verbose=True,
         only_score=False,
         kwargs_mode=False,
+        labels=None
     ):
 
         """__init__(model, historic=True, save=False, verbose=True)
@@ -498,7 +499,7 @@ class MPILoss(LossFunc):
         """
 
         super().__init__(
-            model, objective, historic, save, verbose, only_score, kwargs_mode
+            model, objective, historic, save, verbose, only_score, kwargs_mode, labels
         )
 
         #################
@@ -788,6 +789,7 @@ class SerialLoss(LossFunc):
         verbose=True,
         only_score=False,
         kwargs_mode=False,
+        labels=None
     ):
 
         """__init__(model, historic=True, save=False, verbose=True)
@@ -797,7 +799,7 @@ class SerialLoss(LossFunc):
         """
 
         super().__init__(
-            model, objective, historic, save, verbose, only_score, kwargs_mode
+            model, objective, historic, save, verbose, only_score, kwargs_mode, labels
         )
 
     def __call__(self, X, **kwargs):
@@ -880,6 +882,7 @@ def Loss(
     MPI=False,
     only_score=False,
     kwargs_mode=False,
+    labels=None
 ):
     """Loss(model=None, save=False, verbose=True, MPI=False, only_score=False, kwargs_mode=False)
 
@@ -944,6 +947,7 @@ def Loss(
                     verbose,
                     only_score,
                     kwargs_mode,
+                    labels
                 )
             else:
                 return SerialLoss(
@@ -954,6 +958,7 @@ def Loss(
                     verbose,
                     only_score,
                     kwargs_mode,
+                    labels
                 )
 
         return wrapper
