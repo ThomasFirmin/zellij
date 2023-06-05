@@ -53,16 +53,14 @@ setuptools.setup(
     project_urls={
         "Bug Tracker": "https://github.com/ThomasFirmin/zellij/issues",
     },
-    package_dir={"": "lib"},
-    packages=setuptools.find_packages("lib"),
+    packages=setuptools.find_packages(exclude=["tests", "examples"]),
     install_requires=[
         "numpy>=1.21.4",
-        "scipy>=1.7.3",
         "DEAP>=1.3.1",
         "botorch>=0.6.3.1",
         "gpytorch>=1.6.0",
         "pandas>=1.3.4",
-        "enlighten>=1.10.2",
+        "scipy>=1.9.3",
     ],
     extras_require={
         "mpi": ["mpi4py>=3.1.2"],
