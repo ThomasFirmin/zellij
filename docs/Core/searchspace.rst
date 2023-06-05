@@ -4,9 +4,9 @@
 Search space
 ============
 
-The :ref:`sp` will merge the :ref:`lf` and defined :ref:`var`.
-:ref:`sp` will alows to draw random points and attributes.
-:ref:`sp` features can be extended by grafting :ref:`addons` to it.
+The :ref:`sp` merges the :ref:`lf` and :ref:`var`.
+:ref:`sp` allows to draw random points and attributes.
+:ref:`sp` functionnalities can be extended by grafting :ref:`addons` to it.
 
 Abstract Class
 --------------

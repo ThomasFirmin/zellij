@@ -4,6 +4,9 @@
 Tree search algorithms
 ======================
 
+The :ref:`tree_search` module defines how to expand the tree of :ref:`frac`.
+It is used by :ref:`dba`.
+
 .. automodule:: zellij.strategies.tools.tree_search
    :members: Tree_search
    :undoc-members:

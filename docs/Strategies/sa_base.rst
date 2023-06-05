@@ -7,7 +7,7 @@ Simulated Annealing
 Simulated Annealing
 -------------------
 
-.. automodule:: zellij.strategies.simulated_annealing
+.. automodule:: zellij.strategies.mixed.simulated_annealing
    :members:
    :undoc-members:
    :show-inheritance:

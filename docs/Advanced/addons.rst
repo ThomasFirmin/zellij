@@ -3,18 +3,16 @@
 ======
 Addons
 ======
-An addons, is an object that is linked to another one. It allows to extend
-some functionnalities of the target without modifying its implementation.
-The user can graft addons to :ref:`var` and :ref:`sp` by using the kwargs
-in the init function.
+An :ref:`addons`, is an object linked to another one. It allows extending
+some functionalities of the target without modifying its implementation.
+The user can graft :ref:`addons` to :ref:`var` and :ref:`sp` by using the :code:`kwargs`
+in the :code:`init` function.
 
 Known kwargs are:
 
 * For :ref:`sp`:
 
-  * :code:`to_continuous`: used in algorithms using continuous :ref:`sp`, when the given :ref:`sp` is not continuous.
-
-  * :code:`to_discrete`: used in algorithms using discrete :ref:`sp`, when the given :ref:`sp` is not discrete.
+  * :code:`converter`: used to convert a solution from a space to another.
 
   * :code:`distance`: used in algorithms where a distance is needed.
 
@@ -29,11 +27,9 @@ Known kwargs are:
 
 * For :ref:`var`:
 
-  * :code:`to_continuous`: used by the to_continuous :ref:`spadd`.
+  * :code:`converter`: used by the converter from :ref:`spadd`.
 
-  * :code:`to_discrete`: used by the to_discrete :ref:`spadd`.
-
-  * :code:`neighbor`: Defines what is a neighbor for a given :ref:`var`. It uses the neighbor :ref:`spadd`.
+  * :code:`neighbor`: Defines what a neighbor is for a given :ref:`var`. It uses the neighbor :ref:`spadd`.
 
 
 .. automodule:: zellij.core.addons

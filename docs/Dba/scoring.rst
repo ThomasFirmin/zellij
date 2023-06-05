@@ -4,6 +4,9 @@
 Scoring methods
 ===============
 
+The :ref:`scoring` module defines the scoring for :ref:`frac`.
+It is used by :ref:`dba`.
+
 .. automodule:: zellij.strategies.tools.scoring
    :members: Scoring
    :undoc-members:

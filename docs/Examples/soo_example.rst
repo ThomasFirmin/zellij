@@ -14,6 +14,9 @@ In *Zellij*, SOO is decomposed as follow:
 
 .. [1] R. Munos, ‘Optimistic Optimization of a Deterministic Function without the Knowledge of its Smoothness’, p. 9.
 
+.. warning:: 
+  The following code is deprecated.
+  
 .. code-block:: python
 
   from zellij.core.geometry import Soo

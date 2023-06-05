@@ -7,7 +7,7 @@ Chaotic Optimization
 Chaotic Optimization
 --------------------
 
-.. automodule:: zellij.strategies.chaos_algorithm
+.. automodule:: zellij.strategies.continuous.chaos_algorithm
    :members: Chaotic_optimization
    :undoc-members:
    :show-inheritance:
@@ -16,7 +16,7 @@ Chaotic Optimization
 Chaotic Global Search
 ---------------------
 
-.. automodule:: zellij.strategies.chaos_algorithm
+.. automodule:: zellij.strategies.continuous.chaos_algorithm
    :members: CGS
    :undoc-members:
    :show-inheritance:
@@ -25,7 +25,7 @@ Chaotic Global Search
 Chaotic Local Search
 --------------------
 
-  .. automodule:: zellij.strategies.chaos_algorithm
+  .. automodule:: zellij.strategies.continuous.chaos_algorithm
      :members: CLS
      :undoc-members:
      :show-inheritance:
@@ -34,7 +34,7 @@ Chaotic Local Search
 
 Chaotic Fine Search
 -------------------
-  .. automodule:: zellij.strategies.chaos_algorithm
+  .. automodule:: zellij.strategies.continuous.chaos_algorithm
      :members: CFS
      :undoc-members:
      :show-inheritance:

@@ -17,12 +17,10 @@ In *Zellij*, FDA is decomposed as follow:
 
 .. code-block:: python
 
-  from zellij.core.geometry import Hypersphere
   from zellij.strategies import DBA, ILS, PHS
-  from zellij.strategies.tools.tree_search import Move_up
-  from zellij.strategies.tools.scoring import Distance_to_the_best_corrected
+  from zellij.strategies.tools import Hypersphere,Move_up, Distance_to_the_best_corrected
 
-  from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar, Loss
+  from zellij.core importFloatVar, ArrayVar, Loss
   from zellij.utils.benchmarks import himmelblau
 
   loss = Loss()(himmelblau)
@@ -30,7 +28,7 @@ In *Zellij*, FDA is decomposed as follow:
                     FloatVar("a",-5,5),
                     FloatVar("b",-5,5)
                     )
-
+  # Define FDA algorithm
   def FDA_al(
     values, loss, calls, verbose=True, inflation=1.75, level=5
     ):
@@ -38,22 +36,20 @@ In *Zellij*, FDA is decomposed as follow:
         values,
         loss,
         inflation=inflation,
-        heuristic=Distance_to_the_best_corrected(),
+        scoring=Distance_to_the_best(),
     )
 
-    phs = PHS(sp, 3, verbose=verbose)
-    ils = ILS(sp, 5000000, verbose=verbose)
+    explor = PHS(sp)
+    exploi = ILS(sp)
+    stop1 = Threshold(None, "current_calls",3)
+    stop2 = Threshold(None,"current_calls",100)
+    dba = DBA(sp, Move_up(sp,5),(explor,stop1),(exploi,stop2))
+    stop1.target = dba
+    stop2.target = dba
 
-    dba = DBA(
-        sp,
-        calls,
-        Move_up(sp, level),
-        exploration=phs,
-        exploitation=ils,
-        verbose=verbose,
-        inflation=inflation,
-    )
-    dba.run()
+    stop3 = Threshold(lf, "calls", 5000)
+    exp = Experiment(dba, stop3)
+    exp.run()
 
     return sp
 

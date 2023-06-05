@@ -8,3 +8,4 @@ Decomposition algorithm
    geometry
    tree_search
    scoring
+   measurements

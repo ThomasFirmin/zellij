@@ -5,15 +5,27 @@ Geometry
 ========
 
 
-This module allows to define search space based on an Euclidean geometrical object.
+This module allows defining search space based on a geometrical object.
 It works the same as :ref:`sp`, but all dimensions are continuous.
+It is used by :ref:`dba`.
+
+*******
+Fractal
+*******
+
+.. automodule:: zellij.core.search_space
+   :members: Fractal
+   :undoc-members:
+   :show-inheritance:
+   :noindex:
+
 
 *******
 Classic
 *******
 
-.. automodule:: zellij.core.geometry
-   :members: Fractal, Hypercube, Hypersphere, Section
+.. automodule:: zellij.strategies.tools.geometry
+   :members: Hypercube, Hypersphere, Section
    :undoc-members:
    :show-inheritance:
    :noindex:
@@ -22,7 +34,7 @@ Classic
 Voronoï based
 *************
 
-.. automodule:: zellij.core.geometry
+.. automodule:: zellij.strategies.tools.geometry
   :members: Voronoi, DynamicVoronoi, FixedVoronoi, LightFixedVoronoi, BoxedVoronoi
   :undoc-members:
   :show-inheritance:
@@ -32,7 +44,7 @@ Voronoï based
 Miscellaneous
 *************
 
-.. automodule:: zellij.core.geometry
+.. automodule:: zellij.strategies.tools.geometry
   :members: Direct, Soo
   :undoc-members:
   :show-inheritance:

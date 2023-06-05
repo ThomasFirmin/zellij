@@ -7,7 +7,7 @@ Genetic Algorithm
 Genetic Algorithm
 -----------------
 
-.. automodule:: zellij.strategies.genetic_algorithm
+.. automodule:: zellij.strategies.mixed.genetic_algorithm
    :members:
    :undoc-members:
    :show-inheritance:

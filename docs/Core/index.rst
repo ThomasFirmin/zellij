@@ -8,3 +8,4 @@ Main objects
    searchspace
    lossfunc
    metaheuristic
+   experiment

@@ -1,18 +1,19 @@
 Zellij Documentation
 ====================
 
-**Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Decomposition based algorithms* [1]_ [2]_ .
+**Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was originally
+dedicated to *Decomposition based algorithms* [1]_ [2]_.
 It includes tools to define mixed search space, manage objective functions, and a few algorithms.
-To implements metaheuristics and other optimization methods, **Zellij** uses `DEAP <https://deap.readthedocs.io/>`__ [3]_ for the *Evolutionary Algorithms* part
-and `BoTorch <https://botorch.org/>`__ [4]_ for *Bayesian Optimization*.
+To implement metaheuristics and other optimization methods, **Zellij** uses `DEAP <https://deap.readthedocs.io/>`__ [3]_
+for the *Evolutionary Algorithms* part and `BoTorch <https://botorch.org/>`__ [4]_ for *Bayesian Optimization*.
 
-In **Zellij** we consider a  **minimization** problem with a loss function:
+In **Zellij** we consider a **minimization** problem with a loss function:
 
 :math:`f:\mathcal{X} \subset \mathbb{R}^n \rightarrow \mathbb{R}: \hat{x} = \mathrm{argmin}_{x \in \mathcal{X}}f(x)`.
 
 With, :math:`\hat{x}` the global optima, :math:`f` the objective function, and :math:`\mathcal{X}` a compact set made of inequalities (e.g. upper and lower bounds of decision variables).
 
-Currently **Zellij** supports mono-objective problems and *mixed, non-constrained and non-dynamic* search spaces.
+Currently, **Zellij** supports mono-objective problems and *mixed, non-constrained and non-dynamic* search spaces.
 
 Hyperparameter optimization problem
 -----------------------------------
@@ -21,9 +22,9 @@ A hyperparameter in machine learning is a parameter set before the learning phas
 Hyperparameters can be of multiple types, real, discrete, ordinal, categorical, binary... For example, the learning rate of a Stochastic Gradient Descent, the filter size for a convolution,
 the activation function for a group of neurons...
 
-When doing HPO of neural networks, one have to face several challenges:
+When doing HPO of neural networks, one hhasave to face several challenges:
 
-* **Black box** loss functions: the only knowledge are the inputs and ouputs of the function. One cannot computes the derivatives or the Jacobian matrix for example.
+* **Black box** loss functions: the only knowledge is the inputs and outputs of the function. One cannot compute the derivatives or the Jacobian matrix for example.
 * **Expensive** loss functions: the evaluation takes minutes up to days.
 * **Noisy** loss function: the value of :math:`f(x)` with :math:`x` fixed is not necessary the same over multiple runs.
 * **High dimensional and mixed** search space.
@@ -31,11 +32,11 @@ When doing HPO of neural networks, one have to face several challenges:
 Popular algorithms for such problems are *Grid Search*,
 *Random Search*, *Genetic Algorithms** or *Bayesian Optimization*.
 
-Defining the search space is a critical phase. Selecting too much
+Defining the search space is a critical phase. Selecting too many
 hyperparameters can result to a combinatorial explosion.
-Moreover selecting non significant hyperparameters will have a low impact on the
+Moreover, selecting non-significant hyperparameters will have a low impact on the
 training or model.
-Therefore, before running any optimization algorithms, one should be carefull on
+Therefore, before running any optimization algorithms, one should be careful about
 the search space design. Optimizing in a poorly defined search space will lead
 to worthless optimization.
 
@@ -72,18 +73,34 @@ Then the python script must be executed using :code:`mpiexec`:
 
 First steps
 -----------
+
 .. code-block:: Python
 
-  from zellij.core import FloatVar, ArrayVar, ContinuousSearchspace, Loss
+  from zellij.core import FloatVar, ArrayVar, ContinuousSearchspace, Loss, Experiment, Threshold
   from zellij.strategies import Bayesian_optimization
   from zellij.utils.benchmarks import himmelblau
-  values = ArrayVar(FloatVar("float_1", 0,1),FloatVar("float_2", 0,1))
-  lf = Loss(save=False)(himmelblau)
-  sp = ContinuousSearchspace(values,lf)
-  bo = Bayesian_optimization(sp, 500)
 
-  best, score = bo.run()
-  print(f"Best solution found:\nf({best}) = {score}")
+  # Decision variable
+  values = ArrayVar(FloatVar("float_1", -5,5),FloatVar("float_2", -5,5))
+
+  # Loss function
+  lf = Loss(save=False)(himmelblau)
+
+  # Search space
+  sp = ContinuousSearchspace(values,lf)
+
+  # Optimization Algorithm
+  bo = Bayesian_optimization(sp, initial_size = 30)
+
+  # Stopping criterion
+  stop = Threshold(lf, "calls", 100)
+
+  # Create an experiment
+  exp = Experiment(bo, stop)
+
+  # Run the experiment
+  exp.run()
+  print(f"Best solution found:\nf({lf.best_point}) = {lf.best_score}")
 
 Dependencies
 ------------
@@ -94,7 +111,7 @@ Dependencies
 * `botorch <https://botorch.org/>`__>=0.6.3.1
 * `gpytorch <https://gpytorch.ai/>`__>=1.6.0
 * `pandas <https://pandas.pydata.org/>`__>=1.3.4
-* `enlighten <https://python-enlighten.readthedocs.io/en/stable/>`__>=1.10.2
+* `scipy <https://scipy.org/>`__>=1.9.3
 * [mpi]: `mpi4py <https://mpi4py.readthedocs.io/en/stable/>`__>=3.1.2
 
 Contributors

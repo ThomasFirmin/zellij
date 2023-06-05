@@ -4,7 +4,7 @@
 Neighborhood
 ============
 
-Neighborhood objets are :ref:`addons` defining what a neighborhood is for
+Neighborhood objects are :ref:`addons` defining what a neighborhood is for
 a :ref:`var` via :ref:`varadd`, or a :ref:`sp` via :ref:`spadd`.
 
 .. code-block:: python

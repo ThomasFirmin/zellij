@@ -20,16 +20,17 @@ In *Zellij*, DIRECT is decomposed as follow:
 .. [1] D. R. Jones, C. D. Perttunen, and B. E. Stuckman, ‘Lipschitzian optimization without the Lipschitz constant’, J Optim Theory Appl, vol. 79, no. 1, pp. 157–181, Oct. 1993, doi: 10.1007/BF00941892.
 .. [2] Finkel, Daniel E.. “Direct optimization algorithm user guide.” (2003).
 
+.. warning:: 
+  The following code is deprecated.
+
 .. code-block:: python
 
   <code>
 
-  from zellij.core.geometry import Direct
+  from zellij.core import FloatVar, ArrayVar, Loss
   from zellij.strategies import DBA
-  from zellij.strategies.tools.tree_search import Potentially_Optimal_Rectangle
-  from zellij.strategies.tools.direct_utils import Sigma2, SigmaInf
+  from zellij.strategies.tools import Direct, Potentially_Optimal_Rectangle, Sigma2, SigmaInf, Min
 
-  from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar, Loss
   from zellij.utils.benchmarks import himmelblau
 
   loss = Loss()(himmelblau)
@@ -37,7 +38,7 @@ In *Zellij*, DIRECT is decomposed as follow:
                     FloatVar("a",-5,5),
                     FloatVar("b",-5,5)
                     )
-
+  # Define DIRECT algorithm
   def Direct_al(
     values,
     loss,
@@ -52,22 +53,25 @@ In *Zellij*, DIRECT is decomposed as follow:
     sp = Direct(
         values,
         loss,
-        calls,
+        scoring=Min(),
         sigma=Sigma2(len(values)),
     )
 
     dba = DBA(
         sp,
-        calls,
-            tree_search=Potentially_Optimal_Rectangle(
+        tree_search=Potentially_Optimal_Rectangle(
             sp, level, error=error, maxdiv=maxdiv
         ),
         verbose=verbose,
     )
-    dba.run()
 
+    stop = Threshold(loss, 'calls', calls)
+    exp = Experiment(dba, stop)
+    exp.run()
+    
     return sp
 
+  # Run DIRECT, and get initial search space
   sp = Direct_al(values, loss, 1000)
   best = (sp.loss.best_point, sp.loss.best_score)
   print(f"Best solution found:f({best[0]})={best[1]}")

@@ -8,7 +8,7 @@ Variables
 Abstract variables
 ******************
 
-:ref:`var` functionnalities can be extended with :ref:`addons`.
+:ref:`var` functionalities can be extended with :ref:`addons`.
 
 .. automodule:: zellij.core.variables
    :members: Variable
@@ -19,7 +19,7 @@ Abstract variables
 **************
 Base variables
 **************
-Basic :ref:`var` are the low level bricks to define a variable in **Zellij**.
+Basic :ref:`var` are the low-level bricks to define a variable in **Zellij**.
 
 .. automodule:: zellij.core.variables
    :members: IntVar, FloatVar, CatVar
@@ -61,8 +61,7 @@ Future variables
 ****************
 
 Future :ref:`var`, are variables that are implemented in **Zellij**.
-However they are not yet supported by the whole package.
-(They cannot be save for example)
+However, the whole package does not yet support them.
 
 .. automodule:: zellij.core.variables
    :members: Block, DynamicBlock
