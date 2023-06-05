@@ -1,3 +1,12 @@
+# @Author: Thomas Firmin <tfirmin>
+# @Date:   2022-12-23T02:22:10+01:00
+# @Email:  thomas.firmin@univ-lille.fr
+# @Project: Zellij
+# @Last modified by:   tfirmin
+# @Last modified time: 2023-05-23T18:17:51+02:00
+# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+
+
 # Configuration file for the Sphinx documentation builder.
 #
 # This file only contains a selection of the most common options. For a full
@@ -18,19 +27,17 @@ import sys
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath("."))
 sys.path.insert(0, os.path.abspath("../"))
-sys.path.insert(
-    1, os.path.dirname(os.path.abspath("../")) + os.sep + "feature_engine"
-)
+sys.path.insert(1, os.path.dirname(os.path.abspath("../")) + os.sep + "feature_engine")
 sys.path.insert(0, os.path.abspath("../.."))
 
 # -- Project information -----------------------------------------------------
 
 project = "zellij"
-copyright = "2022, Thomas Firmin"
+copyright = "2023, Thomas Firmin"
 author = "Thomas Firmin"
 
 # The full version, including alpha/beta/rc tags
-release = "1.0.0"
+release = "1.0.1"
 
 
 # -- General configuration ---------------------------------------------------
@@ -39,11 +46,11 @@ release = "1.0.0"
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom
 # ones.
 extensions = [
-    "sphinx.ext.autodoc",
+    "numpydoc",
     "sphinx.ext.napoleon",
+    "sphinx.ext.autodoc",
     "sphinx.ext.viewcode",
     "sphinx.ext.mathjax",
-    "sphinx.ext.imgmath",
     "sphinx_rtd_theme",
     "sphinx_copybutton",
     "sphinx_togglebutton",
@@ -63,6 +70,10 @@ exclude_patterns = [
     ".DS_Store",
     "**.ipynb_checkpoints",
 ]
+
+mathjax_path = (
+    "https://cdn.jsdelivr.net/npm/mathjax@2/MathJax.js?config=TeX-AMS-MML_HTMLorMML"
+)
 
 # -- Options for HTML output -------------------------------------------------
 
@@ -98,15 +109,11 @@ def setup(app):
     # so that we can test RTD-like behavior. We don't need to run it on RTD and we
     # don't wanted it loaded in GitHub Actions because it messes up the lighthouse
     # results.
-    if not os.environ.get("READTHEDOCS") and not os.environ.get(
-        "GITHUB_ACTIONS"
-    ):
+    if not os.environ.get("READTHEDOCS") and not os.environ.get("GITHUB_ACTIONS"):
         app.add_css_file(
             "https://assets.readthedocs.org/static/css/readthedocs-doc-embed.css"
         )
-        app.add_css_file(
-            "https://assets.readthedocs.org/static/css/badge_only.css"
-        )
+        app.add_css_file("https://assets.readthedocs.org/static/css/badge_only.css")
 
         # Create the dummy data file so we can link it
         # ref: https://github.com/readthedocs/readthedocs.org/blob/bc3e147770e5740314a8e8c33fec5d111c850498/readthedocs/core/static-src/core/js/doc-embed/footer.js  # noqa: E501
