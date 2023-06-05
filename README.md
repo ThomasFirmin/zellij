@@ -16,9 +16,9 @@
 ![Maintainer](https://img.shields.io/badge/maintainer-T.Firmin-blue)
 
 
-**Zellij** is an open source Python framework for *HyperParameter Optimization* (HPO) which was orginally dedicated to *Fractal Decomposition based algorithms* [[1]](#1) [[2]](#2).
-It includes tools to define mixed search space, manage objective functions, and a few algorithms.
-**Zellij** is defined as an easy to use and modular framework, based on Python object oriented paradigm.
+**Zellij** is an open-source Python framework for *HyperParameter Optimization* (HPO) which was originally dedicated to *Fractal Decomposition-based algorithms* [[1]](#1) [[2]](#2).
+It includes tools to define mixed search spaces, manage objective functions, and a few algorithms.
+**Zellij** is defined as an easy-to-use and modular framework, based on Python object-oriented paradigm.
 
 See [documentation](https://zellij.readthedocs.io/en/latest/).
 
@@ -38,7 +38,7 @@ It is based on [mpi4py](https://mpi4py.readthedocs.io/en/stable/intro.html#what-
 $ pip install zellij[mpi]
 ```
 
-User will then be able to use the `MPI` option of the `Loss` decorator.
+The user will then be able to use the `MPI` option of the `Loss` decorator.
 ```python
 @Loss(MPI=True)
 ```
@@ -57,7 +57,7 @@ $ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path
 * [botorch](https://botorch.org/)>=0.6.3.1
 * [gpytorch](https://gpytorch.ai/)>=1.6.0
 * [pandas](https://pandas.pydata.org/)>=1.3.4
-* [enlighten](https://python-enlighten.readthedocs.io/en/stable/)>=1.10.2
+* [scipy](https://scipy.org/)>=1.9.3
 
 #### MPI version
 * **Python** >=3.6
@@ -66,7 +66,7 @@ $ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path
 * [botorch](https://botorch.org/)>=0.6.3.1
 * [gpytorch](https://gpytorch.ai/)>=1.6.0
 * [pandas](https://pandas.pydata.org/)>=1.3.4
-* [enlighten](https://python-enlighten.readthedocs.io/en/stable/)>=1.10.2
+* [scipy](https://scipy.org/)>=1.9.3
 * [mpi4py](https://mpi4py.readthedocs.io/en/stable/)>=3.1.2
 
 ## Contributors
