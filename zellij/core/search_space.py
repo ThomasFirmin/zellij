@@ -96,6 +96,14 @@ class Searchspace(ABC):
         # if true solutions must be converted before being past to loss func.
         self._convert_sol = False
 
+    @property
+    def loss(self):
+        return self._loss
+
+    @loss.setter
+    def loss(self, value):
+        self._loss = value
+
     def _add_addons(self, **kwargs):
         for k in kwargs:
             assert isinstance(kwargs[k], SearchspaceAddon), logger.error(
@@ -147,10 +155,11 @@ class Searchspace(ABC):
         """
 
         if exclude:
+            index = []
             if isinstance(exclude, int):
                 index = [exclude]
             elif isinstance(exclude, Variable):
-                index = [exclude._idx]
+                index = [exclude._idx]  # type: ignore
             elif isinstance(exclude, type):
                 index = []
                 for elem in self.variables.variables:
@@ -238,6 +247,19 @@ class Searchspace(ABC):
         sp = type(self)(sub, self.loss, **kwargs, **self.kwargs)
 
         return sp
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["loss"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.loss = None
+        logger.warning("After unpickling a Searchspace, the `loss` is set to None.")
+        logger.warning(
+            "In Searchspace, self.loss has to be manually set after unpickling."
+        )
 
     def __len__(self):
         return len(self.variables)
@@ -349,7 +371,11 @@ class MixedSearchspace(Searchspace):
         )
         self.distance.target = self
 
-        self.loss.labels = [v.label for v in self.variables]
+    @Searchspace.loss.setter
+    def loss(self, value):
+        self._loss = value
+        if self._loss and not self.loss.labels:
+            self.loss.labels = [v.label for v in self.variables]
 
 
 class ContinuousSearchspace(Searchspace):
@@ -468,6 +494,12 @@ class ContinuousSearchspace(Searchspace):
         )
         self.distance.target = self
 
+    @Searchspace.loss.setter
+    def loss(self, value):
+        self._loss = value
+        if self._loss and not self.loss.labels:
+            self.loss.labels = [v.label for v in self.variables]
+
 
 class DiscreteSearchspace(Searchspace):
 
@@ -572,6 +604,12 @@ class DiscreteSearchspace(Searchspace):
             f"Kwargs `distance` must be of type `Distance`, got {self.distance}"
         )
         self.distance.target = self
+
+    @Searchspace.loss.setter
+    def loss(self, value):
+        self._loss = value
+        if self._loss and not self.loss.labels:
+            self.loss.labels = [v.label for v in self.variables]
 
 
 class Fractal(Searchspace):
@@ -704,6 +742,12 @@ class Fractal(Searchspace):
 
         # Determine measure of fractal
         self._update_measure()
+
+    @Searchspace.loss.setter
+    def loss(self, value):
+        self._loss = value
+        if self._loss and not self.loss.labels:
+            self.loss.labels = [v.label for v in self.variables]
 
     def _is_valid_fractal(self):
         conv_condition = all(
