@@ -86,6 +86,62 @@ class ArrayConverter(VarConverter):
         return res
 
 
+class ArrayBinaryBest(VarConverter):
+    """ArrayBinaryBest
+
+    Experimental
+
+    Parameters
+    ----------
+    variable : ArrayVar
+        Targeted ArrayVar.
+
+    Attributes
+    ----------
+    variable : ArrayVar
+        Targeted ArrayVar.
+
+    """
+
+    def __init__(self, loss, variable=None):
+        super(ArrayBinaryBest, self).__init__(variable)
+        if variable:
+            assert all(
+                hasattr(v, "converter") for v in self.target.variables
+            ), logger.error(
+                f"""
+                To use `ArrayMinmax`, variables in `ArrayVar` must have a `converter` method.
+                Use `converter` kwarg when defining a variable
+                """
+            )
+
+        self.loss = loss
+
+    def convert(self, value):
+        res = []
+
+        if self.loss.best_point:
+            for variable, v in zip(self.target.variables, value):
+                res.append(
+                    variable.converter.convert(
+                        v, replacement=self.loss.best_point[v._idx]
+                    )
+                )
+        else:
+            for variable, v in zip(self.target.variables, value):
+                res.append(variable.converter.convert(v, replacement=1))
+
+        return res
+
+    def reverse(self, value):
+        res = []
+
+        for variable, v in zip(self.target.variables, value):
+            res.append(variable.converter.reverse(v))
+
+        return res
+
+
 ####################################
 # Float Converters
 ####################################
@@ -102,6 +158,39 @@ class FloatMinmax(VarConverter):
 
     def convert(self, value):
         return (value - self.target.lower) / (self.target.upper - self.target.lower)
+
+    def reverse(self, value):
+        return value * (self.target.upper - self.target.lower) + self.target.lower
+
+
+class FloatBinary(VarConverter):
+    """FloatBinary
+
+    Experimental
+
+    """
+
+    def convert(self, value):
+        return np.round(
+            (value - self.target.lower) / (self.target.upper - self.target.lower)
+        )
+
+    def reverse(self, value):
+        return value * (self.target.upper - self.target.lower) + self.target.lower
+
+
+class FloatBinaryStochastic(VarConverter):
+    """FloatBinaryStochastic
+    Experimental
+    """
+
+    def __init__(self, transfer, variable=None):
+        super().__init__(variable)
+        self.transfer = transfer
+
+    def convert(self, value, replacement=1):
+        p = self.transfer(value)
+        return 0 if np.random.random() > p else replacement
 
     def reverse(self, value):
         return value * (self.target.upper - self.target.lower) + self.target.lower
