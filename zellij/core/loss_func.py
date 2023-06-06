@@ -647,7 +647,6 @@ class MPILoss(LossFunc):
             else:
                 self.workers_size = self.p - 1
 
-        self._computed_points = 0
         self.recv_msg = 0
         self.sent_msg = 0
 
@@ -666,8 +665,12 @@ class MPILoss(LossFunc):
             i: [None, None, None, None] for i in range(1, self.workers_size + 1)
         }  # historic of points sent to workers
 
+        self._strategy = None  # set to None for definitio issue
+
         self.is_master = self.rank == 0
         self.is_worker = self.rank != 0
+
+        # Property, defines parallelisation strategy
         self._master_rank = 0  # type: ignore
 
     def _master_rank():
