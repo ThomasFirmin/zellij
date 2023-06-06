@@ -39,7 +39,6 @@ class Chaos_map(ABC):
     """
 
     def __init__(self, vectors, params, seed):
-
         self.vectors = vectors
         self.params = params
         self.seed = seed
@@ -64,17 +63,34 @@ class Chaos_map(ABC):
         finally:
             np.random.set_state(state)
 
-    def __add__(self, map):
+    def __add__(self, other):
         assert (
-            self.params == map.params
-        ), f"Error, maps must have equals `params`, got {self.params} and {map.params}"
+            self.params == other.params
+        ), f"Error, maps must have equals `params`, got {self.params} and {other.params}"
 
-        new_map = Chaos_map(self.vectors + map.vectors, self.params)
-
-        new_map.map = np.append(self.map, map.map)
-        np.random.shuffle(new_map.map)
+        new_map = _AddedMap(
+            self.vectors + other.vectors, self.params, self, other, self.seed
+        )
 
         return new_map
+
+
+class _AddedMap(Chaos_map):
+    """_AddedMap
+
+    Addition of two maps. Maps are shuffled.
+
+    """
+
+    def __init__(self, vectors, params, map1, map2, seed):
+        self.vectors = vectors
+        self.params = params
+        self.seed = seed
+
+        self.map = np.append(map1.map, map2.map)
+
+    def sample(self):
+        np.random.shuffle(self.map)
 
 
 class Henon(Chaos_map):
@@ -110,7 +126,6 @@ class Henon(Chaos_map):
     """
 
     def __init__(self, vectors, params, a=1.4020560, b=0.305620406, seed=0):
-
         super().__init__(vectors, params, seed)
 
         self.a = a
@@ -124,7 +139,6 @@ class Henon(Chaos_map):
             x = np.random.random(self.params)
 
             for i in range(1, self.vectors):
-
                 # y_{k+1} = x_{k}
                 y[i, :] = self.b * x
 
@@ -221,7 +235,6 @@ class Logistic(Chaos_map):
     """
 
     def __init__(self, vectors, params, mu=3.57, seed=0):
-
         super().__init__(vectors, params, seed)
 
         self.mu = mu
@@ -232,9 +245,7 @@ class Logistic(Chaos_map):
             self.map[0, :] = np.random.random(self.params)
 
             for i in range(1, self.vectors):
-                self.map[i, :] = (
-                    self.mu * self.map[i - 1, :] * (1 - self.map[i - 1, :])
-                )
+                self.map[i, :] = self.mu * self.map[i - 1, :] * (1 - self.map[i - 1, :])
 
 
 class Tent(Chaos_map):
@@ -271,7 +282,6 @@ class Tent(Chaos_map):
     """
 
     def __init__(self, vectors, params, mu=2 - 1e-10, seed=0):
-
         super().__init__(vectors, params, seed)
 
         self.mu = mu
@@ -289,7 +299,7 @@ class Tent(Chaos_map):
 
 
 class Random(Chaos_map):
-    def __init__(self, vectors, params):
+    def __init__(self, vectors, params, seed=0):
         super().__init__(vectors, params, seed)
         self.sample(seed)
 
