@@ -312,6 +312,21 @@ class AMetaheuristic(ABC):
         pass
 
     @abstractmethod
+    def save(self, path):
+        """save
+        Method saving actual state of the metaheuristic
+        """
+        pass
+
+    @abstractmethod
+    def load(self, path, loss):
+        """save
+        Method loading a previously saved metaheuristic.
+
+        """
+        pass
+
+    @abstractmethod
     def master(self, stop_obj=None):
         """master
         Master process
