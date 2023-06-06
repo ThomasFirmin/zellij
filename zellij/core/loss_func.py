@@ -9,7 +9,7 @@
 
 import numpy as np
 import os
-import shutil
+import pickle
 import time
 
 from abc import ABC, abstractmethod
@@ -164,6 +164,24 @@ class LossFunc(ABC):
         self._init_time = time.time()
 
         self.default = default
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["model"]
+        del state["all_scores"]
+        del state["all_solutions"]
+        del state["_init_time"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+
+    def save(self, path):
+        pickle.dump(self.__getstate__, open(os.path.join(path, "loss.p"), "wb"))
+
+    def load(self, path):
+        states = pickle.load(open(os.path.join(path, "loss.p"), "rb"))
+        self.__setstate__(states)
 
     @abstractmethod
     def _save_model(self, *args):

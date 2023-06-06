@@ -14,6 +14,7 @@ from zellij.core.addons import SearchspaceAddon, Converter
 import numpy as np
 import copy
 import os
+import pickle
 from abc import ABC, abstractmethod
 
 
@@ -248,9 +249,12 @@ class Searchspace(ABC):
 
         return sp
 
+    def save(self, path):
+        pickle.dump(self, open(os.path.join(path, "searchspace.p"), "wb"))
+
     def __getstate__(self):
         state = self.__dict__.copy()
-        del state["loss"]
+        del state["_loss"]
         return state
 
     def __setstate__(self, state):
