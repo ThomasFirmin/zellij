@@ -18,6 +18,8 @@ from .converters import (
     ConstantBinning,
     Basic,
     DoNothing,
+    FloatBinary,
+    FloatBinaryStochastic,
 )
 from .distances import Euclidean, Manhattan, Mixed
 from .neighborhoods import (
