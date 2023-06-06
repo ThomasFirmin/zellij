@@ -694,8 +694,8 @@ class Fractal(Searchspace):
 
         self.level = 0
         self.father = -1  # father id, -1 = no father
-        self.f_id = 1  # fractal id at a given level
-        self.c_id = 1  # Children id
+        self.f_id = 0  # fractal id at a given level
+        self.c_id = 0  # Children id
 
         self.score = float("nan")
 
