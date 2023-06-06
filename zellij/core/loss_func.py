@@ -668,7 +668,7 @@ class MPILoss(LossFunc):
 
         self.is_master = self.rank == 0
         self.is_worker = self.rank != 0
-        self._master_rank = 0
+        self._master_rank = 0  # type: ignore
 
     def _master_rank():
         def fget(self):
@@ -690,10 +690,10 @@ class MPILoss(LossFunc):
 
         return locals()
 
-    _master_rank = property(**_master_rank())
+    _master_rank = property(**_master_rank())  # type: ignore
 
     def __call__(self, X, stop_obj=None, **kwargs):
-        new_x, score = self._strategy(X, stop_obj=stop_obj, **kwargs)
+        new_x, score = self._strategy(X, stop_obj=stop_obj, **kwargs)  # type: ignore
 
         return new_x, score
 
@@ -819,7 +819,7 @@ class MPILoss(LossFunc):
         return point, outputs, point_id, point_info, point_source
 
     def _process_outputs(self, point, outputs, id, info, source):
-        return self._strategy._process_outputs(point, outputs, id, info, source)
+        return self._strategy._process_outputs(point, outputs, id, info, source)  # type: ignore
 
     def _stop(self):
         """stop()
@@ -885,7 +885,7 @@ class MPILoss(LossFunc):
         while stop:
             print(f"WORKER {self.rank} receving message")
             # receive message from master
-            msg = self.comm.recv(source=self._master_rank, status=self.status)
+            msg = self.comm.recv(source=self._master_rank, status=self.status)  # type: ignore
             tag = self.status.Get_tag()
             source = self.status.Get_source()
 
@@ -906,7 +906,7 @@ class MPILoss(LossFunc):
 
                 # Send results
                 print(f"WORKER {self.rank} sending {outputs} to {self._master_rank}")
-                self.comm.send(dest=self._master_rank, tag=1, obj=outputs)
+                self.comm.send(dest=self._master_rank, tag=1, obj=outputs)  # type: ignore
 
             else:
                 print(f"WORKER {self.rank} unknown tag, got {tag}")

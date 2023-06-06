@@ -97,8 +97,8 @@ class Hypercube(Fractal):
 
         return children
 
-    def _modify(self, upper, lower, level, father, f_id, c_id, score):
-        super()._modify(level, father, f_id, c_id, score)
+    def _modify(self, upper, lower, level, father, f_id, c_id, score, measure):
+        super()._modify(level, father, f_id, c_id, score, measure)
         self.upper, self.lower = upper, lower
 
     def _essential_info(self):
@@ -183,8 +183,8 @@ class Hypersphere(Fractal):
 
         return children
 
-    def _modify(self, center, radius, level, father, f_id, c_id, score):
-        super()._modify(level, father, f_id, c_id, score)
+    def _modify(self, center, radius, level, father, f_id, c_id, score, measure):
+        super()._modify(level, father, f_id, c_id, score, measure)
         self.center, self.radius = center, radius
 
     def _essential_info(self):
@@ -307,14 +307,15 @@ class Section(Fractal):
         for l, u, child, mid in zip(lowers, uppers, children, are_middle):
             child.lower = l
             child.upper = u
-            child.center = (u - l) / 2
             child.section = self.section
             child.is_middle = mid
 
         return children
 
-    def _modify(self, upper, lower, level, is_middle, father, f_id, c_id, score):
-        super()._modify(level, father, f_id, c_id, score)
+    def _modify(
+        self, upper, lower, level, is_middle, father, f_id, c_id, score, measure
+    ):
+        super()._modify(level, father, f_id, c_id, score, measure)
         self.upper, self.lower = upper, lower
         self.is_middle = is_middle
 

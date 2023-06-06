@@ -67,9 +67,9 @@ class Experiment(object):
         if isinstance(meta, AMetaheuristic) or isinstance(
             meta.search_space.loss, MPILoss
         ):
-            self.strategy = RunParallelExperiment()
+            self.strategy = RunParallelExperiment()  # type: ignore
         else:
-            self.strategy = RunExperiment()
+            self.strategy = RunExperiment()  # type: ignore
 
     def strategy():
         doc = "Describes how to run an experiment"
@@ -85,7 +85,7 @@ class Experiment(object):
 
         return locals()
 
-    strategy = property(**strategy())
+    strategy = property(**strategy())  # type: ignore
 
     def run(self, X=None, Y=None):
         start = time.time()
@@ -99,7 +99,7 @@ class AExperiment(object):
     def __init__(self, meta, stop, meta_size):
         self.meta = meta
         self.stop = stop
-        self.strategy = RunAExperiment()
+        self.strategy = RunAExperiment()  # type: ignore
         self.ttime = 0
 
         self.comm = MPI.COMM_WORLD
@@ -197,7 +197,7 @@ class AExperiment(object):
 
         return locals()
 
-    strategy = property(**strategy())
+    strategy = property(**strategy())  # type: ignore
 
     def run(self, X=None, Y=None):
         start = time.time()
@@ -235,13 +235,13 @@ class RunExperiment(ABC):
                 A forward(X,Y) returned an empty list of solutions.
                 """
                 )
-            if self._convert_sol:
+            if meta.search_space._convert_sol:
                 # convert from metaheuristic space to loss space
-                X = self.meta.search_space.converter.reverse(X)
+                X = meta.search_space.converter.reverse(X)
                 # compute loss
                 X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
                 # convert from loss space to metaheuristic space
-                X = self.meta.search_space.converter.convert(X)
+                X = meta.search_space.converter.convert(X)
             else:
                 X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
 
@@ -281,7 +281,7 @@ class RunParallelExperiment(RunExperiment):
                 elif meta.is_worker:
                     meta.worker(stop_obj=stop)  # doing the inner while loop
             else:  # Asynchronous mode / iteration parallelisation
-                self._run_forward_loss(self, meta, stop, X, Y)
+                self._run_forward_loss(meta, stop, X, Y)
 
             if meta.search_space.loss.is_master:
                 meta.search_space.loss.master(stop_obj=stop)

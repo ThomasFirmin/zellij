@@ -312,14 +312,14 @@ class AMetaheuristic(ABC):
         pass
 
     @abstractmethod
-    def master(self):
+    def master(self, stop_obj=None):
         """master
         Master process
         """
         pass
 
     @abstractmethod
-    def worker(self):
+    def worker(self, stop_obj=None):
         """worker
         Worker process
         """

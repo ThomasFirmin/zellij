@@ -138,11 +138,11 @@ class Neighborhood(SearchspaceAddon):
 
     def __init__(self, neighborhood, search_space=None):
         super(Neighborhood, self).__init__(search_space)
-        self.neighborhood = neighborhood
+        self.neighborhood = neighborhood  # type: ignore
 
     @property
     def neighborhood(self):
-        return self._neighborhood
+        return self._neighborhood  # type: ignore
 
     @abstractmethod
     def __call__(self, point, size=1):
@@ -169,11 +169,11 @@ class VarNeighborhood(VarAddon):
 
     def __init__(self, neighborhood, variable=None):
         super(VarAddon, self).__init__(variable)
-        self.neighborhood = neighborhood
+        self.neighborhood = neighborhood  # type: ignore
 
     @property
     def neighborhood(self):
-        return self._neighborhood
+        return self._neighborhood  # type: ignore
 
     @abstractmethod
     def __call__(self, point, size=1):
