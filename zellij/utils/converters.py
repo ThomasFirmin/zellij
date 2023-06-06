@@ -212,7 +212,7 @@ class FloatBinning(VarConverter):
         assert (
             isinstance(K, int) and K > 1
         ), f"K must be an int >1 for FloatBinning, got {K}"
-        self.K = K
+        self.K = K + 1
 
     def convert(self, value):
         bins = np.linspace(self.target.lower, self.target.upper, self.K)
