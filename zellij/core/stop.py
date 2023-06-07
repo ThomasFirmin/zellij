@@ -48,7 +48,7 @@ class Stopping(ABC):
 
         return locals()
 
-    target = property(**target())
+    target = property(**target())  # type: ignore
 
     def attribute():
         def fget(self):
@@ -62,7 +62,14 @@ class Stopping(ABC):
 
         return locals()
 
-    attribute = property(**attribute())
+    attribute = property(**attribute())  # type: ignore
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        if isinstance(self.target, LossFunc):
+            state["target"] = "loss"
+
+        return state
 
     def __and__(self, other):
         return Combined(self, other, lambda a, b: a() & b())
@@ -150,7 +157,7 @@ class Threshold(Stopping):
         self.threshold = threshold
 
     def __call__(self):
-        return getattr(self.target, self.attribute) < self.threshold
+        return getattr(self.target, self.attribute) < self.threshold  # type: ignore
 
 
 class Calls(Threshold):
@@ -171,15 +178,15 @@ class Calls(Threshold):
     """
 
     def __init__(self, meta, threshold):
-        super(Calls, self).__init__(meta.search_space.loss, "calls")
+        super(Calls, self).__init__(meta.search_space.loss, "calls")  # type: ignore
         self.threshold = threshold
 
 
 class Convergence(Stopping):
     """Convergence
 
-    Stoppping criterion based on convergence. If the best individual found so
-    far does not change after :code:`patience` calls to the :ref:`lf`, then
+    Stoppping criterion based on convergence. If the targetted attribute
+    does not change after :code:`patience` calls to the :ref:`lf`, then
     returns false.
 
     Parameters
@@ -203,9 +210,8 @@ class Convergence(Stopping):
         self.previous = None
 
     def __call__(self):
-
-        if self.previous != getattr(self.target, self.attribute):
-            self.previous = getattr(self.target, self.attribute)
+        if self.previous != getattr(self.target, self.attribute):  # type: ignore
+            self.previous = getattr(self.target, self.attribute)  # type: ignore
         else:
             self.acc += 1
 
