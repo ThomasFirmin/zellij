@@ -42,7 +42,7 @@ class LossFunc(ABC):
         * :math:`model` is optionnal, it is an object with a save() method. (e.g. a neural network from Tensorflow)
 
     You must wrap your function so it can be used in Zellij by adding
-    several features, such as calls count, saves, parallelization, historic...
+    several features, such as calls count, saves, parallelization...
 
     Attributes
     ----------
@@ -57,10 +57,6 @@ class LossFunc(ABC):
         Best score found so far.
     best_point : list
         Best solution found so far.
-    all_scores : float
-        Historic of all evaluated scores.
-    all_solutions : float
-        Historic of all evaluated solutions.
     calls : int
         Number of loss function calls
 
@@ -75,7 +71,6 @@ class LossFunc(ABC):
         self,
         model,
         objective=Minimizer,
-        historic=False,
         save=False,
         verbose=True,
         only_score=False,
@@ -97,11 +92,6 @@ class LossFunc(ABC):
             If :code:`objective` is :code:`Maximizer`, then the first argument
             of the object, list, tuple or dict, returned by the :code:`__call__`
             function will be maximized.
-        historic : bool, optionnal
-            If True, then all evaluation are saved within the :ref:`lf` object.
-            Otherwise, only the best solution found so far is saved.
-            All solutions and information can be saved by using the :code:`save`
-            parameter;
         save : str, optionnal
             If a :code:`str` is given, then outputs will be saved in :code:`save`.
         verbose : bool, default=False
@@ -128,7 +118,6 @@ class LossFunc(ABC):
         else:
             self.objective = objective
 
-        self.historic = historic
         self.save = save
         self.only_score = only_score
         self.kwargs_mode = kwargs_mode
@@ -141,9 +130,6 @@ class LossFunc(ABC):
 
         self.best_score = float("inf")
         self.best_point = None
-
-        self.all_scores = []
-        self.all_solutions = []
 
         self.calls = 0
 
@@ -168,20 +154,8 @@ class LossFunc(ABC):
     def __getstate__(self):
         state = self.__dict__.copy()
         del state["model"]
-        del state["all_scores"]
-        del state["all_solutions"]
         del state["_init_time"]
         return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-
-    def save(self, path):
-        pickle.dump(self.__getstate__, open(os.path.join(path, "loss.p"), "wb"))
-
-    def load(self, path):
-        states = pickle.load(open(os.path.join(path, "loss.p"), "rb"))
-        self.__setstate__(states)
 
     @abstractmethod
     def _save_model(self, *args):
@@ -366,11 +340,6 @@ class LossFunc(ABC):
             self.best_score = y
             self.best_point = list(x)[:]
 
-        # historic
-        if self.historic:
-            self.all_solutions.append(list(x)[:])
-            self.all_scores.append(y)
-
     def _build_return(self, r):
         """_build_return(r)
 
@@ -402,17 +371,6 @@ class LossFunc(ABC):
 
         return self.objective(results), model
 
-    def get_best(self, n_process=1, idx=None):
-        if self.historic and idx is not None:
-            best_idx = np.argpartition(self.all_scores[idx], n_process)
-            best = [self.all_solutions[i] for i in best_idx[:n_process]]
-            min = [self.all_scores[i] for i in best_idx[:n_process]]
-        else:
-            best = self.best_point
-            min = self.best_score
-
-        return best, min
-
     def reset(self):
         """reset()
 
@@ -423,9 +381,6 @@ class LossFunc(ABC):
         self.best_score = float("inf")
         self.best_point = None
         self.best_argmin = None
-
-        self.all_scores = []
-        self.all_solutions = []
 
         self.calls = 0
 
@@ -472,14 +427,13 @@ class SerialLoss(LossFunc):
         self,
         model,
         objective=Minimizer,
-        historic=False,
         save=False,
         verbose=True,
         only_score=False,
         kwargs_mode=False,
         default=None,
     ):
-        """__init__(model, historic=False, save=False, verbose=True)
+        """__init__(model, save=False, verbose=True)
 
         Initialize SerialLoss.
 
@@ -488,7 +442,6 @@ class SerialLoss(LossFunc):
         super().__init__(
             model,
             objective,
-            historic,
             save,
             verbose,
             only_score,
@@ -554,7 +507,6 @@ class MPILoss(LossFunc):
         self,
         model,
         objective=Minimizer,
-        historic=False,
         save=False,
         verbose=True,
         only_score=False,
@@ -583,11 +535,6 @@ class MPILoss(LossFunc):
             If :code:`objective` is :code:`Maximizer`, then the first argument
             of the object, list, tuple or dict, returned by the :code:`__call__`
             function will be maximized.
-        historic : bool, optionnal
-            If True, then all evaluation are saved within the :ref:`lf` object.
-            Otherwise, only the best solution found so far is saved.
-            All solutions and information can be saved by using the :code:`save`
-            parameter;
         save : str, optionnal
             If a :code:`str` is given, then outputs will be saved in :code:`save`.
         verbose : bool, default=False
@@ -630,7 +577,6 @@ class MPILoss(LossFunc):
         super().__init__(
             model,
             objective,
-            historic,
             save,
             verbose,
             only_score,
@@ -1109,7 +1055,6 @@ class _MultiAsynchronous_strat(_Parallel_strat):
 def Loss(
     model=None,
     objective=Minimizer,
-    historic=False,
     save=False,
     verbose=True,
     MPI=False,
@@ -1135,11 +1080,6 @@ def Loss(
         If :code:`objective` is :code:`Maximizer`, then the first argument
         of the object, list, tuple or dict, returned by the :code:`__call__`
         function will be maximized.
-    historic : bool, optionnal
-        If True, then all evaluation are saved within the :ref:`lf` object.
-        Otherwise, only the best solution found so far is saved.
-        All solutions and information can be saved by using the :code:`save`
-        parameter;
     save : str, optionnal
         If a :code:`str` is given, then outputs will be saved in :code:`save`.
     verbose : bool, default=False
@@ -1177,8 +1117,6 @@ def Loss(
     Best solution found: f(None) = inf
     >>> print(f"Number of evaluations:{himmelblau.calls}")
     Number of evaluations:0
-    >>> print(f"All evaluated solutions:{himmelblau.all_solutions}")
-    All evaluated solutions:[]
     """
     if model:
         return SerialLoss(model)
@@ -1190,7 +1128,6 @@ def Loss(
                     return MPILoss(
                         model,
                         objective,
-                        historic,
                         save,
                         verbose,
                         only_score,
@@ -1203,7 +1140,6 @@ def Loss(
                     return MPILoss(
                         model,
                         objective,
-                        historic,
                         save,
                         verbose,
                         only_score,
@@ -1224,7 +1160,6 @@ def Loss(
                 return SerialLoss(
                     model,
                     objective,
-                    historic,
                     save,
                     verbose,
                     only_score,
