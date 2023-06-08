@@ -695,7 +695,7 @@ class BaseFractal(Searchspace):
             * And other operators linked to the optimization algorithms (crossover, mutation,...)
 
         """
-        super(Fractal, self).__init__(variables, loss, **kwargs)
+        super(BaseFractal, self).__init__(variables, loss, **kwargs)
 
         self._compute_mesure = measure
         self.measure = float("nan")
