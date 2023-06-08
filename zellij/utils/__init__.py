@@ -31,3 +31,4 @@ from .neighborhoods import (
     Intervals,
 )
 from .operators import NeighborMutation, DeapTournament, DeapOnePoint
+from .backup import AutoSave
