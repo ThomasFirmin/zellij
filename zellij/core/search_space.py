@@ -254,16 +254,10 @@ class Searchspace(ABC):
 
     def __getstate__(self):
         state = self.__dict__.copy()
-        del state["_loss"]
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        self.loss = None
-        logger.warning("After unpickling a Searchspace, the `loss` is set to None.")
-        logger.warning(
-            "In Searchspace, self.loss has to be manually set after unpickling."
-        )
 
     def __len__(self):
         return len(self.variables)
@@ -616,7 +610,234 @@ class DiscreteSearchspace(Searchspace):
             self.loss.labels = [v.label for v in self.variables]
 
 
-class Fractal(Searchspace):
+class BaseFractal(Searchspace):
+    """Fractal
+
+    BaseFractal is an abstract describing what an fractal object is.
+    This class is used to build a new kind of search space.
+
+    Fractals can be compared between eachothers, using:
+    :code:`__lt__`, :code:`__le__`, :code:`__eq__`,
+    :code:`__ge__`, :code:`__gt__`, :code:`__ne__` operators.
+
+    Attributes
+    ----------
+    level : int
+        Current level of the fractal in the partition tree. See Tree_search.
+
+    father : int
+        Fractal id of the parent of the fractal.
+
+    f_id : int
+        ID of the fractal at the current level.
+
+    c_id : int
+        ID of the child among the children of the parent.
+
+    score : float
+        Score of the fractal. By default the score of the fractal is equal
+        to the score of its parent (inheritance), so it can be locally
+        used and modified by the :ref:`scoring`.
+
+    solutions : list[list[float]]
+        List of solutions computed within the fractal
+
+    variables : list[float]
+        List of objective variables.
+
+    measure : float, default=NaN
+        Measure of the fractal, obtained by a :code:`Measurement`.
+
+    See Also
+    --------
+    :ref:`lf` : Defines what a loss function is
+    Tree_search : Defines how to explore and exploit a fractal partition tree.
+    :ref:`sp` : Initial search space used to build fractal.
+    Hypercube : Inherited Fractal type
+    Hypersphere : Inherited Fractal type
+    """
+
+    def __init__(
+        self,
+        variables,
+        loss,
+        measure=None,
+        **kwargs,
+    ):
+        """__init__(variables, loss, measure=None, **kwargs)
+
+        Parameters
+        ----------
+
+        variables : ArrayVar
+            Determines the bounds of the search space.
+            For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
+            of `FloatVar`.
+            The :ref:`sp` will then manipulate this array.
+
+        loss : LossFunc
+            Callable of type `LossFunc`. See :ref:`lf` for more information.
+            `loss` will be used by the :ref:`sp` object and by optimization
+            algorithms.
+
+        measure : Measurement, default=None
+            Defines the measure of a fractal.
+
+        **kwargs : dict
+            Kwargs are the different addons one want to add to a `Variable`.
+            Common addons are:
+            * converter : Converter
+                * Will be called when converting a solution to another space is needed.
+            * neighbor : Neighborhood
+                * Will be called when a neighborhood is needed.
+            * distance: Distance, default, Mixed
+                * Will be called when computing a distance is needed
+            * And other operators linked to the optimization algorithms (crossover, mutation,...)
+
+        """
+        super(Fractal, self).__init__(variables, loss, **kwargs)
+
+        self._compute_mesure = measure
+        self.measure = float("nan")
+
+        self.level = 0
+        self.father = -1  # father id, -1 = no father
+        self.f_id = 0  # fractal id at a given level
+        self.c_id = 0  # Children id
+
+        self.score = float("nan")
+
+        self.solutions = []
+        self.losses = []
+
+    @Searchspace.loss.setter
+    def loss(self, value):
+        self._loss = value
+        if self._loss and not self.loss.labels:
+            self.loss.labels = [v.label for v in self.variables]
+
+    def __init_subclass__(cls, *args, **kwargs):
+        super().__init_subclass__(*args, **kwargs)
+
+        def init_measurement(self, *args, init=cls.__init__, **kwargs):
+            init(self, *args, **kwargs)
+            if cls is type(self):
+                self._update_measure()
+
+        cls.__init__ = init_measurement
+
+    def _update_measure(self):
+        if self._compute_mesure:
+            self.measure = self._compute_mesure(self)
+        else:
+            self.measure = float("nan")
+
+    def add_solutions(self, X, Y):
+        """add_solutions
+
+        Add computed solutions to the fractal.
+
+        Parameters
+        ----------
+            X : list[list[float]]
+                List of computed solutions.
+            Y : list[float]
+                List of loss values associated to X.
+        """
+        self.solutions.extend(X)
+        self.losses.extend(Y)
+
+    def get_id(self):
+        return (self.level, self.father, self.c_id)
+
+    def _compute_f_id(self, k):
+        if self.father == -1:
+            return 0, k
+        else:
+            base = self.father * k
+            return base, base + k
+
+    def create_children(self, k, *args, **kwargs):
+        """create_children(self)
+
+        Defines the partition function.
+        Determines how children of the current space should be created.
+
+        The child will inherit the parent's score.
+
+        """
+
+        children = [
+            type(self)(
+                self.variables,
+                self.loss,
+                self._compute_mesure,
+                *args,
+                **kwargs,
+            )
+            for _ in range(k)
+        ]
+        low_id, up_id = self._compute_f_id(k)
+        for c_id, f_id in enumerate(range(low_id, up_id)):
+            children[c_id].level = self.level + 1
+            children[c_id].father = self.f_id
+            children[c_id].c_id = c_id
+            children[c_id].f_id = f_id
+            children[c_id].score = self.score
+            children[c_id]._update_measure()
+
+        return children
+
+    def _modify(self, level, father, f_id, c_id, score, measure):
+        """_modify
+
+        Modify the fractal according to given info. used for sending fractals in
+        distributed environment.
+
+        """
+        self.level = level
+        self.father = father
+        self.f_id = f_id
+        self.c_id = c_id
+        self.score = score
+        self.measure = measure
+
+    def _essential_info(self):
+        return {
+            "level": self.level,
+            "father": self.father,
+            "f_id": self.f_id,
+            "c_id": self.c_id,
+            "score": self.score,
+            "measure": self.measure,
+        }
+
+    def __repr__(self):
+        """_essential_info
+        Essential information to create the fractal. Used in _modify
+        """
+        return f"{type(self).__name__}({self.level},{self.father},{self.c_id})"
+
+    def __lt__(self, other):
+        return self.score < other.score
+
+    def __le__(self, other):
+        return self.score <= other.score
+
+    def __eq__(self, other):
+        return self.score == other.score
+
+    def __ge__(self, other):
+        return self.score > other.score
+
+    def __gt__(self, other):
+        return self.score >= other.score
+
+    def __ne__(self, other):
+        return self.score != other.score
+
+
+class Fractal(BaseFractal):
     """Fractal
 
     Fractal is an abstract class used in DBA.
@@ -717,9 +938,6 @@ class Fractal(Searchspace):
 
         super(Fractal, self).__init__(variables, loss, **kwargs)
 
-        self._compute_mesure = measure
-        self.measure = float("nan")
-
         assert self._is_valid_fractal(), logger.error(
             "`variables` must be be an `ArrayVar` of `FloatVar`,"
             f"or all `Var` must have a `converter` addon, got {variables}"
@@ -733,25 +951,6 @@ class Fractal(Searchspace):
 
         self.lower = np.zeros(self.size)
         self.upper = np.ones(self.size)
-
-        self.level = 0
-        self.father = -1  # father id, -1 = no father
-        self.f_id = 0  # fractal id at a given level
-        self.c_id = 0  # Children id
-
-        self.score = float("nan")
-
-        self.solutions = []
-        self.losses = []
-
-        # Determine measure of fractal
-        self._update_measure()
-
-    @Searchspace.loss.setter
-    def loss(self, value):
-        self._loss = value
-        if self._loss and not self.loss.labels:
-            self.loss.labels = [v.label for v in self.variables]
 
     def _is_valid_fractal(self):
         conv_condition = all(
@@ -769,124 +968,3 @@ class Fractal(Searchspace):
                 unit_cond = False
 
         return isinstance(self.variables, ArrayVar) and (unit_cond or conv_condition)
-
-    def __init_subclass__(cls, *args, **kwargs):
-        super().__init_subclass__(*args, **kwargs)
-
-        def init_measurement(self, *args, init=cls.__init__, **kwargs):
-            init(self, *args, **kwargs)
-            if cls is type(self):
-                self._update_measure()
-
-        cls.__init__ = init_measurement
-
-    def _update_measure(self):
-        if self._compute_mesure:
-            self.measure = self._compute_mesure(self)
-        else:
-            self.measure = float("nan")
-
-    def add_solutions(self, X, Y):
-        """add_solutions
-
-        Add computed solutions to the fractal.
-
-        Parameters
-        ----------
-            X : list[list[float]]
-                List of computed solutions.
-            Y : list[float]
-                List of loss values associated to X.
-        """
-        self.solutions.extend(X)
-        self.losses.extend(Y)
-
-    def get_id(self):
-        return (self.level, self.father, self.c_id)
-
-    def _compute_f_id(self, k):
-        if self.father == -1:
-            return 0, k
-        else:
-            base = self.father * k
-            return base, base + k
-
-    def create_children(self, k, *args, **kwargs):
-        """create_children(self)
-
-        Defines the partition function.
-        Determines how children of the current space should be created.
-
-        The child will inherit the parent's score.
-
-        """
-
-        children = [
-            type(self)(
-                self.variables,
-                self.loss,
-                self._compute_mesure,
-                *args,
-                distance=self.distance,
-                **kwargs,
-            )
-            for _ in range(k)
-        ]
-        low_id, up_id = self._compute_f_id(k)
-        for c_id, f_id in enumerate(range(low_id, up_id)):
-            children[c_id].level = self.level + 1
-            children[c_id].father = self.f_id
-            children[c_id].c_id = c_id
-            children[c_id].f_id = f_id
-            children[c_id].score = self.score
-            children[c_id]._update_measure()
-
-        return children
-
-    def _modify(self, level, father, f_id, c_id, score, measure):
-        """_modify
-
-        Modify the fractal according to given info. used for sending fractals in
-        distributed environment.
-
-        """
-        self.level = level
-        self.father = father
-        self.f_id = f_id
-        self.c_id = c_id
-        self.score = score
-        self.measure = measure
-
-    def _essential_info(self):
-        return {
-            "level": self.level,
-            "father": self.father,
-            "f_id": self.f_id,
-            "c_id": self.c_id,
-            "score": self.score,
-            "measure": self.measure,
-        }
-
-    def __repr__(self):
-        """_essential_info
-        Essential information to create the fractal. Used in _modify
-        """
-        return f"{type(self).__name__}({self.level},{self.father},{self.c_id})"
-
-    def __lt__(self, other):
-        return self.score < other.score
-
-    def __le__(self, other):
-        return self.score <= other.score
-
-    def __eq__(self, other):
-        return self.score == other.score
-
-    def __ge__(self, other):
-        return self.score > other.score
-
-    def __gt__(self, other):
-        return self.score >= other.score
-
-    def __ne__(self, other):
-        return self.score != other.score
