@@ -15,12 +15,14 @@ from zellij.core.loss_func import (
     _MultiAsynchronous_strat,
 )
 from zellij.core.metaheuristic import Metaheuristic, AMetaheuristic
-from zellij.core.search_space import ContinuousSearchspace, DiscreteSearchspace
-from zellij.core.stop import Threshold
+from zellij.utils import AutoSave
+
 
 import time
 import resource
+import os
 import logging
+import pickle
 
 logger = logging.getLogger("zellij.exp")
 
@@ -45,7 +47,11 @@ class Experiment(object):
     meta : Metaheuristic
         Metaheuristic to run.
     stop : Stopping
-        Stopping criterion².
+        Stopping criterion.
+    save : {boolean, str}, default=False
+        Creates a backup regularly
+    backup_interval : int, default=300
+        Interval of time (in seconds) between each backup.
 
     Attributes
     ----------
@@ -58,41 +64,181 @@ class Experiment(object):
 
     """
 
-    def __init__(self, meta, stop):
+    def __init__(self, meta, stop, save=False, backup_interval=300):
         self.meta = meta
         self.stop = stop
+        self.save = save
+        self.backup_interval = backup_interval
+        self.backup_folder = ""
+        self.folder_created = False
 
         self.ttime = 0
 
         if isinstance(meta, AMetaheuristic) or isinstance(
             meta.search_space.loss, MPILoss
         ):
-            self.strategy = RunParallelExperiment()  # type: ignore
+            self.strategy = RunParallelExperiment(self)  # type: ignore
         else:
-            self.strategy = RunExperiment()  # type: ignore
+            self.strategy = RunExperiment(self)  # type: ignore
 
-    def strategy():
-        doc = "Describes how to run an experiment"
+        if self.save:
+            if isinstance(self.meta.search_space.loss, MPILoss):
+                if self.meta.search_space.loss.is_master:
+                    self._create_folder()
+            else:
+                self._create_folder()
 
-        def fget(self):
-            return self._strategy
+    @property
+    def save(self):
+        return self._save
 
-        def fset(self, value):
-            self._strategy = value
+    @save.setter
+    def save(self, value):
+        self.meta.search_space.loss.save = value
+        self._save = value
 
-        def fdel(self):
-            del self._strategy
+    @property
+    def strategy(self):
+        return self._strategy
 
-        return locals()
-
-    strategy = property(**strategy())  # type: ignore
+    @strategy.setter
+    def strategy(self, value):
+        self._strategy = value
 
     def run(self, X=None, Y=None):
         start = time.time()
         self.strategy.run(self.meta, self.stop, X, Y)
         end = time.time()
-        self.ttime = end - start
-        self.usage = resource.getrusage(resource.RUSAGE_SELF)
+        self.ttime += end - start
+        # self.usage = resource.getrusage(resource.RUSAGE_SELF)
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # del state["usage"]
+        return state
+
+    def _create_folder(self):
+        """create_foler()
+
+        Create a save folder:
+
+        """
+
+        # Create a valid folder
+        try:
+            os.makedirs(self.save)
+        except FileExistsError as error:
+            raise FileExistsError(f"Folder already exists, got {self.save}")
+
+        self.backup_folder = os.path.join(self.save, "backup")
+
+        # Create a valid folder
+        try:
+            os.makedirs(self.backup_folder)
+        except FileExistsError as error:
+            raise FileExistsError(
+                f"backup_folder already exists, got {self.backup_folder}"
+            )
+        self.folder_created = True
+
+    def backup(self):
+        logger.info(f"INFO: Saving BACKUP in {self.backup_folder}")
+        print("SAVIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIING")
+        pickle.dump(self, open(os.path.join(self.backup_folder, "experiment.p"), "wb"))  # type: ignore
+
+
+class RunExperiment(ABC):
+    """RunExperiment
+
+    Abstract class describing how to run an experiment
+
+    """
+
+    def __init__(self, exp):
+        super().__init__()
+        self.exp = exp
+
+        # current solutions
+        self._cX = None
+        self._cY = None
+
+    def _run_forward_loss(self, meta, stop, X=None, Y=None):
+        # useful after unpickling
+        if self._cX is None and self._cY is None:
+            self._cX, self._cY = X, Y
+
+        while stop():
+            X, info = meta.forward(self._cX, self._cY)
+
+            if len(X) < 1:
+                raise ValueError(
+                    f"""
+                A forward(X,Y) returned an empty list of solutions.
+                """
+                )
+            if meta.search_space._convert_sol:
+                # convert from metaheuristic space to loss space
+                X = meta.search_space.converter.reverse(X)
+                # compute loss
+                X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
+                # convert from loss space to metaheuristic space
+                X = meta.search_space.converter.convert(X)
+            else:
+                X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
+
+            self._cX, self._cY = X, Y
+
+    def run(self, meta, stop, X=None, Y=None):
+        print(f"I AM MASTER: {meta.search_space.loss.rank}")
+        autosave = AutoSave(self.exp)
+        try:
+            self._run_forward_loss(meta, stop, X, Y)
+        finally:
+            autosave.stop()
+
+
+class RunParallelExperiment(RunExperiment):
+    """RunParallelExperiment
+
+    Default class describing how to run a parallel experiment.
+
+    """
+
+    def _else_not_master(self, meta, stop):
+        if meta.search_space.loss.is_worker:
+            meta.search_space.loss.worker()
+        else:
+            logger.error(
+                f"""Process of rank {meta.search_space.loss.rank}
+                is undefined.
+                It is not a master nor a worker."""
+            )
+
+    def run(self, meta, stop, X=None, Y=None):
+        if isinstance(
+            meta.search_space.loss._strategy, _MonoSynchronous_strat
+        ) or isinstance(meta.search_space.loss._strategy, _MonoAsynchronous_strat):
+            if meta.search_space.loss.is_master:
+                autosave = AutoSave(self.exp)
+                try:
+                    self._run_forward_loss(meta, stop, X, Y)
+                finally:
+                    autosave.stop()
+            else:
+                self._else_not_master(meta, stop)
+        else:  # Have to be changed
+            if isinstance(meta, AMetaheuristic):  # algorithmic parallelization
+                if meta.is_master:
+                    meta.master(stop_obj=stop)  # doing the outer while loop
+                elif meta.is_worker:
+                    meta.worker(stop_obj=stop)  # doing the inner while loop
+            else:  # Asynchronous mode / iteration parallelisation
+                self._run_forward_loss(meta, stop, X, Y)
+
+            if meta.search_space.loss.is_master:
+                meta.search_space.loss.master(stop_obj=stop)
+            else:
+                self._else_not_master(meta, stop)
 
 
 class AExperiment(object):
@@ -213,80 +359,6 @@ class AExperiment(object):
         end = time.time()
         self.ttime = end - start
         self.usage = resource.getrusage(resource.RUSAGE_SELF)
-
-
-class RunExperiment(ABC):
-    """RunExperiment
-
-    Abstract class describing how to run an experiment
-
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-
-    def _run_forward_loss(self, meta, stop, X=None, Y=None):
-        while stop():
-            X, info = meta.forward(X, Y)
-
-            if len(X) < 1:
-                raise ValueError(
-                    f"""
-                A forward(X,Y) returned an empty list of solutions.
-                """
-                )
-            if meta.search_space._convert_sol:
-                # convert from metaheuristic space to loss space
-                X = meta.search_space.converter.reverse(X)
-                # compute loss
-                X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
-                # convert from loss space to metaheuristic space
-                X = meta.search_space.converter.convert(X)
-            else:
-                X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
-
-    def run(self, meta, stop, X=None, Y=None):
-        self._run_forward_loss(meta, stop, X, Y)
-
-
-class RunParallelExperiment(RunExperiment):
-    """RunParallelExperiment
-
-    Default class describing how to run a parallel experiment.
-
-    """
-
-    def _else_not_master(self, meta, stop):
-        if meta.search_space.loss.is_worker:
-            meta.search_space.loss.worker()
-        else:
-            logger.error(
-                f"""Process of rank {meta.search_space.loss.rank}
-                is undefined.
-                It is not a master nor a worker."""
-            )
-
-    def run(self, meta, stop, X=None, Y=None):
-        if isinstance(
-            meta.search_space.loss._strategy, _MonoSynchronous_strat
-        ) or isinstance(meta.search_space.loss._strategy, _MonoAsynchronous_strat):
-            if meta.search_space.loss.is_master:
-                self._run_forward_loss(meta, stop, X, Y)
-            else:
-                self._else_not_master(meta, stop)
-        else:  # Have to be changed
-            if isinstance(meta, AMetaheuristic):  # algorithmic parallelization
-                if meta.is_master:
-                    meta.master(stop_obj=stop)  # doing the outer while loop
-                elif meta.is_worker:
-                    meta.worker(stop_obj=stop)  # doing the inner while loop
-            else:  # Asynchronous mode / iteration parallelisation
-                self._run_forward_loss(meta, stop, X, Y)
-
-            if meta.search_space.loss.is_master:
-                meta.search_space.loss.master(stop_obj=stop)
-            else:
-                self._else_not_master(meta, stop)
 
 
 class RunAExperiment(ABC):

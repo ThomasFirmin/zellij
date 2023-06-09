@@ -22,7 +22,7 @@ logger = logging.getLogger("zellij.loss")
 try:
     from mpi4py import MPI
 except ImportError as err:
-    print(
+    logger.info(
         "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
     You can use: pip install zellij[MPI]"
     )
@@ -113,10 +113,7 @@ class LossFunc(ABC):
         ##############
 
         self.model = model
-        if isinstance(objective, type):
-            self.objective = objective()
-        else:
-            self.objective = objective
+        self.objective = objective
 
         self.save = save
         self.only_score = only_score
@@ -135,11 +132,6 @@ class LossFunc(ABC):
 
         self.labels = []
 
-        if isinstance(self.save, str):
-            self.folder_name = self.save
-        else:
-            self.folder_name = f"{self.model.__class__.__name__}_zlj_save"
-
         self.outputs_path = ""
         self.model_path = ""
         self.plots_path = ""
@@ -151,11 +143,40 @@ class LossFunc(ABC):
 
         self.default = default
 
+    @property
+    def objective(self):
+        return self._objective
+
+    @objective.setter
+    def objective(self, value):
+        if isinstance(value, type):
+            self._objective = value()
+        else:
+            self._objective = value
+
+    @property
+    def save(self):
+        return self._save
+
+    @save.setter
+    def save(self, value):
+        self._save = value
+        if isinstance(value, str):
+            self.folder_name = value
+        else:
+            self.folder_name = f"{self.model.__class__.__name__}_zlj_save"
+
     def __getstate__(self):
         state = self.__dict__.copy()
         del state["model"]
         del state["_init_time"]
         return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        logger.warning("In Loss, after unpickling, the `model` has to be set manually.")
+        self.model = None
+        self._init_time = time.time()
 
     @abstractmethod
     def _save_model(self, *args):
@@ -173,17 +194,17 @@ class LossFunc(ABC):
         pass
 
     @abstractmethod
-    def __call__(self, X, **kwargs):
+    def __call__(self, X, stop_obj=None, **kwargs):
         pass
 
     def _compute_loss(self, point):
         if self.kwargs_mode:
-            new_kwargs = {key: value for key, value in zip(self.labels, point)}
+            new_kwargs = {key: value for key, value in zip(self.labels, point)}  # type: ignore
             if self.default:
                 new_kwargs.update(self.default)
 
             start = time.time()
-            res, trained_model = self._build_return(self.model(**new_kwargs))
+            res, trained_model = self._build_return(self.model(**new_kwargs))  # type: ignore
             end = time.time()
 
             res["eval_time"] = end - start
@@ -192,9 +213,9 @@ class LossFunc(ABC):
         else:
             start = time.time()
             if self.default:
-                lossv = self.model(point, **self.default)
+                lossv = self.model(point, **self.default)  # type: ignore
             else:
-                lossv = self.model(point)
+                lossv = self.model(point)  # type: ignore
 
             res, trained_model = self._build_return(lossv)
             end = time.time()
@@ -235,32 +256,38 @@ class LossFunc(ABC):
         # Create a valid folder
         try:
             os.makedirs(self.folder_name)
-            created = False
         except FileExistsError as error:
-            created = True
-
-        i = 0
-        while created:
-            try:
-                nfolder = f"{self.folder_name}_{i}"
-                os.mkdir(nfolder)
-                created = False
-                logger.warning(
-                    f"WARNING: Folder {self.folder_name} already exists, results will be saved at {nfolder}"
-                )
-                self.folder_name = nfolder
-            except FileExistsError as error:
-                i += 1
+            logger.warning(
+                f"Saving folder already exists, {self.folder_name}. Results will still be saved in it."
+            )
 
         # Create ouputs folder
         self.outputs_path = os.path.join(self.folder_name, "outputs")
-        os.mkdir(self.outputs_path)
+        # Create a valid folder
+        try:
+            os.makedirs(self.outputs_path)
+        except FileExistsError as error:
+            raise FileExistsError(
+                f"Outputs folder already exists, got {self.outputs_path}. The experiment will end. Try another folder to save your experiment."
+            )
 
         self.model_path = os.path.join(self.folder_name, "model")
-        os.mkdir(self.model_path)
+        # Create a valid folder
+        try:
+            os.makedirs(self.model_path)
+        except FileExistsError as error:
+            raise FileExistsError(
+                f"Model folder already exists, got {self.model_path}. The experiment will end. Try another folder to save your experiment."
+            )
 
         self.plots_path = os.path.join(self.folder_name, "plots")
-        os.mkdir(self.plots_path)
+        # Create a valid folder
+        try:
+            os.makedirs(self.plots_path)
+        except FileExistsError as error:
+            raise FileExistsError(
+                f"Plots folder already exists, got {self.plots_path}. The experiment will end. Try another folder to save your experiment."
+            )
 
         # Additionnal header for the outputs file
         if len(args) > 0:
@@ -285,14 +312,16 @@ class LossFunc(ABC):
             else:
                 f.write(",".join(str(e) for e in self.labels) + suffix + "\n")
 
-        print(f"INFO: Results will be saved at: {os.path.abspath(self.folder_name)}")
+        logger.info(
+            f"INFO: Results will be saved at: {os.path.abspath(self.folder_name)}"
+        )
 
         self.file_created = True
 
     def _save_file(self, x, **kwargs):
         """_save_file(x, **kwargs)
 
-        Private method to save informations about an evaluation of the loss function.
+        Private method to save information about an evaluation of the loss function.
 
         Parameters
         ----------
@@ -386,11 +415,6 @@ class LossFunc(ABC):
 
         self.labels = []
 
-        if isinstance(self.save, str):
-            self.folder_name = self.save
-        else:
-            self.folder_name = f"{self.model.__class__.__name__}_zlj_save"
-
         self.outputs_path = ""
         self.model_path = ""
         self.plots_path = ""
@@ -467,7 +491,6 @@ class SerialLoss(LossFunc):
             Return a list of all the scores corresponding to each evaluated solution of X.
 
         """
-
         res = []
 
         for x in X:
@@ -478,10 +501,11 @@ class SerialLoss(LossFunc):
             # Saving
             if self.save:
                 # Save model into a file if it is better than the best found one
-                self._save_model(outputs["objective"], model)
+                if model:
+                    self._save_model(outputs["objective"], model)
 
                 # Save score and solution into a file
-                self._save_file(x, **outputs)
+                self._save_file(x, **outputs, **kwargs)
 
             self._save_best(x, outputs["objective"])
         return X, res
@@ -614,7 +638,9 @@ class MPILoss(LossFunc):
         self.recv_msg = 0
         self.sent_msg = 0
 
-        self._personnal_folder = os.path.join("tmp_wks", f"worker{self.rank}")
+        self._personnal_folder = os.path.join(
+            os.path.join(self.folder_name, "tmp_wks"), f"worker{self.rank}"
+        )
 
         self.asynchronous = asynchronous
 
@@ -629,7 +655,7 @@ class MPILoss(LossFunc):
             i: [None, None, None, None] for i in range(1, self.workers_size + 1)
         }  # historic of points sent to workers
 
-        self._strategy = None  # set to None for definitio issue
+        self._strategy = None  # set to None for definition issue
 
         self.is_master = self.rank == 0
         self.is_worker = self.rank != 0
@@ -637,27 +663,81 @@ class MPILoss(LossFunc):
         # Property, defines parallelisation strategy
         self._master_rank = 0  # type: ignore
 
-    def _master_rank():
-        def fget(self):
-            return self.__master_rank
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["comm"]
+        del state["status"]
+        del state["p_name"]
+        del state["rank"]
+        del state["p"]
+        del state["_personnal_folder"]
+        del state["_pqueue_mode"]
+        del state["pqueue"]
+        del state["idle"]
+        del state["p_historic"]
+        del state["_strategy"]
+        del state["is_master"]
+        del state["is_worker"]
+        del state["_MPILoss__master_rank"]
+        del state["model"]
+        del state["_init_time"]
+        return state
 
-        def fset(self, value):
-            self.__master_rank = value
+    def __setstate__(self, state):
+        super().__setstate__(state)
+        self.__dict__.update(state)
 
-            if self.rank == value:
-                self.is_master = True
+        try:
+            self.comm = MPI.COMM_WORLD
+            self.status = MPI.Status()
+            self.p_name = MPI.Get_processor_name()
 
-            if self.asynchronous:
-                self._strategy = _MonoAsynchronous_strat(self, value)
-            else:
-                self._strategy = _MonoSynchronous_strat(self, value)
+            self.rank = self.comm.Get_rank()
+            self.p = self.comm.Get_size()
+        except Exception as err:
+            logger.error(
+                """To use MPILoss object you need to install mpi4py and an MPI
+                distribution.\nYou can use: pip install zellij[Parallel]"""
+            )
 
-        def fdel(self):
-            del self.__master_rank
+            raise err
 
-        return locals()
+        self._personnal_folder = os.path.join("tmp_wks", f"worker{self.rank}")
 
-    _master_rank = property(**_master_rank())  # type: ignore
+        self._pqueue_mode = False
+        self.pqueue = Queue()
+
+        # list of idle workers
+        self.idle = list(range(1, self.workers_size + 1))
+
+        # loss worker rank : (point, id, info, source)
+        self.p_historic = {
+            i: [None, None, None, None] for i in range(1, self.workers_size + 1)
+        }  # historic of points sent to workers
+
+        self._strategy = None  # set to None for definition issue
+
+        self.is_master = self.rank == 0
+        self.is_worker = self.rank != 0
+
+        # Property, defines parallelisation strategy
+        self._master_rank = 0  # type: ignore
+
+    @property
+    def _master_rank(self):
+        return self.__master_rank
+
+    @_master_rank.setter
+    def _master_rank(self, value):
+        self.__master_rank = value
+
+        if self.rank == value:
+            self.is_master = True
+
+        if self.asynchronous:
+            self._strategy = _MonoAsynchronous_strat(self, value)
+        else:
+            self._strategy = _MonoSynchronous_strat(self, value)
 
     def __call__(self, X, stop_obj=None, **kwargs):
         new_x, score = self._strategy(X, stop_obj=stop_obj, **kwargs)  # type: ignore
@@ -676,7 +756,7 @@ class MPILoss(LossFunc):
 
         """
 
-        print(f"Master of rank {self.rank} Starting")
+        logger.info(f"Master of rank {self.rank} Starting")
 
         # if there is a stopping criterion
         if stop_obj:
@@ -706,10 +786,10 @@ class MPILoss(LossFunc):
 
         if self._pqueue_mode:
             if not stopping():
-                print(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
+                logger.info(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
                 self._stop()
         else:
-            print(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
+            logger.info(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
             self._stop()
 
     def _parse_message(self, msg, pqueue, historic, idle, status):
@@ -755,14 +835,14 @@ class MPILoss(LossFunc):
         next_point = pqueue.get()
         dest = idle.pop()
         historic[dest] = next_point
-        print(
+        logger.info(
             f"MASTER {self.rank} sending point to WORKER {dest}.\n Remaining points in queue: {pqueue.qsize()}"
         )
         self.comm.send(dest=dest, tag=0, obj=next_point[0])
 
     # receive a new point to put in the point queue. (from a forward)
     def _recv_point(self, msg, source, pqueue):
-        print(f"MASTER {self.rank} receiving point from PROCESS {source}")
+        logger.info(f"MASTER {self.rank} receiving point from PROCESS {source}")
         msg.append(source)
         pqueue.put(msg)
 
@@ -770,7 +850,7 @@ class MPILoss(LossFunc):
 
     # receive score from workers
     def _recv_score(self, msg, source, idle, historic):
-        print(
+        logger.info(
             f"MASTER {self.rank} receiving score from WORKER {source} : {msg}, historic : {historic[source]}"
         )
         point = historic[source][0][:]
@@ -794,7 +874,7 @@ class MPILoss(LossFunc):
         Send a stop message to all workers.
 
         """
-        print(f"MASTER {self.rank} sending stop message")
+        logger.info(f"MASTER {self.rank} sending stop message")
         for i in range(0, self.p):
             if i != self.rank:
                 self.comm.send(dest=i, tag=9, obj=False)
@@ -824,7 +904,9 @@ class MPILoss(LossFunc):
             master_path = os.path.join(
                 self.model_path, f"{self.model.__class__.__name__}_best"
             )
-            worker_path = os.path.join("tmp_wks", f"worker{self.rank}")
+            worker_path = os.path.join(
+                os.path.join(self.folder_name, "tmp_wks"), f"worker{source}"
+            )
 
             if os.path.isdir(worker_path):
                 os.system(f"rm -rf {master_path}")
@@ -845,38 +927,41 @@ class MPILoss(LossFunc):
 
         """
 
-        print(f"WORKER {self.rank} starting")
+        logger.info(f"WORKER {self.rank} starting")
 
         stop = True
 
         while stop:
-            print(f"WORKER {self.rank} receving message")
+            logger.info(f"WORKER {self.rank} receving message")
             # receive message from master
             msg = self.comm.recv(source=self._master_rank, status=self.status)  # type: ignore
             tag = self.status.Get_tag()
             source = self.status.Get_source()
 
             if tag == 9:
-                print(f"WORKER{self.rank} |!| STOPPING |!|")
+                logger.info(f"WORKER{self.rank} |!| STOPPING |!|")
                 stop = False
 
             elif tag == 0:
-                print(f"WORKER {self.rank} receved a point, {msg}")
+                logger.info(f"WORKER {self.rank} receved a point, {msg}")
                 point = msg
                 # Verify if a model is returned or not
                 outputs, model = self._compute_loss(point)
 
                 # Save the model using its save method
                 if model and self.save:
-                    print(f"WORKER {self.rank} saving model")
-                    self._wsave_model(model)
+                    logger.info(f"WORKER {self.rank} saving model")
+                    if model:
+                        self._wsave_model(model)
 
                 # Send results
-                print(f"WORKER {self.rank} sending {outputs} to {self._master_rank}")
+                logger.info(
+                    f"WORKER {self.rank} sending {outputs} to {self._master_rank}"
+                )
                 self.comm.send(dest=self._master_rank, tag=1, obj=outputs)  # type: ignore
 
             else:
-                print(f"WORKER {self.rank} unknown tag, got {tag}")
+                logger.info(f"WORKER {self.rank} unknown tag, got {tag}")
 
 
 class _Parallel_strat:
@@ -917,12 +1002,12 @@ class _MonoSynchronous_strat(_Parallel_strat):
         self._computed += 1
 
         if self._computed < len(self.y):
-            print(
+            logger.info(
                 f"COMPUTED POINT {self._computed}/{len(self.y)}, calls:{self._lf.calls}"
             )
             return True
         else:
-            print(
+            logger.info(
                 f"STOP COMPUTED POINT {self._computed}/{len(self.y)}, calls:{self._lf.calls}"
             )
             self._computed = 0
@@ -952,8 +1037,8 @@ class _MonoAsynchronous_strat(_Parallel_strat):
         self._lf.master(stop_obj=stop_obj)
 
         new_x, y = (
-            self._computed_point[0].copy(),
-            self._computed_point[1].copy(),
+            self._computed_point[0].copy(),  # type: ignore
+            self._computed_point[1].copy(),  # type: ignore
         )
         self._computed_point = (None, None)
         return [new_x], [y["objective"]]
@@ -985,17 +1070,17 @@ class _MultiSynchronous_strat(_Parallel_strat):
         nb_recv = 0
         while nb_recv < len(X) and stop:
             # receive score from loss
-            print(f"call() of rank :{self.rank} receiveing message")
-            msg = self.comm.recv(source=self.master_rank, status=self.status)
-            tag = self.status.Get_tag()
-            source = self.status.Get_source()
+            logger.info(f"call() of rank :{self._lf.rank} receiveing message")
+            msg = self.comm.recv(source=self.master_rank, status=self._lf.status)
+            tag = self._lf.status.Get_tag()
+            source = self._lf.status.Get_source()
 
             if tag == 9:
-                print(f"call() of rank :{self.rank} |!| STOPPING |!|")
+                logger.info(f"call() of rank :{self._lf.rank} |!| STOPPING |!|")
                 stop = False
 
             elif tag == 2:
-                print(f"call() of rank :{self.rank} received a score")
+                logger.info(f"call() of rank :{self._lf.rank} received a score")
                 # id / score
                 y[msg[1]] = msg[0]
                 nb_recv += 1
@@ -1028,21 +1113,27 @@ class _MultiAsynchronous_strat(_Parallel_strat):
             self._send_to_master(p, kwargs)  # send point
 
         # receive score from loss
-        print(f"call() of rank :{self.rank} receiveing message")
-        msg = self.comm.recv(source=self.master_rank, status=self.status)
-        tag = self.status.Get_tag()
-        source = self.status.Get_source()
+        logger.info(f"call() of rank :{self._lf.rank} receiveing message")
+        msg = self.comm.recv(source=self.master_rank, status=self._lf.status)
+        tag = self._lf.status.Get_tag()
+        source = self._lf.status.Get_source()
+
+        new_x, y = None, None
 
         if tag == 9:
-            print(f"call() of rank :{self.rank} |!| STOPPING |!|")
+            logger.info(f"call() of rank :{self._lf.rank} |!| STOPPING |!|")
             stop = False
             new_x, y = None, None
         elif tag == 2:
-            print(f"call() of rank :{self.rank} received a score")
+            logger.info(f"call() of rank :{self._lf.rank} received a score")
             # id / score
-            new_x, y = self._current_points.pop(msg[1]), msg[0]
+            new_x, y = self._current_points.pop(msg[1]), msg[0]  # type: ignore
+        else:
+            raise ValueError(
+                "Unknown tag message in _MultiAsynchronous_strat, got tag={tag}"
+            )
 
-        print("RETURN: ", [new_x], [y])
+        logger.info("RETURN: ", [new_x], [y])
         return [new_x], [y]
 
     # Executed by master when it receives a score from a worker
@@ -1185,7 +1276,7 @@ class MockModel(object):
         Pass *args and **kwargs to these functions when calling this MockModel.
 
     verbose : bool
-        If True print information when saving and __call___.
+        If True logger.info information when saving and __call___.
 
     return_format : string
         Output format. It can be :code:`'dict'` > :code:`{'o1':value1,'o2':value2,...}`
@@ -1204,14 +1295,14 @@ class MockModel(object):
     --------
     >>> from zellij.core.loss_func import MockModel, Loss
     >>> mock = MockModel()
-    >>> print(mock("test", 1, 2.0, param1="Mock", param2=True))
+    >>> logger.info(mock("test", 1, 2.0, param1="Mock", param2=True))
     I am Mock !
         ->*args: ('test', 1, 2.0)
         ->**kwargs: {'param1': 'Mock', 'param2': True}
     ({'o1': 0.3440051802032301},
     <zellij.core.loss_func.MockModel at 0x7f5c8027a100>)
     >>> loss = Loss(save=True, verbose=False)(mock)
-    >>> print(loss([["test", 1, 2.0, "Mock", True]], other_info="Hi !"))
+    >>> logger.info(loss([["test", 1, 2.0, "Mock", True]], other_info="Hi !"))
     I am Mock !
         ->*args: (['test', 1, 2.0, 'Mock', True],)
         ->**kwargs: {}
@@ -1238,11 +1329,11 @@ class MockModel(object):
         filename = os.path.join(filepath, "i_am_mock.txt")
         with open(filename, "wb") as f:
             if self.verbose:
-                print(f"\nI am Mock !\n\t->saving in {filename}")
+                logger.info(f"\nI am Mock !\n\t->saving in {filename}")
 
     def __call__(self, *args, **kwargs):
         if self.verbose:
-            print(f"\nI am Mock !\n\t->*args: {args}\n\t->**kwargs: {kwargs}")
+            logger.info(f"\nI am Mock !\n\t->*args: {args}\n\t->**kwargs: {kwargs}")
 
         if self.return_format == "dict":
             part_1 = {x: y(*args, **kwargs) for x, y in self.outputs.items()}
