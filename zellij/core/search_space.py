@@ -87,15 +87,14 @@ class Searchspace(ABC):
         #############
         # VARIABLES #
         #############
+        # if true solutions must be converted before being past to loss func.
+        self._convert_sol = False
 
         self.size = len(self.variables)
 
         self._all_addons = kwargs
 
         self._add_addons(**kwargs)
-
-        # if true solutions must be converted before being past to loss func.
-        self._convert_sol = False
 
     @property
     def loss(self):
@@ -968,3 +967,35 @@ class Fractal(BaseFractal):
                 unit_cond = False
 
         return isinstance(self.variables, ArrayVar) and (unit_cond or conv_condition)
+
+    def create_children(self, k, *args, **kwargs):
+        """create_children(self)
+
+        Defines the partition function.
+        Determines how children of the current space should be created.
+
+        The child will inherit the parent's score.
+
+        """
+
+        children = [
+            type(self)(
+                self.variables,
+                self.loss,
+                self._compute_mesure,
+                *args,
+                **kwargs,
+            )
+            for _ in range(k)
+        ]
+        low_id, up_id = self._compute_f_id(k)
+        for c_id, f_id in enumerate(range(low_id, up_id)):
+            children[c_id].level = self.level + 1
+            children[c_id].father = self.f_id
+            children[c_id].c_id = c_id
+            children[c_id].f_id = f_id
+            children[c_id].score = self.score
+            children[c_id]._update_measure()
+            children[c_id].distance = self.distance
+
+        return children
