@@ -97,14 +97,6 @@ class CGS(ContinuousMetaheuristic):
         ##############
         super().__init__(search_space, verbose)
 
-        assert hasattr(search_space, "convert") or isinstance(
-            search_space, ContinuousSearchspace
-        ), logger.error(
-            f"""If the `search_space` is not a `ContinuousSearchspace`,
-            the user must give a `Converter` to the :ref:`sp` object
-            with the kwarg `convert`"""
-        )
-
         self.map = map
         self.level = self.map.vectors
 
@@ -114,29 +106,12 @@ class CGS(ContinuousMetaheuristic):
 
         self.iteration = 0
 
-        if isinstance(self.search_space, ContinuousSearchspace):
-            self.bounds = np.array(
-                [
-                    [v.low_bound for v in self.search_space.values],
-                    [v.up_bound for v in self.search_space.values],
-                ],
-                dtype=float,
-            )
-        else:
-            self.bounds = np.array(
-                [
-                    [0.0] * self.search_space.size,
-                    [1.0] * self.search_space.size,
-                ],
-                dtype=float,
-            )
-
         # Working attributes, saved to avoid useless computations.
-        self.up_plus_lo = self.bounds[1] + self.bounds[0]
-        self.up_m_lo = self.bounds[1] - self.bounds[0]
+        self.up_plus_lo = self.search_space.upper + self.search_space.lower
+        self.up_m_lo = self.search_space.upper - self.search_space.lower
         self.center = np.multiply(0.5, self.up_plus_lo)
         self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.bounds[0]
+        self.center_m_lo_bounds = self.center - self.search_space.lower
 
     def forward(self, X, Y):
         """forward(x, Y)
@@ -173,7 +148,7 @@ class CGS(ContinuousMetaheuristic):
             # Apply 3 transformations on the selected chaotic variables
             r_mul_y = np.multiply(self.up_m_lo, self.map.map[l])
 
-            # xx = [np.add(self.center,r_mul_y), np.add(self.center,np.multiply(self.radius,np.multiply(2,y)-1)), np.subtract(self.bounds[1],r_mul_y)]
+            # xx = [np.add(self.center,r_mul_y), np.add(self.center,np.multiply(self.radius,np.multiply(2,y)-1)), np.subtract(self.search_space.upper,r_mul_y)]
 
             # for each transformation of the chaotic variable
             # for x in xx:
@@ -185,7 +160,7 @@ class CGS(ContinuousMetaheuristic):
             #     points = np.append(points,sym,axis=0)
             #     n_points += 4
 
-            xx = [self.bounds[0] + r_mul_y, self.bounds[1] - r_mul_y]
+            xx = [self.search_space.lower + r_mul_y, self.search_space.upper - r_mul_y]
 
             # for each transformation of the chaotic variable
             sym = np.array([xx[0], xx[1], xx[0], xx[1]])
@@ -287,41 +262,16 @@ class CLS(ContinuousMetaheuristic):
         ##############
         super().__init__(search_space, verbose)
 
-        assert hasattr(search_space, "convert") or isinstance(
-            search_space, ContinuousSearchspace
-        ), logger.error(
-            f"""If the `search_space` is not a `ContinuousSearchspace`,
-            the user must give a `Converter` to the :ref:`sp` object
-            with the kwarg `convert`"""
-        )
-
         self.polygon = polygon
         self.map = map
         self.level = self.map.vectors
 
-        if isinstance(self.search_space, ContinuousSearchspace):
-            self.bounds = np.array(
-                [
-                    [v.low_bound for v in self.search_space.values],
-                    [v.up_bound for v in self.search_space.values],
-                ],
-                dtype=float,
-            )
-        else:
-            self.bounds = np.array(
-                [
-                    [0.0] * self.search_space.size,
-                    [1.0] * self.search_space.size,
-                ],
-                dtype=float,
-            )
-
-        self.up_plus_lo = self.bounds[1] + self.bounds[0]
-        self.up_m_lo = self.bounds[1] - self.bounds[0]
+        self.up_plus_lo = self.search_space.upper + self.search_space.lower
+        self.up_m_lo = self.search_space.upper - self.search_space.lower
 
         self.center = np.multiply(0.5, self.up_plus_lo)
         self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.bounds[0]
+        self.center_m_lo_bounds = self.center - self.search_space.lower
 
         trigo_val = 2 * np.pi / self.polygon
         self.H = [np.zeros(self.polygon), np.zeros(self.polygon)]
@@ -359,7 +309,9 @@ class CLS(ContinuousMetaheuristic):
 
         # Initialization
         # Limits of the search space, if parameter greater than center, then = 1 else = -1, used to avoid overflow
-        db = np.minimum(self.bounds[1] - x_best, x_best - self.bounds[0])
+        db = np.minimum(
+            self.search_space.upper - x_best, x_best - self.search_space.lower
+        )
 
         logger.info("CLS computing chaotic points")
 
@@ -480,14 +432,6 @@ class CFS(ContinuousMetaheuristic):
         ##############
         super().__init__(search_space, verbose)
 
-        assert hasattr(search_space, "convert") or isinstance(
-            search_space, ContinuousSearchspace
-        ), logger.error(
-            f"""If the `search_space` is not a `ContinuousSearchspace`,
-            the user must give a `Converter` to the :ref:`sp` object
-            with the kwarg `convert`"""
-        )
-
         self.polygon = polygon
         self.map = map
         self.level = self.map.vectors
@@ -496,29 +440,12 @@ class CFS(ContinuousMetaheuristic):
         # VARIABLES #
         #############
 
-        if isinstance(self.search_space, ContinuousSearchspace):
-            self.bounds = np.array(
-                [
-                    [v.low_bound for v in self.search_space.values],
-                    [v.up_bound for v in self.search_space.values],
-                ],
-                dtype=float,
-            )
-        else:
-            self.bounds = np.array(
-                [
-                    [0.0] * self.search_space.size,
-                    [1.0] * self.search_space.size,
-                ],
-                dtype=float,
-            )
-
-        self.up_plus_lo = self.bounds[1] + self.bounds[0]
-        self.up_m_lo = self.bounds[1] - self.bounds[0]
+        self.up_plus_lo = self.search_space.upper + self.search_space.lower
+        self.up_m_lo = self.search_space.upper - self.search_space.lower
 
         self.center = np.multiply(0.5, self.up_plus_lo)
         self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.bounds[0]
+        self.center_m_lo_bounds = self.center - self.search_space.lower
 
         trigo_val = 2 * np.pi / self.polygon
         self.H = [np.zeros(self.polygon), np.zeros(self.polygon)]
@@ -564,7 +491,9 @@ class CFS(ContinuousMetaheuristic):
 
         # Initialization
         # Limits of the search space, if parameter greater than center, then = 1 else = -1, used to avoid overflow
-        db = np.minimum(self.bounds[1] - x_best, x_best - self.bounds[0])
+        db = np.minimum(
+            self.search_space.upper - x_best, x_best - self.search_space.lower
+        )
 
         logger.info("CLS computing chaotic points")
 

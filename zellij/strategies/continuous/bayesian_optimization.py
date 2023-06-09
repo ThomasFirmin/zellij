@@ -127,14 +127,6 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         # PARAMETERS #
         ##############
 
-        assert hasattr(search_space, "convert") or isinstance(
-            search_space, ContinuousSearchspace
-        ), logger.error(
-            f"""If the `search_space` is not a `ContinuousSearchspace`,
-            the user must give a `Converter` to the :ref:`sp` object
-            with the kwarg `convert`"""
-        )
-
         self.acquisition = acquisition
         self.surrogate = surrogate
         self.likelihood = likelihood
@@ -163,25 +155,6 @@ class Bayesian_optimization(ContinuousMetaheuristic):
             self.device = "cpu"
 
         self.dtype = torch.double
-
-        if isinstance(self.search_space, ContinuousSearchspace):
-            self.bounds = torch.tensor(
-                [
-                    [v.low_bound for v in self.search_space.values],
-                    [v.up_bound for v in self.search_space.values],
-                ],
-                device=self.device,
-                dtype=self.dtype,
-            )
-        else:
-            self.bounds = torch.tensor(
-                [
-                    [0.0] * self.search_space.size,
-                    [1.0] * self.search_space.size,
-                ],
-                device=self.device,
-                dtype=self.dtype,
-            )
 
     def _generate_initial_data(self):
         # generate training data
@@ -218,10 +191,23 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         """Optimizes the acquisition function, and returns a new candidate
         and a noisy observation."""
 
+        bounds = torch.tensor(
+            [
+                torch.tensor(
+                    self.search_space.lower, device=self.device, dtype=self.dtype
+                ),
+                torch.tensor(
+                    self.search_space.upper, device=self.device, dtype=self.dtype
+                ),
+            ],
+            device=self.device,
+            dtype=self.dtype,
+        )
+
         # optimize
         candidates, acqf_value = optimize_acqf(
             acq_function=acq_func,
-            bounds=self.bounds,
+            bounds=bounds,
             q=self.kwargs.get("q", 1),
             num_restarts=restarts,
             raw_samples=raw,  # used for intialization heuristic
