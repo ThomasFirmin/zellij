@@ -183,16 +183,8 @@ class Distance_to_the_best(Scoring):
 
         """
         best_ind = fractal.loss.best_point
-        res = -np.max(
-            np.array(fractal.losses)
-            / (
-                np.linalg.norm(
-                    np.array(fractal.solutions) - np.array(best_ind),
-                    axis=1,
-                )
-                + 1e-20
-            )
-        )
+        distances = [fractal.distance(s, best_ind) + 1e-20 for s in fractal.solutions]
+        res = -np.max(np.array(fractal.losses) / distances)
         return res
 
 
@@ -221,16 +213,8 @@ class Distance_to_the_best_centered(Scoring):
 
         """
         best_ind = fractal.loss.best_point
-        res = np.min(
-            (np.array(fractal.losses) - fractal.loss.best_score)
-            / (
-                np.linalg.norm(
-                    np.array(fractal.solutions) - np.array(best_ind),
-                    axis=1,
-                )
-                + 1e-20
-            )
-        )
+        distances = [fractal.distance(s, best_ind) + 1e-20 for s in fractal.solutions]
+        res = np.min((np.array(fractal.losses) - fractal.loss.best_score) / distances)
         return res
 
 
