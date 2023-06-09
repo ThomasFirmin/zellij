@@ -106,9 +106,15 @@ class CGS(ContinuousMetaheuristic):
 
         self.iteration = 0
 
-        # Working attributes, saved to avoid useless computations.
-        self.up_plus_lo = self.search_space.upper + self.search_space.lower
-        self.up_m_lo = self.search_space.upper - self.search_space.lower
+    @property
+    def search_space(self):
+        return self._search_space
+
+    @search_space.setter
+    def search_space(self, value):
+        self._search_space = value
+        self.up_plus_lo = value.upper + value.lower
+        self.up_m_lo = value.upper - value.lower
         self.center = np.multiply(0.5, self.up_plus_lo)
         self.radius = np.multiply(0.5, self.up_m_lo)
         self.center_m_lo_bounds = self.center - self.search_space.lower
@@ -266,13 +272,6 @@ class CLS(ContinuousMetaheuristic):
         self.map = map
         self.level = self.map.vectors
 
-        self.up_plus_lo = self.search_space.upper + self.search_space.lower
-        self.up_m_lo = self.search_space.upper - self.search_space.lower
-
-        self.center = np.multiply(0.5, self.up_plus_lo)
-        self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.search_space.lower
-
         trigo_val = 2 * np.pi / self.polygon
         self.H = [np.zeros(self.polygon), np.zeros(self.polygon)]
 
@@ -280,6 +279,19 @@ class CLS(ContinuousMetaheuristic):
             # Initialize trigonometric part of symetric variables (CLS & CFS)
             self.H[0][i - 1] = np.cos(trigo_val * i)
             self.H[1][i - 1] = np.sin(trigo_val * i)
+
+    @property
+    def search_space(self):
+        return self._search_space
+
+    @search_space.setter
+    def search_space(self, value):
+        self._search_space = value
+        self.up_plus_lo = value.upper + value.lower
+        self.up_m_lo = value.upper - value.lower
+        self.center = np.multiply(0.5, self.up_plus_lo)
+        self.radius = np.multiply(0.5, self.up_m_lo)
+        self.center_m_lo_bounds = self.center - value.lower
 
     def forward(self, X, Y):
         """forward(X, Y)
@@ -440,13 +452,6 @@ class CFS(ContinuousMetaheuristic):
         # VARIABLES #
         #############
 
-        self.up_plus_lo = self.search_space.upper + self.search_space.lower
-        self.up_m_lo = self.search_space.upper - self.search_space.lower
-
-        self.center = np.multiply(0.5, self.up_plus_lo)
-        self.radius = np.multiply(0.5, self.up_m_lo)
-        self.center_m_lo_bounds = self.center - self.search_space.lower
-
         trigo_val = 2 * np.pi / self.polygon
         self.H = [np.zeros(self.polygon), np.zeros(self.polygon)]
 
@@ -454,6 +459,19 @@ class CFS(ContinuousMetaheuristic):
             # Initialize trigonometric part of symetric variables (CLS & CFS)
             self.H[0][i - 1] = np.cos(trigo_val * i)
             self.H[1][i - 1] = np.sin(trigo_val * i)
+
+    @property
+    def search_space(self):
+        return self._search_space
+
+    @search_space.setter
+    def search_space(self, value):
+        self._search_space = value
+        self.up_plus_lo = value.upper + value.lower
+        self.up_m_lo = value.upper - value.lower
+        self.center = np.multiply(0.5, self.up_plus_lo)
+        self.radius = np.multiply(0.5, self.up_m_lo)
+        self.center_m_lo_bounds = self.center - value.lower
 
     def _stochastic_round(self, solution, k):
         s = np.array(solution)
