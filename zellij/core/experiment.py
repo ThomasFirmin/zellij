@@ -143,7 +143,6 @@ class Experiment(object):
 
     def backup(self):
         logger.info(f"INFO: Saving BACKUP in {self.backup_folder}")
-        print("SAVIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIING")
         pickle.dump(self, open(os.path.join(self.backup_folder, "experiment.p"), "wb"))  # type: ignore
 
 
