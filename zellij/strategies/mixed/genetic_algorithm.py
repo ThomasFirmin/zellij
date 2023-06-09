@@ -9,16 +9,18 @@
 
 from zellij.core.metaheuristic import Metaheuristic
 from zellij.core.addons import Mutator, Selector, Crossover
-from deap import base
-from deap import creator
-from deap import tools
+from deap import creator, base, tools
 import numpy as np
-import os
-import pandas as pd
 
 import logging
 
 logger = logging.getLogger("zellij.GA")
+
+
+creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
+
+# Define what an individual is for the algorithm
+creator.create("Individual", list, fitness=creator.FitnessMin)  # type: ignore
 
 
 class Genetic_algorithm(Metaheuristic):
@@ -77,7 +79,7 @@ class Genetic_algorithm(Metaheuristic):
     ...                         crossover = DeapOnePoint())
     ...
     >>> stop = Threshold(lf, 'calls', 100)
-    >>> ga = Genetic_algorithm(sp, 1000, pop_size=25, generation=40,elitism=0.5)
+    >>> ga = Genetic_algorithm(sp, pop_size=25,elitism=0.5)
     >>> exp = Experiment(ga, stop)
     >>> exp.run()
     >>> print(f"Best solution:f({lf.best_point})={lf.best_score}")
@@ -91,7 +93,6 @@ class Genetic_algorithm(Metaheuristic):
         verbose=True,
         init_pop=None,
     ):
-
         """__init__(search_space, pop_size = 10, verbose=True)
 
         Initialize Genetic_algorithm class
@@ -153,39 +154,64 @@ class Genetic_algorithm(Metaheuristic):
 
         self.initialized = False
         self.first_offspring = False
+        self.pop = []
+
+        self.g = 0
 
         logger.info("Constructing tools...")
-
-        # Define problem type "fitness", weights = -1.0 -> minimization problem
-        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-
-        # Define what an individual is for the algorithm
-        creator.create("Individual", list, fitness=creator.FitnessMin)
 
         # toolbox contains all the operator of GA. (mutate, select, crossover...)
         self.toolbox = base.Toolbox()
 
+    @property
+    def toolbox(self):
+        return self._toolbox
+
+    @toolbox.setter
+    def toolbox(self, value):
+        self._toolbox = value
+
         # Create operators
-        self.search_space.mutation._build(self.toolbox)
-        self.search_space.selection._build(self.toolbox)
-        self.search_space.crossover._build(self.toolbox)
+        self.search_space.mutation._build(value)
+        self.search_space.selection._build(value)
+        self.search_space.crossover._build(value)
 
         # Create a tool to select best individuals from a population
         bpn = int(self.pop_size * self.elitism)
         bcn = self.pop_size - bpn
-        self.toolbox.register("best_p", tools.selBest, k=bpn)
-        self.toolbox.register("best_c", tools.selBest, k=bcn)
+        value.register("best_p", tools.selBest, k=bpn)
+        value.register("best_c", tools.selBest, k=bcn)
 
-        self.toolbox.register(
+        value.register(
             "individual_guess",
             self.initIndividual,
-            creator.Individual,
+            creator.Individual,  # type: ignore
         )
-        self.toolbox.register(
+        value.register(
             "population_guess",
             self.initPopulation,
             list,
             self.toolbox.individual_guess,
+        )
+
+        # Determine what an individual is
+        value.register("hyperparameters", self.search_space.random_point)
+
+        # Determine the way to build individuals for the population
+        value.register(
+            "individual",
+            tools.initRepeat,
+            creator.Individual,  # type: ignore
+            value.hyperparameters,
+            n=1,
+        )
+
+        # Determine the way to build a population
+        value.register(
+            "population",
+            tools.initRepeat,
+            list,
+            value.individual,
         )
 
     # Initialize an individual extracted from a file
@@ -218,7 +244,6 @@ class Genetic_algorithm(Metaheuristic):
 
     # Run GA
     def forward(self, X, Y):
-
         """forward(X, Y)
         Runs one step of Genetic_algorithm.
 
@@ -250,31 +275,8 @@ class Genetic_algorithm(Metaheuristic):
 
             # Start from a random population
             else:
-                # Determine what an individual is
-                self.toolbox.register(
-                    "hyperparameters", self.search_space.random_point
-                )
-
-                # Determine the way to build individuals for the population
-                self.toolbox.register(
-                    "individual",
-                    tools.initRepeat,
-                    creator.Individual,
-                    self.toolbox.hyperparameters,
-                    n=1,
-                )
-
-                # Determine the way to build a population
-                self.toolbox.register(
-                    "population",
-                    tools.initRepeat,
-                    list,
-                    self.toolbox.individual,
-                )
-
-                logger.info("Creation of the initial population...")
-
                 # Build the population
+                logger.info("Creation of the initial population...")
                 pop = self.toolbox.population(n=self.pop_size)
 
             logger.info("Evaluating the initial population...")
@@ -284,19 +286,20 @@ class Genetic_algorithm(Metaheuristic):
 
             return solutions, {"algorithm": "GA", "generation": 0}
 
-        fitnesses = Y
-        pop = self.toolbox.population_guess(X)
+        o_fitnesses = Y
+        offspring = self.toolbox.population_guess(X)
 
         # Map computed fitness to individual fitness value
-        for ind, fit in zip(pop, fitnesses):
+        for ind, fit in zip(offspring, o_fitnesses):
             ind.fitness.values = (fit,)
 
         if self.first_offspring:
             # Build new population
-            pop[:] = self.toolbox.best_p(self.offspring) + self.toolbox.best_c(
-                pop
-            )
+            self.pop[:] = self.toolbox.best_p(self.pop) + self.toolbox.best_c(offspring)
+
         else:
+            # Initialize computed population
+            self.pop = offspring[:]
             self.first_offspring = True
 
         self.g += 1
@@ -306,7 +309,7 @@ class Genetic_algorithm(Metaheuristic):
         # Selection operator
         logger.debug("Selection...")
 
-        self.offspring = self.search_space.selection(pop, k=len(pop))
+        offspring = self.search_space.selection(self.pop, k=len(self.pop))
 
         children = []
 
@@ -314,8 +317,7 @@ class Genetic_algorithm(Metaheuristic):
         logger.debug("Crossover...")
 
         i = 0
-        for child1, child2 in zip(self.offspring[::2], self.offspring[1::2]):
-
+        for child1, child2 in zip(offspring[::2], offspring[1::2]):
             # Clone individuals from crossover
             children1 = self.toolbox.clone(child1)
             children2 = self.toolbox.clone(child2)
@@ -342,6 +344,15 @@ class Genetic_algorithm(Metaheuristic):
         logger.info(f"Evaluating n°{self.g}...")
 
         return solutions, {"algorithm": "GA", "generation": self.g}
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["_toolbox"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.toolbox = base.Toolbox()
 
 
 class Steady_State_GA(Metaheuristic):
@@ -403,7 +414,6 @@ class Steady_State_GA(Metaheuristic):
         pop_size=10,
         verbose=True,
     ):
-
         """__init__(search_space, pop_size = 10, verbose=True)
 
         Initialize Genetic_algorithm class
@@ -448,7 +458,7 @@ class Steady_State_GA(Metaheuristic):
         ##############
 
         self.pop_size = pop_size
-
+        self.pop = []
         #############
         # VARIABLES #
         #############
@@ -458,31 +468,52 @@ class Steady_State_GA(Metaheuristic):
 
         logger.info("Constructing tools...")
 
-        # Define problem type "fitness", weights = -1.0 -> minimization problem
-        creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
-
-        # Define what an individual is for the algorithm
-        creator.create("Individual", list, fitness=creator.FitnessMin)
-
         # toolbox contains all the operator of GA. (mutate, select, crossover...)
         self.toolbox = base.Toolbox()
 
-        # Create operators
-        self.search_space.mutation._build(self.toolbox)
-        self.search_space.selection._build(self.toolbox)
-        self.search_space.crossover._build(self.toolbox)
+    @property
+    def toolbox(self):
+        return self._toolbox
 
-        self.toolbox.register(
+    @toolbox.setter
+    def toolbox(self, value):
+        self._toolbox = value
+
+        # Create operators
+        self.search_space.mutation._build(value)
+        self.search_space.selection._build(value)
+        self.search_space.crossover._build(value)
+
+        value.register(
             "individual_guess",
             self.initIndividual,
-            creator.Individual,
+            creator.Individual,  # type: ignore
         )
-
-        self.toolbox.register(
+        value.register(
             "population_guess",
             self.initPopulation,
             list,
             self.toolbox.individual_guess,
+        )
+
+        # Determine what an individual is
+        value.register("hyperparameters", self.search_space.random_point)
+
+        # Determine the way to build individuals for the population
+        value.register(
+            "individual",
+            tools.initRepeat,
+            creator.Individual,  # type: ignore
+            value.hyperparameters,
+            n=1,
+        )
+
+        # Determine the way to build a population
+        value.register(
+            "population",
+            tools.initRepeat,
+            list,
+            value.individual,
         )
 
     # Initialize an individual extracted from a file
@@ -548,7 +579,6 @@ class Steady_State_GA(Metaheuristic):
 
     # Run GA
     def forward(self, X, Y):
-
         """forward(X, Y)
         Runs one step of Genetic_algorithm.
 
@@ -568,9 +598,8 @@ class Steady_State_GA(Metaheuristic):
             Additionnal information linked to :code:`points`
 
         """
-
-        logger.info("GA Starting")
         if not self.initialized:
+            logger.info("GA Starting")
             self.pop = []
             if X:
                 self.initialized = True
@@ -580,30 +609,8 @@ class Steady_State_GA(Metaheuristic):
                     # Map computed fitness to individual fitness value
                     for ind, fit in zip(self.pop, Y):
                         ind.fitness.values = (fit,)
-                    return self._do_selcrossmut(), {"algorithm": "GA"}
+                    return self._do_selcrossmut(), {"algorithm": "SGA"}
             else:
-                # Determine what an individual is
-                self.toolbox.register(
-                    "hyperparameters", self.search_space.random_point
-                )
-
-                # Determine the way to build individuals for the population
-                self.toolbox.register(
-                    "individual",
-                    tools.initRepeat,
-                    creator.Individual,
-                    self.toolbox.hyperparameters,
-                    n=1,
-                )
-
-                # Determine the way to build a population
-                self.toolbox.register(
-                    "population",
-                    tools.initRepeat,
-                    list,
-                    self.toolbox.individual,
-                )
-
                 logger.info("Creation of the initial population...")
 
                 # Build the population
@@ -634,4 +641,13 @@ class Steady_State_GA(Metaheuristic):
             sol = self._do_selcrossmut()
             return sol, {"algorithm": "GA"}
         else:
-            return [self.search_space.random_point(1)], {"algorithm": "GA"}
+            return [self.search_space.random_point(1)], {"algorithm": "SGA"}
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        del state["_toolbox"]
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self.toolbox = base.Toolbox()

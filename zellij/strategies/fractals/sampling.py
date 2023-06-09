@@ -9,36 +9,28 @@
 
 import numpy as np
 from zellij.strategies.tools.chaos_map import Henon, Chaos_map
-from zellij.core.metaheuristic import Metaheuristic
-from zellij.core.search_space import ContinuousSearchspace
+from zellij.core.metaheuristic import ContinuousMetaheuristic
+from zellij.core.search_space import Fractal, ContinuousSearchspace
 import logging
 
 logger = logging.getLogger("zellij.sampling")
 
+
 # Promising Hypersphere Search
-class Center(Metaheuristic):
+class Center(ContinuousMetaheuristic):
 
     """Center
 
     Samples the center of the targeted search space.
-    The search space must have a :code:`center` attribute.
+    The search space must have a :code:`center` attribute, or
+    upper and lower bounds.
 
     Attributes
     ----------
     search_space : Searchspace
-        :ref:`sp` object containing decision variables and the loss function.
-
-    f_calls : int
-        Maximum number of calls to :ref:`lf`.
-
+            :ref:`sp` containing bounds of the search space.
     verbose : boolean, default=True
-        Activate or deactivate the progress bar.
-
-    Methods
-    -------
-
-    run(self, n_process=1)
-        Runs Center
+        Algorithm verbosity
 
 
     See Also
@@ -48,8 +40,7 @@ class Center(Metaheuristic):
     Searchspace : Describes what a loss function is in Zellij
     """
 
-    def __init__(self, search_space, f_calls=1, verbose=True):
-
+    def __init__(self, search_space, verbose=True):
         """__init__(search_space, f_calls,verbose=True)
 
         Initialize PHS class
@@ -58,97 +49,80 @@ class Center(Metaheuristic):
         ----------
         search_space : Searchspace
             Search space object containing bounds of the search space.
-
-        f_calls : int
-            Maximum number of :ref:`lf` calls
-
         verbose : boolean, default=True
             Algorithm verbosity
 
         """
 
-        super().__init__(search_space, f_calls, verbose)
+        super().__init__(search_space, verbose)
 
-    def run(self, H=None, n_process=1):
-        """run(H=None, n_process=1)
+    @ContinuousMetaheuristic.search_space.setter
+    def search_space(self, value):
+        if value:
+            if (
+                isinstance(value, ContinuousSearchspace)
+                or isinstance(value, Fractal)
+                or hasattr(value, "converter")
+            ):
+                self._search_space = value
+            else:
+                raise ValueError(
+                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
+                )
+
+            if not (hasattr(value, "lower") and hasattr(value, "upper")):
+                raise AttributeError(
+                    "Search space must have lower and upper bounds attributes, got {value}."
+                )
+
+            if hasattr(value, "center"):
+                self.center = value.center  # type: ignore
+            else:
+                self.center = (value.upper - value.lower) / 2
+
+    def forward(self, X, Y):
+        """run(X, Y)
 
         Parameters
         ----------
-        H : Fractal, default=None
-            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
-        n_process : int, default=1
-            Determine the number of best solution found to return.
+        X : list
+            List of previously computed points
+        Y : list
+            List of loss value linked to :code:`X`.
+            :code:`X` and :code:`Y` must have the same length.
 
         Returns
         -------
-        best_sol : list[float]
-            Returns a list of the :code:`n_process` best found points to the continuous format
-
-        best_scores : list[float]
-            Returns a list of the :code:`n_process` best found scores associated to best_sol
+        points
+            Return a list of new points to be computed with the :ref:`lf`.
+        info
+            Additionnal information linked to :code:`points`
 
         """
-
-        points = [H.center]
-
-        self.build_bar(self.f_calls)
 
         # logging
         logger.info("Starting")
 
-        self.pending_pb(1)
-
-        logger.info(f"Evaluating points")
-        if (
-            isinstance(self.search_space, ContinuousSearchspace)
-            or not H.to_convert
-        ):
-            scores = self.search_space.loss(points, algorithm="Center")
-        else:
-            scores = self.search_space.loss(
-                self.search_space.to_continuous.reverse(points, True),
-                algorithm="Center",
-            )
-
-        self.update_main_pb(
-            1, explor=True, best=self.search_space.loss.new_best
-        )
-        self.meta_pb.update(1)
-
-        logger.info("Ending")
-
-        self.close_bar()
-
-        logger.info("Center ending")
-
-        idx = np.argmin(scores)
-        return points[idx], scores[idx]
+        return self.center, {"algorithm": "Center"}
 
 
-class Diagonal(Metaheuristic):
+class Diagonal(ContinuousMetaheuristic):
 
     """Diagonal
 
-    Sample the center of the targeted search space, and two equidistant points
-    on the diagonal of an hypercube.
-    The search space must be an hypercube or an hyperrectangle.
+    Sample the center of the :ref:`sp`, and two equidistant points
+    on the diagonal.
+    The search space must be a :code:`Hypercube` or a :code:`Section`.
 
     Attributes
     ----------
     search_space : Searchspace
-        :ref:`sp` object containing decision variables and the loss function.
-
-    f_calls : int
-        Maximum number of calls to :ref:`lf`.
-
+            :ref:`sp` containing bounds of the search space.
+    ratio : float, default=0.8
+        0.0<:code:`ratio`<=1.0.
+        Proportionnal distance of sampled points from the center.
     verbose : boolean, default=True
-        Activate or deactivate the progress bar.
-
-    Methods
-    -------
-
-    run(self, n_process=1)
-        Runs Diagonal
+        Algorithm verbosity
 
 
     See Also
@@ -158,8 +132,7 @@ class Diagonal(Metaheuristic):
     Searchspace : Describes what a loss function is in Zellij
     """
 
-    def __init__(self, search_space, f_calls=1, ratio=0.8, verbose=True):
-
+    def __init__(self, search_space, ratio=0.8, verbose=True):
         """__init__(search_space, f_calls,verbose=True)
 
         Initialize PHS class
@@ -167,20 +140,43 @@ class Diagonal(Metaheuristic):
         Parameters
         ----------
         search_space : Searchspace
-            Search space object containing bounds of the search space.
-
-        f_calls : int
-            Maximum number of :ref:`lf` calls
-
+            :ref:`sp` containing bounds of the search space.
+        ratio : float, default=0.8
+            0.0<:code:`ratio`<=1.0.
+            Proportionnal distance of sampled points from the center.
         verbose : boolean, default=True
             Algorithm verbosity
 
         """
 
-        super().__init__(search_space, f_calls, verbose)
         self.ratio = ratio
+        super().__init__(search_space, verbose)
 
-    def run(self, H=None, n_process=1):
+    @ContinuousMetaheuristic.search_space.setter
+    def search_space(self, value):
+        if value:
+            if (
+                isinstance(value, ContinuousSearchspace)
+                or isinstance(value, Fractal)
+                or hasattr(value, "converter")
+            ):
+                self._search_space = value
+            else:
+                raise ValueError(
+                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
+                )
+
+            if not (hasattr(value, "lower") and hasattr(value, "upper")):
+                raise AttributeError(
+                    "Search space must have lower and upper bounds attributes, got {value}."
+                )
+
+            if hasattr(value, "center"):
+                self.center = value.center  # type: ignore
+            else:
+                self.center = (value.upper - value.lower) / 2
+
+    def forward(self, X, Y):
         """run(H=None, n_process=1)
 
         Parameters
@@ -200,305 +196,217 @@ class Diagonal(Metaheuristic):
 
         """
 
-        upmlo = (H.up_bounds - H.lo_bounds) / 2
         points = [
-            H.center,
-            np.array(H.center) + self.ratio * upmlo,
-            np.array(H.center) - self.ratio * upmlo,
+            self.center,
+            np.array(self.center) + self.ratio * self.center,
+            np.array(self.center) - self.ratio * self.center,
         ]
-
-        self.build_bar(self.f_calls)
 
         # logging
         logger.info("Starting")
 
-        self.pending_pb(3)
-
-        logger.info(f"Evaluating points")
-        if (
-            isinstance(self.search_space, ContinuousSearchspace)
-            or not H.to_convert
-        ):
-            scores = self.search_space.loss(points, algorithm="Diagonal")
-        else:
-            scores = self.search_space.loss(
-                self.search_space.to_continuous.reverse(points, True),
-                algorithm="Diagonal",
-            )
-
-        self.update_main_pb(
-            1, explor=True, best=self.search_space.loss.new_best
-        )
-        self.meta_pb.update(1)
-
-        logger.info("Ending")
-
-        self.close_bar()
-
-        logger.info("Diagonal ending")
-
-        idx = np.argmin(scores)
-        return points[idx], scores[idx]
+        return points, {"algorithm": "Diagonal"}
 
 
-class Chaos(Metaheuristic):
+class Chaos(ContinuousMetaheuristic):
 
     """Chaos
 
-    Sample points in a chaotic fashion.
+     Sample points in a chaotic fashion.
 
     Attributes
-    ----------
-    search_space : Searchspace
-        :ref:`sp` object containing decision variables and the loss function.
-
-    f_calls : int
-        Maximum number of calls to :ref:`lf`.
-
-    map : Chaos_map, default=Henon
-        :ref:`cmap` used to generate points.
-
-    verbose : boolean, default=True
-        Activate or deactivate the progress bar.
-
-    Methods
-    -------
-
-    run(self, n_process=1)
-        Runs Chaos
+     ----------
+     search_space : Searchspace
+             :ref:`sp` containing bounds of the search space.
+     verbose : boolean, default=True
+         Algorithm verbosity
 
 
-    See Also
-    --------
-    Metaheuristic : Parent class defining what a Metaheuristic is.
-    LossFunc : Describes what a loss function is in Zellij
-    Searchspace : Describes what a loss function is in Zellij
+     See Also
+     --------
+     Metaheuristic : Parent class defining what a Metaheuristic is.
+     LossFunc : Describes what a loss function is in Zellij
+     Searchspace : Describes what a loss function is in Zellij
     """
 
     def __init__(
         self,
         search_space,
         samples,
-        f_calls=1,
-        map=Henon,
+        cmap=Henon,
         verbose=True,
         seed=None,
     ):
-
         """__init__(search_space, f_calls,verbose=True)
 
-        Initialize PHS class
+        Initialize Chaos class
 
         Parameters
         ----------
         search_space : Searchspace
             Search space object containing bounds of the search space.
-
-        f_calls : int
-            Maximum number of :ref:`lf` calls
-
+        samples : int
+            Number of sampled points.
+        cmap : ChaosMap, default=Henon
+            ChaosMap.
         verbose : boolean, default=True
             Algorithm verbosity
 
         """
-        np.random.seed(seed)
-        super().__init__(search_space, f_calls, verbose)
-        if isinstance(map, Chaos_map):
-            self.map = map.map
-        else:
-            self.map = map(samples, len(self.search_space)).map
+        self.seed = seed
+        self.samples = samples
+        super().__init__(search_space, verbose)
+        self.map = cmap
 
-    def run(self, H=None, n_process=1):
-        """run(H=None, n_process=1)
+    @property
+    def seed(self):
+        return self._seed
+
+    @seed.setter
+    def seed(self, value):
+        self._seed = value
+        np.random.seed(value)
+
+    @property
+    def map(self):
+        return self._map
+
+    @map.setter
+    def map(self, value):
+        if isinstance(value, Chaos_map):
+            self._map = value.map
+        else:
+            self._map = value(self.samples, len(self.search_space)).map
+
+    def forward(self, X, Y):
+        """run(X, Y)
 
         Parameters
         ----------
-        H : Fractal, default=None
-            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
-        n_process : int, default=1
-            Determine the number of best solution found to return.
+        X : list
+            List of previously computed points
+        Y : list
+            List of loss value linked to :code:`X`.
+            :code:`X` and :code:`Y` must have the same length.
 
         Returns
         -------
-        best_sol : list[float]
-            Returns a list of the :code:`n_process` best found points to the continuous format
-
-        best_scores : list[float]
-            Returns a list of the :code:`n_process` best found scores associated to best_sol
+        points
+            Return a list of new points to be computed with the :ref:`lf`.
+        info
+            Additionnal information linked to :code:`points`
 
         """
-
-        self.build_bar(self.f_calls)
-
         # logging
         logger.info("Starting")
 
-        self.pending_pb(len(self.map))
-
         logger.info(f"Evaluating points")
-        if (
-            isinstance(self.search_space, ContinuousSearchspace)
-            or not H.to_convert
-        ):
-            points = (
-                self.map
-                * (self.search_space.up_bounds - self.search_space.lo_bounds)
-                + self.search_space.lo_bounds
-            )
-            scores = self.search_space.loss(points, algorithm="Chaos")
-        else:
-            scores = self.search_space.loss(
-                self.search_space.to_continuous.reverse(self.map, True),
-                algorithm="Chaos",
-            )
-
-        self.update_main_pb(
-            len(self.map), explor=True, best=self.search_space.loss.new_best
+        points = (
+            self.map * (self.search_space.upper - self.search_space.lower)
+            + self.search_space.lower
         )
-        self.meta_pb.update(len(self.map))
 
         logger.info("Ending")
 
-        self.close_bar()
-
-        logger.info("Diagonal ending")
-
-        idx = np.argmin(scores)
-        return points[idx], scores[idx]
+        return points, {"algorithm": "Chaos"}
 
 
-class Chaos_Hypersphere(Metaheuristic):
+class Chaos_Hypersphere(ContinuousMetaheuristic):
 
     """Chaos_Hypersphere
 
-    Sample points in a chaotic fashion. For hypersphere
+    Sample points in a chaotic fashion. Adapted to :code:`Hypersphere`.
 
     Attributes
-    ----------
-    search_space : Searchspace
-        :ref:`sp` object containing decision variables and the loss function.
-
-    f_calls : int
-        Maximum number of calls to :ref:`lf`.
-
-    map : Chaos_map, default=Henon
-        :ref:`cmap` used to generate points.
-
-    verbose : boolean, default=True
-        Activate or deactivate the progress bar.
-
-    Methods
-    -------
-
-    run(self, n_process=1)
-        Runs Chaos
+     ----------
+     search_space : Searchspace
+             :ref:`sp` containing bounds of the search space.
+     verbose : boolean, default=True
+         Algorithm verbosity
 
 
-    See Also
-    --------
-    Metaheuristic : Parent class defining what a Metaheuristic is.
-    LossFunc : Describes what a loss function is in Zellij
-    Searchspace : Describes what a loss function is in Zellij
+     See Also
+     --------
+     Metaheuristic : Parent class defining what a Metaheuristic is.
+     LossFunc : Describes what a loss function is in Zellij
+     Searchspace : Describes what a loss function is in Zellij
     """
 
     def __init__(
         self,
         search_space,
         samples,
-        f_calls=1,
-        map=Henon,
+        cmap=Henon,
         verbose=True,
         seed=None,
     ):
-
         """__init__(search_space, f_calls,verbose=True)
 
-        Initialize PHS class
+        Initialize Chaos class
 
         Parameters
         ----------
         search_space : Searchspace
             Search space object containing bounds of the search space.
-
-        f_calls : int
-            Maximum number of :ref:`lf` calls
-
+        samples : int
+            Number of sampled points.
+        cmap : ChaosMap, default=Henon
+            ChaosMap.
         verbose : boolean, default=True
             Algorithm verbosity
 
         """
+        self.seed = seed
+        self.samples = samples
+        super().__init__(search_space, verbose)
+        self.map = cmap
 
-        super().__init__(search_space, f_calls, verbose)
-        if isinstance(map, Chaos_map):
-            self.map = map[0].map
-            self.map = self.map * 2 - 1
-            inner = map[1].map
+    @property
+    def seed(self):
+        return self._seed
 
-            d = np.linalg.norm(self.map, axis=1, keepdims=True)
-            self.map = self.map * inner ** (1 / len(self.search_space)) / d
+    @seed.setter
+    def seed(self, value):
+        self._seed = value
+        np.random.seed(value)
+
+    @property
+    def map(self):
+        return self._map
+
+    @map.setter
+    def map(self, value):
+        if isinstance(value, Chaos_map):
+            self._map = value.map
         else:
-            np.random.seed(seed)
-            self.map = map(samples, len(self.search_space)).map
-            self.map = self.map * 2 - 1
-            inner = map(samples, 1).map
+            self._map = value(self.samples, len(self.search_space)).map
 
-            d = np.linalg.norm(self.map, axis=1, keepdims=True)
-            self.map = self.map * inner ** (1 / len(self.search_space)) / d
-
-    def run(self, H=None, n_process=1):
-        """run(H=None, n_process=1)
+    def forward(self, X, Y):
+        """run(X, Y)
 
         Parameters
         ----------
-        H : Fractal, default=None
-            When used by :ref:`dba`, a fractal corresponding to the current subspace is given
-        n_process : int, default=1
-            Determine the number of best solution found to return.
+        X : list
+            List of previously computed points
+        Y : list
+            List of loss value linked to :code:`X`.
+            :code:`X` and :code:`Y` must have the same length.
 
         Returns
         -------
-        best_sol : list[float]
-            Returns a list of the :code:`n_process` best found points to the continuous format
-
-        best_scores : list[float]
-            Returns a list of the :code:`n_process` best found scores associated to best_sol
+        points
+            Return a list of new points to be computed with the :ref:`lf`.
+        info
+            Additionnal information linked to :code:`points`
 
         """
-
-        self.build_bar(self.f_calls)
 
         # logging
         logger.info("Starting")
 
         points = self.map + self.search_space.center
         points *= self.search_space.radius
-        points = np.maximum(points, self.search_space._god.lo_bounds)
-        points = np.minimum(points, self.search_space._god.up_bounds)
+        points = np.maximum(points, 0)
+        points = np.minimum(points, 1)
 
-        self.pending_pb(len(points))
-
-        logger.info(f"Evaluating points")
-        if (
-            isinstance(self.search_space, ContinuousSearchspace)
-            or not H.to_convert
-        ):
-            scores = self.search_space.loss(points, algorithm="ChaosH")
-        else:
-            scores = self.search_space.loss(
-                self.search_space.to_continuous.reverse(points, True),
-                algorithm="ChaosH",
-            )
-
-        self.update_main_pb(
-            len(self.map), explor=True, best=self.search_space.loss.new_best
-        )
-        self.meta_pb.update(len(points))
-
-        logger.info("Ending")
-
-        self.close_bar()
-
-        logger.info("Diagonal ending")
-
-        idx = np.argmin(scores)
-        return points[idx], scores[idx]
+        return points, {"algorithm": "ChaosH"}

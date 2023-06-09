@@ -91,7 +91,6 @@ class Simulated_annealing(Metaheuristic):
         neighbors,
         verbose=True,
     ):
-
         """__init__(search_space, cooling, max_iter, verbose=True)
 
         Initialize Genetic_algorithm class
@@ -181,7 +180,6 @@ class Simulated_annealing(Metaheuristic):
 
     # RUN SA
     def forward(self, X, Y):
-
         """forward(X, Y)
         Runs one step of Simulated_annealing.
 

@@ -8,14 +8,16 @@
 
 
 import numpy as np
-from zellij.core.metaheuristic import Metaheuristic
+from zellij.core.metaheuristic import ContinuousMetaheuristic
+from zellij.core.search_space import Fractal, ContinuousSearchspace
 
 import logging
 
 logger = logging.getLogger("zellij.ILS")
 
+
 # Intensive local search
-class ILS(Metaheuristic):
+class ILS(ContinuousMetaheuristic):
 
     """ILS
 
@@ -26,7 +28,6 @@ class ILS(Metaheuristic):
     ----------
     search_space : Searchspace
         :ref:`sp` object containing decision variables and the loss function.
-
     red_rate : float, default=0.5
         Determines the step reduction rate each time an improvement happens.
     precision : flaot, default=1e-20
@@ -53,10 +54,9 @@ class ILS(Metaheuristic):
         self,
         search_space,
         red_rate=0.5,
-        precision=1e-20,
+        inflation=1.75,
         verbose=True,
     ):
-
         """__init__(search_space, red_rate=0.5,verbose=True)
 
         Initialize ILS class
@@ -65,23 +65,22 @@ class ILS(Metaheuristic):
         ----------
         search_space : Searchspace
             Search space object containing bounds of the search space.
-
         red_rate : float, default=0.5
             Determines the step reduction rate each time an improvement happens.
-
+        inflation : float, default=1.75
+            Inflation rate of the :code:`Hypersphere`.
         verbose : boolean, default=True
             Algorithm verbosity
 
         """
 
+        self.red_rate = red_rate
+        self.inflation = inflation
         super().__init__(search_space, verbose)
 
-        self.red_rate = red_rate
-        self.precision = precision
-        self.step = np.tile(
-            self.search_space.radius * self.search_space.inflation, 2
-        )
-        self.step[1] = -self.step[1]
+        #############
+        # VARIABLES #
+        #############
 
         self.initialized = False
         self.current_dim = 0
@@ -89,24 +88,27 @@ class ILS(Metaheuristic):
         self.current_point = np.zeros(self.search_space.size)
         self.improvement = False
 
-    def search_space():
-        doc = "The search_space property."
-
-        def fget(self):
-            return super().search_space.fget()
-
-        def fset(self, value):
-            super(ILS, self.__class__).search_space.fset(self, value)
-            if value:
-                self.step = np.tile(
-                    self.search_space.radius * self.search_space.inflation, 2
+    @ContinuousMetaheuristic.search_space.setter
+    def search_space(self, value):
+        if value:
+            if (
+                isinstance(value, ContinuousSearchspace)
+                or isinstance(value, Fractal)
+                or hasattr(value, "converter")
+            ):
+                self._search_space = value
+            else:
+                raise ValueError(
+                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
                 )
-                self.step[1] = -self.step[1]
 
-        def fdel(self):
-            super().search_space.fdel()
+            if not (hasattr(value, "lower") and hasattr(value, "upper")):
+                raise AttributeError(
+                    "Search space must have lower and upper bounds attributes, got {value}."
+                )
 
-        return locals()
+            self.step = np.tile(self.search_space.radius * self.inflation, 2)
+            self.step[1] = -self.step[1]
 
     def reset(self):
         """reset()
@@ -115,9 +117,7 @@ class ILS(Metaheuristic):
 
         """
 
-        self.step = np.tile(
-            self.search_space.radius * self.search_space.inflation, 2
-        )
+        self.step = np.tile(self.search_space.radius * self.inflation, 2)
         self.step[1] = -self.step[1]
 
         self.initialized = False
@@ -127,21 +127,13 @@ class ILS(Metaheuristic):
         self.improvement = False
 
     def _one_step(self):
-        if self.step[0] > self.precision:
-            points = np.tile(self.current_point, (2, 1))
-            points[:, self.current_dim] += self.step
-            points[:, self.current_dim] = np.clip(
-                points[:, self.current_dim],
-                self.search_space._god.lo_bounds[self.current_dim],
-                self.search_space._god.up_bounds[self.current_dim],
-            )
+        points = np.tile(self.current_point, (2, 1))
+        points[:, self.current_dim] += self.step
+        points[:, self.current_dim] = np.clip(points[:, self.current_dim], 0.0, 1.0)
 
-            return points, {"algorithm": "ILS"}
-        else:
-            return [], "endILSprecision"
+        return points, {"algorithm": "ILS"}
 
     def forward(self, X, Y):
-
         """forward(X, Y)
         Runs one step of ILS.
 
@@ -173,7 +165,7 @@ class ILS(Metaheuristic):
                 self.current_point = X[argmin]
                 self.improvement = True
         else:
-            self.current_point = X[0]
+            self.current_point = self.search_space.center
             self.initialized = True
 
         if self.current_dim >= self.search_space.size:
@@ -204,12 +196,12 @@ class ILS_section(ILS):
     """ILS_section
 
     Intensive local search is an exploitation algorithm comming from the
-    original FDA paper. It evaluate a point in each dimension arround
+    original FDA paper. It evaluates a point in each dimension arround
     an initial solution. Distance of the computed point to the initial one is
     decreasing according to a reduction rate. At each iteration the algorithm
     moves to the best solution found.
 
-    This variation works with sections
+    This variation works with :code:`Section` fractals.
 
     Attributes
     ----------
@@ -243,7 +235,6 @@ class ILS_section(ILS):
         red_rate=0.5,
         verbose=True,
     ):
-
         """__init__(search_space, red_rate=0.5,verbose=True)
 
         Initialize ILS class
@@ -261,10 +252,19 @@ class ILS_section(ILS):
 
         """
 
-        super().__init__(search_space, red_rate, verbose)
+        super().__init__(search_space, red_rate, 1, verbose)
 
-        self.step = np.tile(self.search_space.length, 2)
+        self.length = np.max(self.search_space.upper - self.search_space.lower)
+        self.step = np.tile(self.length, 2)
         self.step[1] = -self.step[1]
+
+    @ContinuousMetaheuristic.search_space.setter
+    def fset(self, value):
+        super(ILS, self.__class__).search_space.fset(self, value)
+        if value:
+            self.length = np.max(self.search_space.upper - self.search_space.lower)
+            self.step = np.tile(self.length * self.inflation, 2)
+            self.step[1] = -self.step[1]
 
     def reset(self):
         """reset()

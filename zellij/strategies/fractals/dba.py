@@ -11,7 +11,7 @@ from zellij.core.metaheuristic import Metaheuristic
 from zellij.strategies.tools.scoring import Min
 
 import numpy as np
-from queue import PriorityQueue, Queue
+from collections import deque
 
 import logging
 
@@ -21,6 +21,8 @@ logger = logging.getLogger("zellij.DBA")
 class DBA(Metaheuristic):
 
     """DBA
+
+    DBA works in the unit hypercube.
 
     Decomposition-Based-Algorithm (DBA) is made of 5 part:
 
@@ -33,10 +35,9 @@ class DBA(Metaheuristic):
     Attributes
     ----------
 
-    search_space : Fractal
+    search_space : BaseFractal
         :ref:`sp` defined as a  :ref:`frac`. Contains decision
-        variables of the search space, converted to continuous and
-        constrained to an Euclidean :ref:`frac`.
+        variables of the search space.
 
     exploration : {(Metaheuristic, Stopping), (Metaheuristic, list[Stopping])}, default=None
         Tuple made of a :ref:`meta` and one or a list of :ref:`stop` used to sample inside each subspaces.
@@ -48,18 +49,11 @@ class DBA(Metaheuristic):
     tree_search : Tree_search
         Tree search algorithm applied on the partition tree.
 
+    scoring : Scoring, default=Min()
+        Scoring component used to compute a score of a given fractal.
+
     verbose : boolean, default=True
         Algorithm verbosity
-
-
-    Methods
-    -------
-
-    evaluate(hypervolumes)
-        Evaluate a list of fractals using exploration and/or exploitation
-
-    run(n_process=1)
-        Runs DBA
 
     Example
     -------
@@ -76,8 +70,8 @@ class DBA(Metaheuristic):
     ...
     >>> explor = PHS(sp)
     >>> exploi = ILS(sp)
-    >>> stop1 = Threshold(None, "current_calls", 3)
-    >>> stop2 = Threshold(None,"current_calls", 100)
+    >>> stop1 = Threshold(None, "current_calls", 3)  # set target to None, DBA will automatically asign it.
+    >>> stop2 = Threshold(None,"current_calls", 100)  # set target to None, DBA will automatically asign it.
     >>> dba = DBA(sp, Move_up(sp,5),(explor,stop1),(exploi,stop2))
     >>> stop1.target = dba
     >>> stop2.target = dba
@@ -142,29 +136,8 @@ class DBA(Metaheuristic):
         super(DBA, self).__init__(search_space, verbose)
 
         # Exploration and exploitation function
-
-        if exploration:  # If there is exploration
-            self.exploration = exploration[0]
-            if type(exploration[1]) != list:  # if only 1 Stopping
-                self.stop_explor = [exploration[1]]
-            else:
-                self.stop_explor = exploration[1]
-        else:
-            self.exploration = False
-
-        if exploitation:
-            self.exploitation = exploitation[0]
-            self.stop_exploi = exploitation[1]
-        else:
-            self.exploitation = False
-
-        # If no target for stop -> self
-        for s in self.stop_explor:
-            if not s.target:
-                s.target = self
-
-        if not self.stop_exploi.target:
-            self.stop_exploi.target = self
+        self.exploration = exploration
+        self.exploitation = exploitation
 
         #############
         # VARIABLES #
@@ -184,9 +157,61 @@ class DBA(Metaheuristic):
         self.current_subspace = None
 
         # Queue to manage built subspaces
-        self.subspaces_queue = Queue()
+        self.subspaces_queue = deque()
         # If true do exploration, elso do exploitation
         self.do_explor = True
+
+    @property
+    def exploration(self):
+        return self._exploration
+
+    @exploration.setter
+    def exploration(self, value):
+        if value:  # If there is exploration
+            self._exploration = value[0]
+            self.stop_explor = value[1]
+        else:
+            self.exploration = False
+            self.stop_explor = None
+
+    @property
+    def stop_explor(self):
+        return self._stop_explor
+
+    @stop_explor.setter
+    def stop_explor(self, value):
+        if isinstance(value, list):
+            self._stop_explor = value
+        else:  # if only 1 Stopping
+            self._stop_explor = [value]
+
+        # If no target for stop -> self
+        for s in self._stop_explor:
+            if not s.target:
+                s.target = self
+
+    @property
+    def exploitation(self):
+        return self._exploitation
+
+    @exploitation.setter
+    def exploitation(self, value):
+        if value:
+            self._exploitation = value[0]
+            self.stop_exploi = value[1]
+        else:
+            self._exploitation = False
+            self.stop_exploi = None
+
+    @property
+    def stop_exploi(self):
+        return self._stop_exploi
+
+    @stop_exploi.setter
+    def stop_exploi(self, value):
+        self._stop_exploi = value
+        if not self._stop_exploi.target:
+            self._stop_exploi.target = self
 
     def reset(self):
         """reset()
@@ -201,21 +226,20 @@ class DBA(Metaheuristic):
         self.current_calls = 0
         self.current_subspace = None
         self.do_explor = True
-        self.subspaces_queue = Queue()
+        self.subspaces_queue = deque()
 
-    # Add more info
+    # Add more info to ouputs
     def _add_info(self, info):
-        info["level"] = self.current_subspace.level
-        info["id"] = self.current_subspace.id
-        if isinstance(self.current_subspace.father, str):  # root
-            info["father"] = self.current_subspace.father
-        else:
-            info["father"] = self.current_subspace.father.id
+        info["level"] = self.current_subspace.level  # type: ignore
+        info["father"] = self.current_subspace.father  # type: ignore
+        info["f_id"] = self.current_subspace.f_id  # type: ignore
+        info["c_id"] = self.current_subspace.f_id  # type: ignore
 
         return info
 
     def _explor(self, X, Y):
-        index = min(self.current_subspace.level, len(self.stop_explor)) - 1
+        # select the stoping criterion
+        index = min(self.current_subspace.level, len(self.stop_explor)) - 1  # type: ignore
         stop = self.stop_explor[index]
 
         if stop():
@@ -233,7 +257,7 @@ class DBA(Metaheuristic):
 
     def _exploi(self, X, Y):
         if self.stop_exploi():
-            points, info = self.exploitation.forward(X, Y)
+            points, info = self.exploitation.forward(X, Y)  # type: ignore
             if len(points) != 0:
                 info = self._add_info(info)  # add DBA information
 
@@ -246,21 +270,22 @@ class DBA(Metaheuristic):
             return False, None, None  # Exploitation ending
 
     def _new_children(self, subspace):
-        subspace.create_children()
-        for s in subspace.children:  # put subspaces in queue
-            self.subspaces_queue.put(s)
+        children = subspace.create_children()
+        for s in children:  # put subspaces in queue
+            self.subspaces_queue.appendleft(s)
 
     def _next_tree(self):
-        stop, subspaces = self.tree_search.get_next()  # Get next leaves to decompose
+        # continue, selected fractals
+        cnt, subspaces = self.tree_search.get_next()  # Get next leaves to decompose
 
-        if stop:
+        if cnt:
             for s in subspaces:
                 self._new_children(s)  # creates children and add them to the queue
 
-        return stop
+        return cnt
 
     def _next_subspace(self):
-        if self.subspaces_queue.empty():  # if no more subspace in queue
+        if len(self.subspaces_queue) < 1:  # if no more subspace in queue
             # if there is leaves, create children and add to queue
             if self._next_tree():
                 return self._next_subspace()
@@ -273,7 +298,7 @@ class DBA(Metaheuristic):
             ):  # add subspace to OPEN list
                 self.tree_search.add(self.current_subspace)
 
-            self.current_subspace = self.subspaces_queue.get()
+            self.current_subspace = self.subspaces_queue.pop()
             # If not max level do exploration else exploitation
             if self.current_subspace.level < self.tree_search.max_depth:
                 self.exploration.search_space = self.current_subspace
@@ -281,7 +306,7 @@ class DBA(Metaheuristic):
                 self.do_exploi = False
             else:
                 if self.exploitation:
-                    self.exploitation.search_space = self.current_subspace
+                    self.exploitation.search_space = self.current_subspace  # type: ignore
                     self.do_explor = False
                     self.do_exploi = True
                 else:
@@ -313,19 +338,18 @@ class DBA(Metaheuristic):
             self.initialized = True
             self.current_calls = 0
             # Select initial hypervolume (root) from the search tree
-            stop = self._next_subspace()
+            cnt = self._next_subspace()
 
-            if not stop:  # Early stopping
+            if not cnt:  # Early stopping
                 return [], "initialization"
 
         if self.do_explor:
             # continue, points, info
             if self.initialized_explor:
+                self.exploration.search_space.add_solutions(X, Y)
                 cte, points, info = self._explor(X, Y)
             else:
-                cte, points, info = self._explor(
-                    [self.current_subspace.center], [float("inf")]
-                )
+                cte, points, info = self._explor(None, None)
                 self.initialized_explor = True
 
             if cte:
@@ -334,10 +358,11 @@ class DBA(Metaheuristic):
                 self.n_h += 1
                 self.current_calls = 0
                 self.initialized_explor = False
+                self.scoring(self.current_subspace)
                 self.exploration.reset()
-                nostop = self._next_subspace()
+                cnt = self._next_subspace()
 
-                if nostop:
+                if cnt:
                     return self.forward(X, Y)
                 else:
                     return [], "explor"
@@ -347,9 +372,7 @@ class DBA(Metaheuristic):
             if self.initialized_exploi:
                 cte, points, info = self._exploi(X, Y)
             else:
-                cte, points, info = self._exploi(
-                    [self.current_subspace.center], [float("inf")]
-                )
+                cte, points, info = self._exploi(None, None)
                 self.initialized_exploi = True
             if cte:
                 return points, info
@@ -357,10 +380,10 @@ class DBA(Metaheuristic):
                 self.n_h += 1
                 self.current_calls = 0
                 self.initialized_exploi = False
-                self.exploitation.reset()
-                nostop = self._next_subspace()
+                self.exploitation.reset()  # type: ignore
+                cnt = self._next_subspace()
 
-                if nostop:
+                if cnt:
                     return self.forward(X, Y)
                 else:
                     return [], "exploi"

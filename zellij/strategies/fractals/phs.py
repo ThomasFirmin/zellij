@@ -8,14 +8,16 @@
 
 
 import numpy as np
-from zellij.core.metaheuristic import Metaheuristic
+from zellij.core.metaheuristic import ContinuousMetaheuristic
+from zellij.core.search_space import Fractal, ContinuousSearchspace
 
 import logging
 
 logger = logging.getLogger("zellij.PHS")
 
+
 # Promising Hypersphere Search
-class PHS(Metaheuristic):
+class PHS(ContinuousMetaheuristic):
 
     """PHS
 
@@ -26,7 +28,8 @@ class PHS(Metaheuristic):
     ----------
     search_space : Searchspace
         :ref:`sp` object containing decision variables and the loss function.
-
+    inflation : float, default=1.75
+        Inflation rate of the :code:`Hypersphere`
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
 
@@ -44,8 +47,7 @@ class PHS(Metaheuristic):
     Searchspace : Describes what a loss function is in Zellij
     """
 
-    def __init__(self, search_space, verbose=True):
-
+    def __init__(self, search_space, inflation=1.75, verbose=True):
         """__init__(search_space,verbose=True)
 
         Initialize PHS class
@@ -53,41 +55,46 @@ class PHS(Metaheuristic):
         Parameters
         ----------
         search_space : Searchspace
-            Search space object containing bounds of the search space.
-
+            :ref:`sp` object containing decision variables and the loss function.
+        inflation : float, default=1.75
+            Inflation rate of the :code:`Hypersphere`
         verbose : boolean, default=True
-            Algorithm verbosity
+            Activate or deactivate the progress bar.
 
         """
 
+        self.inflation = inflation
         super().__init__(search_space, verbose)
 
-    def search_space():
-        doc = "The search_space property."
+    @ContinuousMetaheuristic.search_space.setter
+    def search_space(self, value):
+        if value:
+            if (
+                isinstance(value, ContinuousSearchspace)
+                or isinstance(value, Fractal)
+                or hasattr(value, "converter")
+            ):
+                self._search_space = value
+            else:
+                raise ValueError(
+                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
+                )
 
-        def fget(self):
-            return super().search_space
+            if not (hasattr(value, "lower") and hasattr(value, "upper")):
+                raise AttributeError(
+                    "Search space must have lower and upper bounds attributes, got {value}."
+                )
 
-        def fset(self, value):
-            super(PHS, self.__class__).search_space.fset(self, value)
-            if value:
-                self.radius = np.tile(
-                    self.search_space.inflation
-                    * self.search_space.radius
-                    / np.sqrt(self.search_space.size),
+            self.radius = (
+                np.tile(
+                    self.inflation * self.search_space.radius,
                     (2, 1),
                 )
-                self.radius[1] = -self.radius[1]
-
-        def fdel(self):
-            super().search_space.fdel()
-
-        return locals()
-
-    search_space = property(**search_space())
+                / self.search_space.size
+            )
+            self.radius[1] = -self.radius[1]
 
     def forward(self, X, Y):
-
         """forward(X, Y)
         Runs one step of PHS.
 
@@ -114,10 +121,6 @@ class PHS(Metaheuristic):
         logger.info("Starting")
 
         points[1:] += self.radius
-        points[1:] = np.clip(
-            points[1:],
-            self.search_space._god.lo_bounds,
-            self.search_space._god.up_bounds,
-        )
+        points[1:] = np.clip(points[1:], 0.0, 1.0)
 
         return points, {"algorithm": "PHS"}
