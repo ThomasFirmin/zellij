@@ -139,7 +139,7 @@ class Mixed(Distance):
         num = 0
         denum = 0
 
-        for x, y, op, w in zip(point_a, point_b, self.operations, self.weights):
+        for x, y, op, w in zip(point_a, point_b, self.operations, self.weights):  # type: ignore
             res = op(x, y) * w
             num += res**2
             denum += res
@@ -170,7 +170,7 @@ class Mixed(Distance):
 
             self.operations = []
 
-            for v in self._target.values:
+            for v in self._target.values:  # type: ignore
                 if isinstance(v, FloatVar) or isinstance(v, IntVar):
                     up, lo = v.upper, v.lower
                     self.operations.append(lambda x, y: np.abs(x - y) / (up - lo))
