@@ -52,21 +52,13 @@ class Metaheuristic(ABC):
 
         self.verbose = verbose
 
-    def search_space():
-        doc = "The search_space property."
+    @property
+    def search_space(self):
+        return self._search_space
 
-        def fget(self):
-            return self._search_space
-
-        def fset(self, value):
-            self._search_space = value
-
-        def fdel(self):
-            del self._search_space
-
-        return locals()
-
-    search_space = property(**search_space())
+    @search_space.setter
+    def search_space(self, value):
+        self._search_space = value
 
     @abstractmethod
     def forward(self, X, Y):
@@ -134,35 +126,23 @@ class ContinuousMetaheuristic(Metaheuristic):
         self.search_space = search_space
         self.verbose = verbose
 
-    def search_space():
-        doc = "Search space property."
+    @Metaheuristic.search_space.setter
+    def search_space(self, value):
+        if (
+            isinstance(value, ContinuousSearchspace)
+            or isinstance(value, Fractal)
+            or hasattr(value, "converter")
+        ):
+            self._search_space = value
+        else:
+            raise ValueError(
+                f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
+            )
 
-        def fget(self):
-            return self._search_space
-
-        def fset(self, value):
-            if (
-                isinstance(value, ContinuousSearchspace)
-                or isinstance(value, Fractal)
-                or hasattr(value, "converter")
-            ):
-                self._search_space = value
-            else:
-                raise ValueError(
-                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
-                )
-
-            if not (hasattr(value, "lower") and hasattr(value, "upper")):
-                raise AttributeError(
-                    "Search space must have lower and upper bounds attributes, got {value}."
-                )
-
-        def fdel(self):
-            del self._search_space
-
-        return locals()
-
-    search_space = property(**search_space())
+        if not (hasattr(value, "lower") and hasattr(value, "upper")):
+            raise AttributeError(
+                "Search space must have lower and upper bounds attributes, got {value}."
+            )
 
 
 class DiscreteMetaheuristic(Metaheuristic):
@@ -200,26 +180,14 @@ class DiscreteMetaheuristic(Metaheuristic):
 
         self.verbose = verbose
 
-    def search_space():
-        doc = "Search space property."
-
-        def fget(self):
-            return self._search_space
-
-        def fset(self, value):
-            if isinstance(value, DiscreteSearchspace) or hasattr(value, "converter"):
-                self._search_space = value
-            else:
-                raise ValueError(
-                    "Search space must be discrete or have a `converter` addon"
-                )
-
-        def fdel(self):
-            del self._search_space
-
-        return locals()
-
-    search_space = property(**search_space())
+    @Metaheuristic.search_space.setter
+    def search_space(self, value):
+        if isinstance(value, DiscreteSearchspace) or hasattr(value, "converter"):
+            self._search_space = value
+        else:
+            raise ValueError(
+                "Search space must be discrete or have a `converter` addon"
+            )
 
 
 class AMetaheuristic(ABC):

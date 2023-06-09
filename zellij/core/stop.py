@@ -36,40 +36,21 @@ class Stopping(ABC):
         self.target = target
         self.attribute = attribute
 
-    def target():
-        def fget(self):
-            return self._target
+    @property
+    def target(self):
+        return self._target
 
-        def fset(self, value):
-            self._target = value
+    @target.setter
+    def target(self, value):
+        self._target = value
 
-        def fdel(self):
-            del self._target
+    @property
+    def attribute(self):
+        return self._attribute
 
-        return locals()
-
-    target = property(**target())  # type: ignore
-
-    def attribute():
-        def fget(self):
-            return self._attribute
-
-        def fset(self, value):
-            self._attribute = value
-
-        def fdel(self):
-            del self._attribute
-
-        return locals()
-
-    attribute = property(**attribute())  # type: ignore
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        if isinstance(self.target, LossFunc):
-            state["target"] = "loss"
-
-        return state
+    @attribute.setter
+    def attribute(self, value):
+        self._attribute = value
 
     def __and__(self, other):
         return Combined(self, other, lambda a, b: a() & b())
