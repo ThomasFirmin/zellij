@@ -138,7 +138,7 @@ class Threshold(Stopping):
         self.threshold = threshold
 
     def __call__(self):
-        return getattr(self.target, self.attribute) < self.threshold  # type: ignore
+        return getattr(self.target, self.attribute) >= self.threshold  # type: ignore
 
 
 class Calls(Threshold):
@@ -196,4 +196,4 @@ class Convergence(Stopping):
         else:
             self.acc += 1
 
-        return self.acc < self.patience
+        return self.acc >= self.patience
