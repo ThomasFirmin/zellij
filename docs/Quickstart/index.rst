@@ -48,7 +48,7 @@ Where:
   @Loss(save=False, verbose=True)
   def himmelblau(x):
     x_ar = np.array(x)
-    return np.sum(x_ar**4 -16*x_ar**2 + 5*x_ar) * (1/len(x_ar))
+    return (x_ar[0] ** 2 + x_ar[1] - 11) ** 2 + (x_ar[0] + x_ar[1] ** 2 - 7) ** 2
 
   print(himmelblau)
 

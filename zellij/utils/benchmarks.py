@@ -12,7 +12,7 @@ from abc import ABC, abstractmethod
 
 def himmelblau(x):
     x_ar = np.array(x)
-    return np.sum(x_ar**4 - 16 * x_ar**2 + 5 * x_ar) * (1 / len(x_ar))
+    return (x_ar[0] ** 2 + x_ar[1] - 11) ** 2 + (x_ar[0] + x_ar[1] ** 2 - 7) ** 2
 
 
 class Benchmark(ABC):
@@ -152,10 +152,7 @@ class Rosenbrock(Benchmark):
         z = self.transform(y) + 1
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return (
-            np.sum((z[:-1] - 1) ** 2 + 100 * (z[:-1] ** 2 - z[1:]) ** 2)
-            + self.bias
-        )
+        return np.sum((z[:-1] - 1) ** 2 + 100 * (z[:-1] ** 2 - z[1:]) ** 2) + self.bias
 
 
 class Rastrigin(Benchmark):
@@ -295,9 +292,7 @@ class F10(Benchmark):
         shuffle=None,
         bias=0,
     ):
-        super(F10, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(F10, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
 
     def __call__(self, y):
         z = self.transform(y)
@@ -430,9 +425,7 @@ class Cigar(Benchmark):
         shuffle=None,
         bias=0,
     ):
-        super(Cigar, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(Cigar, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
 
     def __call__(self, y):
         z = self.transform(y)
@@ -482,9 +475,7 @@ class Levy(Benchmark):
         shuffle=None,
         bias=0,
     ):
-        super(Levy, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(Levy, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
 
     def __call__(self, y):
         z = self.transform(y)
@@ -493,9 +484,7 @@ class Levy(Benchmark):
         z = 1 + (z - 1) / 4
         return (
             np.sin(np.pi * y[0]) ** 2
-            + np.sum(
-                (y[:-1] - 1) ** 2 * (1 + 10 * np.sin(np.pi * y[:-1] + 1) ** 2)
-            )
+            + np.sum((y[:-1] - 1) ** 2 * (1 + 10 * np.sin(np.pi * y[:-1] + 1) ** 2))
             + (y[-1] - 1) ** 2 * (1 + np.sin(2 * np.pi * y[-1]) ** 2)
             + self.bias
         )
@@ -512,9 +501,7 @@ class Brown(Benchmark):
         shuffle=None,
         bias=0,
     ):
-        super(Brown, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(Brown, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
 
     def __call__(self, y):
         z = self.transform(y)
@@ -547,8 +534,7 @@ class High_conditioned_elliptic(Benchmark):
         if self.shuffle is not None:
             z = z[self.shuffle]
         return np.sum(
-            (10**6) ** (np.arange(0, len(z)) / (len(z) - 1)) * z**2
-            + self.bias
+            (10**6) ** (np.arange(0, len(z)) / (len(z) - 1)) * z**2 + self.bias
         )
 
 
@@ -564,9 +550,7 @@ class HGBat(Benchmark):
         shuffle=None,
         bias=0,
     ):
-        super(HGBat, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(HGBat, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
         self.alpha = alpha
 
     def __call__(self, y):
@@ -700,10 +684,7 @@ class Modified_schwefel(Benchmark):
         )
 
     def __call__(self, y):
-        z = (
-            self._rotate_point(10 * self._shift_point(y))
-            + 4.209687462275036e002
-        )
+        z = self._rotate_point(10 * self._shift_point(y)) + 4.209687462275036e002
         if self.shuffle is not None:
             z = z[self.shuffle]
         g = np.zeros(len(z), dtype=float)
@@ -750,9 +731,7 @@ class Expanded_schaffer(Benchmark):
         xpy_last = z[-1] ** 2 + z[0] ** 2
         F = 0.5 + (np.sin(np.sqrt(xpy) - 0.5) ** 2) / (1 + 0.001 * xpy) ** 2
         last = (
-            0.5
-            + (np.sin(np.sqrt(xpy_last) - 0.5) ** 2)
-            / (1 + 0.001 * xpy_last) ** 2
+            0.5 + (np.sin(np.sqrt(xpy_last) - 0.5) ** 2) / (1 + 0.001 * xpy_last) ** 2
         )
         return np.sum(F) + last + self.bias
 
@@ -820,8 +799,7 @@ class Weierstrass(Benchmark):
         if self.shuffle is not None:
             z = z[self.shuffle]
         sum1 = np.sum(
-            self.ak[:, np.newaxis]
-            * np.cos(np.outer(2 * np.pi * self.bk, (z + 0.5)))
+            self.ak[:, np.newaxis] * np.cos(np.outer(2 * np.pi * self.bk, (z + 0.5)))
         )
         sum2 = len(z) * np.sum(self.ak * np.cos(2 * np.pi * self.bk * 0.5))
         return sum1 - sum2 + self.bias
@@ -830,6 +808,7 @@ class Weierstrass(Benchmark):
 ##############
 # GECCO 2022 #
 ##############
+
 
 # hf01 case 11 realnum 4
 class H1(Benchmark):
@@ -846,9 +825,7 @@ class H1(Benchmark):
         self.g1 = Modified_schwefel()
         self.g2 = Rastrigin()
         self.g3 = High_conditioned_elliptic()
-        super(H1, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(H1, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
         self.p = np.cumsum([0.3, 0.3, 0.4])
 
     @Benchmark.shift.setter
@@ -904,9 +881,7 @@ class H2(Benchmark):
         self.g2 = HGBat(alpha=0.5)
         self.g3 = Rosenbrock()
         self.g4 = Modified_schwefel()
-        super(H2, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(H2, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
         self.p = np.cumsum([0.2, 0.2, 0.3, 0.3])
 
     @Benchmark.shift.setter
@@ -969,9 +944,7 @@ class H3(Benchmark):
         self.g3 = Rosenbrock()
         self.g4 = Modified_schwefel()
         self.g5 = High_conditioned_elliptic()
-        super(H3, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(H3, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
         self.p = np.cumsum([0.1, 0.2, 0.2, 0.2, 0.3])
 
     @Benchmark.shift.setter
@@ -1049,9 +1022,7 @@ class C1(Benchmark):
         self.g1 = Rastrigin(shift=None, rotate=None, shuffle=None)
         self.g2 = Griewank(shift=None, rotate=None, shuffle=None)
         self.g3 = Modified_schwefel(shift=None, rotate=None, shuffle=None)
-        super(C1, self).__init__(
-            lower, upper, optimum, shift, rotate, shuffle, bias
-        )
+        super(C1, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
 
     @Benchmark.shift.setter
     def shift(self, shift):
@@ -1121,9 +1092,7 @@ class C2(Benchmark):
         bias=0,
     ):
         self.g1 = Ackley(shift=None, rotate=None, shuffle=None)
-        self.g2 = High_conditioned_elliptic(
-            shift=None, rotate=None, shuffle=None
-        )
+        self.g2 = High_conditioned_elliptic(shift=None, rotate=None, shuffle=None)
         self.g3 = Griewank(shift=None, rotate=None, shuffle=None)
         self.g4 = Rastrigin(shift=None, rotate=None, shuffle=None)
         super(C2, self).__init__(lower, upper, optimum, None, None, None, bias)
@@ -1203,7 +1172,6 @@ class C3(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = Rastrigin(shift=None, rotate=None, shuffle=None)
         self.g2 = Happycat(alpha=0.25, shift=None, rotate=None, shuffle=None)
         self.g3 = Ackley(shift=None, rotate=None, shuffle=None)
@@ -1296,12 +1264,9 @@ class CF9F1_25(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = F10(shift=None, rotate=None, shuffle=None)
         self.g2 = Sphere(shift=None, rotate=None, shuffle=None)
-        super(CF9F1_25, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF9F1_25, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.25
 
@@ -1349,12 +1314,9 @@ class CF9F3_25(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = F10(shift=None, rotate=None, shuffle=None)
         self.g2 = Rosenbrock(shift=None, rotate=None, shuffle=None)
-        super(CF9F3_25, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF9F3_25, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.25
 
@@ -1402,12 +1364,9 @@ class CF9F4_25(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = F10(shift=None, rotate=None, shuffle=None)
         self.g2 = Rastrigin(shift=None, rotate=None, shuffle=None)
-        super(CF9F4_25, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF9F4_25, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.25
 
@@ -1455,12 +1414,9 @@ class CF10F7_25(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = Bohachevsky(shift=None, rotate=None, shuffle=None)
         self.g2 = Schwefel_problem_2_22(shift=None, rotate=None, shuffle=None)
-        super(CF10F7_25, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF10F7_25, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.25
 
@@ -1508,12 +1464,9 @@ class CF9F1_75(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = F10(shift=None, rotate=None, shuffle=None)
         self.g2 = Sphere(shift=None, rotate=None, shuffle=None)
-        super(CF9F1_75, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF9F1_75, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.75
 
@@ -1561,12 +1514,9 @@ class CF9F3_75(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = F10(shift=None, rotate=None, shuffle=None)
         self.g2 = Rosenbrock(shift=None, rotate=None, shuffle=None)
-        super(CF9F3_75, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF9F3_75, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.75
 
@@ -1614,12 +1564,9 @@ class CF9F4_75(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = F10(shift=None, rotate=None, shuffle=None)
         self.g2 = Rastrigin(shift=None, rotate=None, shuffle=None)
-        super(CF9F4_75, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF9F4_75, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.75
 
@@ -1667,12 +1614,9 @@ class CF10F7_75(Benchmark):
         shuffle=None,
         bias=0,
     ):
-
         self.g1 = Bohachevsky(shift=None, rotate=None, shuffle=None)
         self.g2 = Schwefel_problem_2_22(shift=None, rotate=None, shuffle=None)
-        super(CF10F7_75, self).__init__(
-            lower, upper, optimum, None, None, None, bias
-        )
+        super(CF10F7_75, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.75
 
