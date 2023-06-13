@@ -9,7 +9,6 @@
 
 import numpy as np
 import os
-import pickle
 import time
 
 from abc import ABC, abstractmethod
@@ -756,13 +755,13 @@ class MPILoss(LossFunc):
 
         """
 
-        logger.info(f"Master of rank {self.rank} Starting")
+        print(f"Master of rank {self.rank} Starting")
 
         # if there is a stopping criterion
         if stop_obj:
             stopping = stop_obj
         else:
-            stopping = lambda *args: True
+            stopping = lambda *args: False
         # second stopping criterion determine by the parallelization itself
         stop = True
 
@@ -770,7 +769,7 @@ class MPILoss(LossFunc):
             self._pqueue_mode = True
             self.pqueue = pqueue
 
-        while stopping() and stop:
+        while not stopping() and stop:
             # Send solutions to workers
             # if a worker is idle and if there are solutions
             while not self.comm.iprobe() and (
@@ -785,11 +784,11 @@ class MPILoss(LossFunc):
                 )
 
         if self._pqueue_mode:
-            if not stopping():
-                logger.info(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
+            if stopping():
+                print(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
                 self._stop()
         else:
-            logger.info(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
+            print(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
             self._stop()
 
     def _parse_message(self, msg, pqueue, historic, idle, status):
@@ -835,22 +834,20 @@ class MPILoss(LossFunc):
         next_point = pqueue.get()
         dest = idle.pop()
         historic[dest] = next_point
-        logger.info(
+        print(
             f"MASTER {self.rank} sending point to WORKER {dest}.\n Remaining points in queue: {pqueue.qsize()}"
         )
         self.comm.send(dest=dest, tag=0, obj=next_point[0])
 
     # receive a new point to put in the point queue. (from a forward)
     def _recv_point(self, msg, source, pqueue):
-        logger.info(f"MASTER {self.rank} receiving point from PROCESS {source}")
-        msg.append(source)
+        print(f"MASTER {self.rank} receiving point from PROCESS {source}\n{msg}\n")
         pqueue.put(msg)
-
         return True
 
     # receive score from workers
     def _recv_score(self, msg, source, idle, historic):
-        logger.info(
+        print(
             f"MASTER {self.rank} receiving score from WORKER {source} : {msg}, historic : {historic[source]}"
         )
         point = historic[source][0][:]
@@ -874,7 +871,7 @@ class MPILoss(LossFunc):
         Send a stop message to all workers.
 
         """
-        logger.info(f"MASTER {self.rank} sending stop message")
+        print(f"MASTER {self.rank} sending stop message")
         for i in range(0, self.p):
             if i != self.rank:
                 self.comm.send(dest=i, tag=9, obj=False)
@@ -927,41 +924,39 @@ class MPILoss(LossFunc):
 
         """
 
-        logger.info(f"WORKER {self.rank} starting")
+        print(f"WORKER {self.rank} starting")
 
         stop = True
 
         while stop:
-            logger.info(f"WORKER {self.rank} receving message")
+            print(f"WORKER {self.rank} receving message")
             # receive message from master
             msg = self.comm.recv(source=self._master_rank, status=self.status)  # type: ignore
             tag = self.status.Get_tag()
             source = self.status.Get_source()
 
             if tag == 9:
-                logger.info(f"WORKER{self.rank} |!| STOPPING |!|")
+                print(f"WORKER{self.rank} |!| STOPPING |!|")
                 stop = False
 
             elif tag == 0:
-                logger.info(f"WORKER {self.rank} receved a point, {msg}")
+                print(f"WORKER {self.rank} receved a point, {msg}")
                 point = msg
                 # Verify if a model is returned or not
                 outputs, model = self._compute_loss(point)
 
                 # Save the model using its save method
                 if model and self.save:
-                    logger.info(f"WORKER {self.rank} saving model")
+                    print(f"WORKER {self.rank} saving model")
                     if model:
                         self._wsave_model(model)
 
                 # Send results
-                logger.info(
-                    f"WORKER {self.rank} sending {outputs} to {self._master_rank}"
-                )
+                print(f"WORKER {self.rank} sending {outputs} to {self._master_rank}")
                 self.comm.send(dest=self._master_rank, tag=1, obj=outputs)  # type: ignore
 
             else:
-                logger.info(f"WORKER {self.rank} unknown tag, got {tag}")
+                print(f"WORKER {self.rank} unknown tag, got {tag}")
 
 
 class _Parallel_strat:
@@ -1058,29 +1053,28 @@ class _MultiSynchronous_strat(_Parallel_strat):
     # Executed by Experiment to compute X
     def __call__(self, X, stop_obj=None, **kwargs):
         # Early stopping
-        stop = True
+        ctn = True
 
         # score
         y = [None] * len(X)
 
         # send point, point ID and point info
         for i, p in enumerate(X):
-            self._send_to_master((p, i, kwargs))  # send point
+            self._send_to_master([p, i, kwargs, self._lf.rank])  # send point
 
         nb_recv = 0
-        while nb_recv < len(X) and stop:
+        while nb_recv < len(X) and ctn:
             # receive score from loss
-            logger.info(f"call() of rank :{self._lf.rank} receiveing message")
+            print(f"call() of rank :{self._lf.rank} receiveing message")
             msg = self.comm.recv(source=self.master_rank, status=self._lf.status)
             tag = self._lf.status.Get_tag()
-            source = self._lf.status.Get_source()
 
             if tag == 9:
-                logger.info(f"call() of rank :{self._lf.rank} |!| STOPPING |!|")
-                stop = False
-
+                print(f"call() of rank :{self._lf.rank} |!| STOPPING |!|")
+                ctn = False
+                X, y = None, None
             elif tag == 2:
-                logger.info(f"call() of rank :{self._lf.rank} received a score")
+                print(f"call() of rank :{self._lf.rank} received a score")
                 # id / score
                 y[msg[1]] = msg[0]
                 nb_recv += 1
@@ -1122,7 +1116,6 @@ class _MultiAsynchronous_strat(_Parallel_strat):
 
         if tag == 9:
             logger.info(f"call() of rank :{self._lf.rank} |!| STOPPING |!|")
-            stop = False
             new_x, y = None, None
         elif tag == 2:
             logger.info(f"call() of rank :{self._lf.rank} received a score")

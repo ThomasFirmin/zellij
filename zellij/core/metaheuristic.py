@@ -8,10 +8,24 @@
 
 from abc import abstractmethod, ABC
 from zellij.core.search_space import ContinuousSearchspace, DiscreteSearchspace, Fractal
+from zellij.core.loss_func import (
+    MPILoss,
+    _MultiAsynchronous_strat,
+    _MultiSynchronous_strat,
+)
 
 import logging
+from collections import deque
 
 logger = logging.getLogger("zellij.meta")
+
+try:
+    from mpi4py import MPI
+except ImportError as err:
+    logger.info(
+        "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
+    You can use: pip install zellij[MPI]"
+    )
 
 
 class Metaheuristic(ABC):
@@ -28,12 +42,6 @@ class Metaheuristic(ABC):
     ----------
     search_space : Searchspace
         :ref:`sp` object containing decision variables and the loss function.
-
-    stop : Stopping
-        :ref:`stop` criterion.
-
-    save : boolean, optional
-        If True save results into a file
 
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
@@ -104,12 +112,6 @@ class ContinuousMetaheuristic(Metaheuristic):
     search_space : Searchspace
         :ref:`sp` object containing decision variables and the loss function.
 
-    stop : Stopping
-        :ref:`stop` criterion.
-
-    save : boolean, optional
-        If True save results into a file
-
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
 
@@ -157,12 +159,6 @@ class DiscreteMetaheuristic(Metaheuristic):
     search_space : Searchspace
         :ref:`sp` object containing decision variables and the loss function.
 
-    stop : Stopping
-        :ref:`stop` criterion.
-
-    save : boolean, optional
-        If True save results into a file
-
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
 
@@ -190,7 +186,7 @@ class DiscreteMetaheuristic(Metaheuristic):
             )
 
 
-class AMetaheuristic(ABC):
+class AMetaheuristic(Metaheuristic):
 
     """AMetaheuristic
 
@@ -201,12 +197,6 @@ class AMetaheuristic(ABC):
     ----------
     search_space : Searchspace
         :ref:`sp` object containing decision variables and the loss function.
-
-    stop : Stopping
-        :ref:`stop` criterion.
-
-    save : boolean, optional
-        If True save results into a file
 
     verbose : boolean, default=True
         Activate or deactivate the progress bar.
@@ -224,13 +214,8 @@ class AMetaheuristic(ABC):
     :ref:`sp` : Defines what a search space is in Zellij.
     """
 
-    def __init__(self, search_space, workers, verbose=True):
-        ##############
-        # PARAMETERS #
-        ##############
-        self.search_space = search_space
-        self.verbose = verbose
-
+    def __init__(self, search_space, verbose=True):
+        super().__init__(search_space, verbose)
         try:
             self.comm = MPI.COMM_WORLD
             self.status = MPI.Status()
@@ -247,17 +232,37 @@ class AMetaheuristic(ABC):
             raise err
 
         if isinstance(search_space.loss, MPILoss):
-            rank_start = search_space.loss.workers + 1
-            self.is_master = self.rank == rank_start
-            self.is_worker = self.rank > rank_start
-            self.master_rank = rank_start
+            rank_start = search_space.loss.workers_size + 1
         else:
-            self.is_master = self.rank == 0
-            self.is_worker = self.rank != rank_start
-            self.master_rank = 0
+            rank_start = 0
+
+        assert (
+            rank_start + 1 <= self.p
+        ), "In AMetaheuristic, invalid number of workers compared to comm size."
+
+        self.workers = list(range(rank_start + 1, self.p))
+        self.master_rank = rank_start
+        self.is_master = self.rank == rank_start
+        self.is_worker = self.rank > rank_start
+
+        self.msgrecv = 0
+        self.msgsend = 0
+
+        self.send_state_lst = deque()
+        self.recv_state_lst = []
+
+        self._change_loss()
+
+    def _change_loss(self):
+        loss = self.search_space.loss
+        if isinstance(loss, MPILoss):
+            if loss.asynchronous:
+                loss._strategy = _MultiAsynchronous_strat(loss, loss._master_rank)  # type: ignore
+            else:
+                loss._strategy = _MultiSynchronous_strat(loss, loss._master_rank)  # type: ignore
 
     @abstractmethod
-    def forward(self, X, Y):
+    def forward(self, X, Y) -> tuple:
         """forward
 
         Abstract method describing one step of the :ref:`meta`.
@@ -280,38 +285,88 @@ class AMetaheuristic(ABC):
         pass
 
     @abstractmethod
-    def save(self, path):
-        """save
-        Method saving actual state of the metaheuristic
-        """
+    def next_state(self, state) -> list:
         pass
 
     @abstractmethod
-    def load(self, path, loss):
-        """save
-        Method loading a previously saved metaheuristic.
-
-        """
+    def update_state(self, state):
         pass
 
     @abstractmethod
+    def get_state(self) -> object:
+        pass
+
+    def _msend_state(self, dest, state):
+        self.msgsend += 1
+        print(f"META MASTER{self.rank}, send state to {dest}\n{state}\n")
+        self.comm.send(dest=dest, tag=1, obj=state)
+
+    def _wsend_state(self, dest):
+        state = self.get_state()
+        self.msgsend += 1
+        print(f"META WORKER{self.rank}, send state to {dest}\n{state}\n")
+        self.comm.send(dest=dest, tag=2, obj=state)
+
+    def _wsend_solution(self, dest, solution, info):
+        self.msgsend += 1
+        print(f"META WORKER{self.rank}, send solutions to {dest}\n{solution,info}\n")
+        self.comm.send(dest=dest, tag=2, obj=(solution, info))
+
+    def _recv_msg(self):
+        state = self.comm.recv(status=self.status)
+        tag = self.status.Get_tag()
+        source = self.status.Get_source()
+        print(f"META WORKER{self.rank}, receive state from {source}\n{state}\n")
+
+        if tag == 9:  # Stop
+            return None, False
+        elif tag == 1:  # new state
+            return state, True
+
     def master(self, stop_obj=None):
-        """master
-        Master process
-        """
-        pass
+        ctn = True
+        idle = self.workers[:]
+        total_workers = len(self.workers)
 
-    @abstractmethod
-    def worker(self, stop_obj=None):
-        """worker
-        Worker process
-        """
-        pass
+        self.send_state_lst.extendleft(self.next_state(None))
 
-    def reset(self):
-        """reset()
+        if stop_obj:
+            stopping = stop_obj
+        else:
+            stopping = lambda *args, **kwargs: False
 
-        reset :ref:`meta` to its initial value
+        while ctn:
+            ##---------MULTITHREAD---------##
+            if len(idle) > 0 and len(self.send_state_lst) > 0:
+                dest = idle.pop(0)
+                state = self.send_state_lst.pop()
+                self._msend_state(dest, state)
+            elif (
+                len(idle) == total_workers
+                and len(self.send_state_lst) == 0
+                and len(self.recv_state_lst) == 0
+            ):
+                ctn = False
 
-        """
-        pass
+            # receive msg from workers
+            if self.comm.iprobe(tag=9):  # Stop
+                state = self.comm.recv(status=self.status, tag=9)
+                ctn = False
+            elif stopping():
+                ctn = False
+            elif self.comm.iprobe(tag=2):  # Received status
+                state = self.comm.recv(status=self.status, tag=2)
+                idle.append(self.status.Get_source())
+                self.recv_state_lst.append(state)
+                if len(self.send_state_lst) < 1:
+                    self.send_state_lst.extendleft(
+                        self.next_state(self.recv_state_lst[:])
+                    )
+                    self.recv_state_lst = []
+
+            ##---------MULTITHREAD---------##
+        print(f"META MASTER{self.rank} is STOPPING")
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        self._change_loss()

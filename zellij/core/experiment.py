@@ -94,7 +94,8 @@ class Experiment(object):
 
     @save.setter
     def save(self, value):
-        self.meta.search_space.loss.save = value
+        if value:
+            self.meta.search_space.loss.save = value
         self._save = value
 
     @property
@@ -162,36 +163,48 @@ class RunExperiment(ABC):
         self._cY = None
 
     def _run_forward_loss(self, meta, stop, X=None, Y=None):
-        # useful after unpickling
+        cnt = True
         if self._cX is None and self._cY is None:
             self._cX, self._cY = X, Y
 
-        while stop():
-            X, info = meta.forward(self._cX, self._cY)
+        X, info = meta.forward(self._cX, self._cY)
 
-            if len(X) < 1:
-                raise ValueError(
-                    f"""
-                A forward(X,Y) returned an empty list of solutions.
-                """
-                )
+        if len(X) < 1:
+            self._cX, self._cY = None, None
+            return None, None, cnt
+        else:
             if meta.search_space._convert_sol:
                 # convert from metaheuristic space to loss space
                 X = meta.search_space.converter.reverse(X)
                 # compute loss
                 X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
                 # convert from loss space to metaheuristic space
-                X = meta.search_space.converter.convert(X)
+                if X is None:
+                    cnt = False
+                else:
+                    X = meta.search_space.converter.convert(X)
             else:
                 X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
+                if X is None:
+                    cnt = False
 
             self._cX, self._cY = X, Y
+
+            return X, Y, cnt
 
     def run(self, meta, stop, X=None, Y=None):
         print(f"I AM MASTER: {meta.search_space.loss.rank}")
         autosave = AutoSave(self.exp)
         try:
-            self._run_forward_loss(meta, stop, X, Y)
+            cnt = True
+            while not stop() and cnt:
+                X, Y, cnt = self._run_forward_loss(meta, X, Y)
+                if X is None and Y is None:
+                    raise ValueError(
+                        f"""
+                    A forward(X,Y) returned an empty list of solutions.
+                    """
+                    )
         finally:
             autosave.stop()
 
@@ -220,24 +233,37 @@ class RunParallelExperiment(RunExperiment):
             if meta.search_space.loss.is_master:
                 autosave = AutoSave(self.exp)
                 try:
-                    self._run_forward_loss(meta, stop, X, Y)
+                    while not stop():
+                        X, Y, cnt = self._run_forward_loss(meta, stop, X, Y)
                 finally:
                     autosave.stop()
             else:
                 self._else_not_master(meta, stop)
-        else:  # Have to be changed
-            if isinstance(meta, AMetaheuristic):  # algorithmic parallelization
-                if meta.is_master:
-                    meta.master(stop_obj=stop)  # doing the outer while loop
-                elif meta.is_worker:
-                    meta.worker(stop_obj=stop)  # doing the inner while loop
-            else:  # Asynchronous mode / iteration parallelisation
-                self._run_forward_loss(meta, stop, X, Y)
+        elif isinstance(meta, AMetaheuristic):  # algorithmic parallelization
+            if meta.is_master:
+                meta.master(stop_obj=stop)  # managing states
 
-            if meta.search_space.loss.is_master:
-                meta.search_space.loss.master(stop_obj=stop)
-            else:
-                self._else_not_master(meta, stop)
+            elif meta.is_worker:  # Receiving states and updating meta state
+                state, cnt = meta._recv_msg()  # type: ignore
+                meta.update_state(state)
+
+                while cnt and not stop():
+                    X, Y, cnt = self._run_forward_loss(meta, stop, X, Y)
+                    if X is None and Y is None and cnt:
+                        meta._wsend_state(meta.master_rank)
+                        state, cnt = meta._recv_msg()  # type: ignore
+                        if cnt:
+                            meta.update_state(state)
+
+            if isinstance(
+                meta.search_space.loss._strategy, _MultiSynchronous_strat
+            ) or isinstance(meta.search_space.loss._strategy, _MultiAsynchronous_strat):
+                if meta.search_space.loss.is_master:
+                    meta.search_space.loss.master(stop_obj=stop)
+                else:
+                    self._else_not_master(meta, stop)
+        else:
+            raise TypeError("Unknown experiment configuration")
 
 
 class AExperiment(object):
