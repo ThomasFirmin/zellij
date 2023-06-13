@@ -163,14 +163,14 @@ class Mixed(Distance):
         if self._target:
             if self.weights:
                 assert len(self.weights) == self._target.size, logger.error(
-                    f"len(weights) must be equal to len(values) in `ArrayVar` of :ref:`Searchspace`"
+                    f"len(weights) must be equal to len(variables) in `ArrayVar` of :ref:`Searchspace`"
                 )
             else:
                 self.weights = [1] * self._target.size
 
             self.operations = []
 
-            for v in self._target.values:  # type: ignore
+            for v in self._target.variables:  # type: ignore
                 if isinstance(v, FloatVar) or isinstance(v, IntVar):
                     up, lo = v.upper, v.lower
                     self.operations.append(lambda x, y: np.abs(x - y) / (up - lo))
