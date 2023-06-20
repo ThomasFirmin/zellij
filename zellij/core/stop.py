@@ -163,6 +163,21 @@ class Calls(Threshold):
         self.threshold = threshold
 
 
+class BooleanStop(Stopping):
+    """BooleanStop
+
+    Stoppping criterion based on a boolean attribute.
+    Return the value of the targetted attribute.
+
+    Attributes
+    ----------
+    threshold
+    """
+
+    def __call__(self):
+        return getattr(self.target, self.attribute)  # type: ignore
+
+
 class Convergence(Stopping):
     """Convergence
 
