@@ -168,7 +168,6 @@ class RunExperiment(ABC):
             self._cX, self._cY = X, Y
 
         X, info = meta.forward(self._cX, self._cY)
-
         if len(X) < 1:
             self._cX, self._cY = None, None
             return None, None, cnt
@@ -193,7 +192,6 @@ class RunExperiment(ABC):
             return X, Y, cnt
 
     def run(self, meta, stop, X=None, Y=None):
-        print(f"I AM MASTER: {meta.search_space.loss.rank}")
         autosave = AutoSave(self.exp)
         try:
             cnt = True
@@ -264,152 +262,3 @@ class RunParallelExperiment(RunExperiment):
                     self._else_not_master(meta, stop)
         else:
             raise TypeError("Unknown experiment configuration")
-
-
-class AExperiment(object):
-    def __init__(self, meta, stop, meta_size):
-        self.meta = meta
-        self.stop = stop
-        self.strategy = RunAExperiment()  # type: ignore
-        self.ttime = 0
-
-        self.comm = MPI.COMM_WORLD
-        self.n_process = self.comm.Get_size()
-        self.meta_size = meta_size
-
-        # if meta_size = 1, meta worker = meta master
-        # -> Meta is not parallelized at algorithmic level
-        # -> no competetion nor cooperation
-        ################ (master meta to meta worker)
-        # WORKER SPLIT #
-        ################ (master loss to loss worker)
-
-        # meta process < loss process
-        color = int(self.comm.Get_rank() < meta_size)
-
-        if meta_size > 1:
-            key = self.comm.Get_rank() % meta_size
-        else:
-            key = self.comm.Get_rank() - 1 if self.comm.Get_rank() > 0 else 0
-
-        self.comm_workers = self.comm.Split(color=color, key=key)
-
-        ################# (master meta to loss worker)
-        # CROSSED SPLIT #
-        ################# (master loss to meta worker)
-
-        if meta_size > 1:
-            inter_color = int(
-                (self.comm.Get_rank() <= meta_size and self.comm.Get_rank() > 0)
-            )
-        else:
-            inter_color = int(
-                (self.comm.Get_rank() <= meta_size and self.comm.Get_rank() >= 0)
-            )
-
-        if self.comm.Get_rank() == meta_size or self.comm.Get_rank() == 0:
-            key = 0
-        else:
-            key = self.comm.Get_rank() % meta_size
-
-        self.comm_crossed = self.comm.Split(color=inter_color, key=key)
-
-        ############### (master meta to master loss)
-        # TYPED SPLIT #
-        ############### (loss worker to meta worker)
-
-        if self.comm.Get_rank() == 0:
-            typed_color = 0
-            key = 0
-        elif self.comm.Get_rank() == self.meta_size:
-            typed_color = 0
-            key = 1
-        else:
-            typed_color = 1
-            work_size = self.comm.Get_size() - 2
-            if self.comm.Get_rank() < work_size:
-                key = self.comm.Get_rank()
-            elif self.comm.Get_rank() % work_size == 0:
-                key = 0
-            else:
-                key = self.meta_size
-
-        self.comm_typed = self.comm.Split(color=typed_color, key=key)
-
-        # loss workers
-        if self.comm.Get_rank() >= self.meta_size:
-            self.meta.search_space.loss.comm_workers = self.comm_workers
-            self.meta.search_space.loss.comm_crossed = self.comm_crossed
-            self.meta.search_space.loss.comm_typed = self.comm_typed
-            self.meta_process = False
-
-            self.p_name = self.meta.search_space.loss.p_name
-        # meta workers
-        else:
-            self.meta.comm_workers = self.comm_workers
-            self.meta.comm_crossed = self.comm_crossed
-            self.meta.comm_typed = self.comm_typed
-            self.meta_process = True
-
-            self.p_name = self.meta.p_name
-        self.comm.Barrier()
-
-    def strategy():
-        doc = "Describes how to run an experiment"
-
-        def fget(self):
-            return self._strategy
-
-        def fset(self, value):
-            self._strategy = value
-
-        def fdel(self):
-            del self._strategy
-
-        return locals()
-
-    strategy = property(**strategy())  # type: ignore
-
-    def run(self, X=None, Y=None):
-        start = time.time()
-        self.strategy.run(
-            self.meta,
-            self.meta.search_space.loss,
-            self.stop,
-            self.comm,
-            self.meta_size,
-            X,
-            Y,
-        )
-        end = time.time()
-        self.ttime = end - start
-        self.usage = resource.getrusage(resource.RUSAGE_SELF)
-
-
-class RunAExperiment(ABC):
-    """RunAExperiment
-
-    Default class describing how to run an asynchronous experiment
-
-    """
-
-    def run(self, meta, loss, stop, comm, meta_size, X=None, Y=None):
-        if comm.Get_rank() >= meta_size:  # If process is in loss group
-            if loss.master:
-                # verify if the stoping criterion focuses loss or meta
-                if stop.target == loss:
-                    loss.dispatcher(stop)
-                else:
-                    loss.dispatcher()
-            else:
-                loss.worker()
-
-        else:  # If process is in the meta group
-            if meta.master:
-                # verify if the stoping criterion focuses loss or meta
-                if stop.target == meta:
-                    meta.dispatcher(stop)
-                else:
-                    meta.dispatcher()
-            else:
-                meta.worker()
