@@ -76,13 +76,10 @@ class Sigma2(Direct_size):
     """
 
     def __call__(self, fractal):
-        upmlo = fractal.upper - fractal.lower
-        n = len(upmlo)
-
-        longest = np.max(upmlo)
-        stage = n - len(upmlo == longest)
+        n = fractal.size
+        stage = n - len(fractal.set_i)
         return round(
-            longest * (n - 8 / 9 * stage) ** (1 / 2),
+            fractal.width * (n - 8 / 9 * stage) ** (1 / 2),
             13,
         )
 
@@ -96,6 +93,4 @@ class SigmaInf(Direct_size):
     """
 
     def __call__(self, fractal):
-        upmlo = fractal.upper - fractal.lower
-        longest = np.max(upmlo)
-        return round(longest / 2, 13)
+        return round(fractal.width / 2, 15)
