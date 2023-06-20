@@ -791,8 +791,8 @@ class Weierstrass(Benchmark):
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
         k = np.arange(0, kmax)
-        self.ak = self.a**k
-        self.bk = self.b**k
+        self.ak = a**k
+        self.bk = b**k
 
     def __call__(self, y):
         z = self.transform(y)
