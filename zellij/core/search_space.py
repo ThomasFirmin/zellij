@@ -704,7 +704,7 @@ class BaseFractal(Searchspace):
         self.f_id = 0  # fractal id at a given level
         self.c_id = 0  # Children id
 
-        self.score = float("nan")
+        self.score = float("inf")
 
         self.solutions = []
         self.losses = []
@@ -750,11 +750,8 @@ class BaseFractal(Searchspace):
         return (self.level, self.father, self.c_id)
 
     def _compute_f_id(self, k):
-        if self.father == -1:
-            return 0, k
-        else:
-            base = self.father * k
-            return base, base + k
+        base = self.f_id * k
+        return base, base + k
 
     def create_children(self, k, *args, **kwargs):
         """create_children(self)
@@ -800,6 +797,8 @@ class BaseFractal(Searchspace):
         self.c_id = c_id
         self.score = score
         self.measure = measure
+        self.solutions = []
+        self.losses = []
 
     def _essential_info(self):
         return {
