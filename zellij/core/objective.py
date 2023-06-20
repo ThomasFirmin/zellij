@@ -107,7 +107,12 @@ class Objective(ABC):
         """
         rd = {}
         # Separate results
-        if isinstance(outputs, int) or isinstance(outputs, float):
+        if (
+            isinstance(outputs, int)
+            or isinstance(outputs, float)
+            or isinstance(outputs, np.integer)
+            or isinstance(outputs, np.floating)
+        ):
             rd["objective"] = outputs
         elif isinstance(outputs, dict):
             rd = outputs
