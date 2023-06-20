@@ -298,25 +298,27 @@ class AMetaheuristic(Metaheuristic):
 
     def _msend_state(self, dest, state):
         self.msgsend += 1
-        print(f"META MASTER{self.rank}, send state to {dest}\n{state}\n")
+        logger.debug(f"META MASTER{self.rank}, send state to {dest}\n{state}\n")
         self.comm.send(dest=dest, tag=1, obj=state)
 
     def _wsend_state(self, dest):
         state = self.get_state()
         self.msgsend += 1
-        print(f"META WORKER{self.rank}, send state to {dest}\n{state}\n")
+        logger.debug(f"META WORKER{self.rank}, send state to {dest}\n{state}\n")
         self.comm.send(dest=dest, tag=2, obj=state)
 
     def _wsend_solution(self, dest, solution, info):
         self.msgsend += 1
-        print(f"META WORKER{self.rank}, send solutions to {dest}\n{solution,info}\n")
+        logger.debug(
+            f"META WORKER{self.rank}, send solutions to {dest}\n{solution,info}\n"
+        )
         self.comm.send(dest=dest, tag=2, obj=(solution, info))
 
     def _recv_msg(self):
         state = self.comm.recv(status=self.status)
         tag = self.status.Get_tag()
         source = self.status.Get_source()
-        print(f"META WORKER{self.rank}, receive state from {source}\n{state}\n")
+        logger.debug(f"META WORKER{self.rank}, receive state from {source}\n{state}\n")
 
         if tag == 9:  # Stop
             return None, False
@@ -328,7 +330,8 @@ class AMetaheuristic(Metaheuristic):
         idle = self.workers[:]
         total_workers = len(self.workers)
 
-        self.send_state_lst.extendleft(self.next_state(None))
+        states, cnt = self.next_state(None)
+        self.send_state_lst.extendleft(states)
 
         if stop_obj:
             stopping = stop_obj
@@ -354,18 +357,37 @@ class AMetaheuristic(Metaheuristic):
                 ctn = False
             elif stopping():
                 ctn = False
+                self._stop()
             elif self.comm.iprobe(tag=2):  # Received status
                 state = self.comm.recv(status=self.status, tag=2)
-                idle.append(self.status.Get_source())
+                source = self.status.Get_source()
+                idle.append(source)
+
+                logger.debug(
+                    f"META MASTER{self.rank}, received state from {source}\n{state}\n"
+                )
+
                 self.recv_state_lst.append(state)
                 if len(self.send_state_lst) < 1:
-                    self.send_state_lst.extendleft(
-                        self.next_state(self.recv_state_lst[:])
-                    )
-                    self.recv_state_lst = []
-
+                    states, cnt = self.next_state(self.recv_state_lst[:])
+                    if cnt:
+                        self.send_state_lst.extendleft(states)
+                        self.recv_state_lst = []
+                    else:
+                        self._stop()
             ##---------MULTITHREAD---------##
-        print(f"META MASTER{self.rank} is STOPPING")
+        logger.debug(f"META MASTER {self.rank} is STOPPING")
+
+    def _stop(self):
+        """stop()
+
+        Send a stop message to all processes.
+
+        """
+        logger.debug(f"MASTER {self.rank} sending stop message")
+        for i in range(0, self.p):
+            if i != self.rank:
+                self.comm.send(dest=i, tag=9, obj=False)
 
     def __setstate__(self, state):
         self.__dict__.update(state)
