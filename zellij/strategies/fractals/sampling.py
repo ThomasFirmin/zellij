@@ -16,7 +16,6 @@ import logging
 logger = logging.getLogger("zellij.sampling")
 
 
-# Promising Hypersphere Search
 class Center(ContinuousMetaheuristic):
 
     """Center
@@ -78,7 +77,7 @@ class Center(ContinuousMetaheuristic):
             if hasattr(value, "center"):
                 self.center = value.center  # type: ignore
             else:
-                self.center = (value.upper - value.lower) / 2
+                self.center = (value.upper + value.lower) / 2
 
     def forward(self, X, Y):
         """run(X, Y)
@@ -103,7 +102,105 @@ class Center(ContinuousMetaheuristic):
         # logging
         logger.info("Starting")
 
-        return self.center, {"algorithm": "Center"}
+        return [self.center], {"algorithm": "Center"}
+
+
+class CenterSOO(ContinuousMetaheuristic):
+
+    """Center
+
+    Samples the center of the targeted search space.
+    The search space must have a :code:`center` attribute, or
+    upper and lower bounds. If fractal :code:`is_middle`,
+    then return empty list.
+
+    Attributes
+    ----------
+    search_space : Searchspace
+            :ref:`sp` containing bounds of the search space.
+    verbose : boolean, default=True
+        Algorithm verbosity
+
+
+    See Also
+    --------
+    Metaheuristic : Parent class defining what a Metaheuristic is.
+    LossFunc : Describes what a loss function is in Zellij
+    Searchspace : Describes what a loss function is in Zellij
+    """
+
+    def __init__(self, search_space, verbose=True):
+        """__init__(search_space, f_calls,verbose=True)
+
+        Initialize PHS class
+
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        verbose : boolean, default=True
+            Algorithm verbosity
+
+        """
+
+        super().__init__(search_space, verbose)
+        self.computed = False
+
+    @ContinuousMetaheuristic.search_space.setter
+    def search_space(self, value):
+        if value:
+            if (
+                isinstance(value, ContinuousSearchspace)
+                or isinstance(value, Fractal)
+                or hasattr(value, "converter")
+            ):
+                self._search_space = value
+            else:
+                raise ValueError(
+                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
+                )
+
+            if not (hasattr(value, "lower") and hasattr(value, "upper")):
+                raise AttributeError(
+                    "Search space must have lower and upper bounds attributes, got {value}."
+                )
+
+            if hasattr(value, "center"):
+                self.center = value.center  # type: ignore
+            else:
+                self.center = (value.lower + value.upper) / 2
+
+    def forward(self, X, Y):
+        """run(X, Y)
+
+        Parameters
+        ----------
+        X : list
+            List of previously computed points
+        Y : list
+            List of loss value linked to :code:`X`.
+            :code:`X` and :code:`Y` must have the same length.
+
+        Returns
+        -------
+        points
+            Return a list of new points to be computed with the :ref:`lf`.
+        info
+            Additionnal information linked to :code:`points`
+
+        """
+
+        # logging
+        logger.info("Starting")
+        if np.isfinite(self.search_space.score) and self.search_space.is_middle:
+            self.computed = True
+            return [], {"algorithm": "Center"}
+        else:
+            self.computed = True
+            return [self.center], {"algorithm": "Center"}
+
+    def reset(self):
+        self.computed = False
 
 
 class Diagonal(ContinuousMetaheuristic):
@@ -174,7 +271,7 @@ class Diagonal(ContinuousMetaheuristic):
             if hasattr(value, "center"):
                 self.center = value.center  # type: ignore
             else:
-                self.center = (value.upper - value.lower) / 2
+                self.center = (value.lower + value.upper) / 2
 
     def forward(self, X, Y):
         """run(H=None, n_process=1)
@@ -410,3 +507,113 @@ class Chaos_Hypersphere(ContinuousMetaheuristic):
         points = np.minimum(points, 1)
 
         return points, {"algorithm": "ChaosH"}
+
+
+class DirectSampling(ContinuousMetaheuristic):
+
+    """DirectSampling
+
+    Samples points as in DIRECT algorithms.
+
+    Attributes
+    ----------
+    search_space : Searchspace
+            :ref:`sp` containing bounds of the search space.
+    verbose : boolean, default=True
+        Algorithm verbosity
+
+
+    See Also
+    --------
+    Metaheuristic : Parent class defining what a Metaheuristic is.
+    LossFunc : Describes what a loss function is in Zellij
+    Searchspace : Describes what a loss function is in Zellij
+    """
+
+    def __init__(self, search_space, verbose=True):
+        """__init__(search_space, f_calls,verbose=True)
+
+        Initialize PHS class
+
+        Parameters
+        ----------
+        search_space : Searchspace
+            Search space object containing bounds of the search space.
+        verbose : boolean, default=True
+            Algorithm verbosity
+
+        """
+
+        super().__init__(search_space, verbose)
+        self.computed = False
+
+    @ContinuousMetaheuristic.search_space.setter
+    def search_space(self, value):
+        if value:
+            if (
+                isinstance(value, ContinuousSearchspace)
+                or isinstance(value, Fractal)
+                or hasattr(value, "converter")
+            ):
+                self._search_space = value
+            else:
+                raise ValueError(
+                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
+                )
+
+            if not (hasattr(value, "lower") and hasattr(value, "upper")):
+                raise AttributeError(
+                    "Search space must have lower and upper bounds attributes, got {value}."
+                )
+
+            if hasattr(value, "center"):
+                self.center = value.center  # type: ignore
+            else:
+                self.center = (value.upper + value.lower) / 2
+
+    def forward(self, X, Y):
+        """run(X, Y)
+
+        Parameters
+        ----------
+        X : list
+            List of previously computed points
+        Y : list
+            List of loss value linked to :code:`X`.
+            :code:`X` and :code:`Y` must have the same length.
+
+        Returns
+        -------
+        points
+            Return a list of new points to be computed with the :ref:`lf`.
+        info
+            Additionnal information linked to :code:`points`
+
+        """
+
+        center = (self.search_space.lower + self.search_space.upper) / 2
+
+        if self.search_space.level == 0:
+            n_points = 2 * len(self.search_space.set_i) + 1
+            start = 1
+        else:
+            n_points = 2 * len(self.search_space.set_i)
+            start = 0
+        section_length = self.search_space.width / 3
+
+        points = np.tile(center, (n_points, 1))
+
+        for i, p1, p2 in zip(
+            self.search_space.set_i,
+            points[start:-1:2],
+            points[start + 1 :: 2],
+        ):
+            p1[i] -= section_length
+            p2[i] += section_length
+
+        self.computed = True
+
+        return points, {"algorithm": "DIRECT"}
+
+    def reset(self):
+        self.computed = False
