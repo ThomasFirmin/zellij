@@ -8,11 +8,20 @@
 
 from .continuous.bayesian_optimization import Bayesian_optimization
 from .continuous.chaos_algorithm import CGS, CLS, CFS, Chaotic_optimization
-from .fractals.dba import DBA
+from .fractals.dba import DBA, DBA_Direct
 from .fractals.ils import ILS, ILS_section
 from .fractals.phs import PHS
-from .fractals.sampling import Center, Diagonal, Chaos, Chaos_Hypersphere
-from .fractals.adba import ADBA
+from .fractals.sampling import (
+    Center,
+    CenterSOO,
+    Diagonal,
+    Chaos,
+    Chaos_Hypersphere,
+    DirectSampling,
+)
+from .asynchronous.adba import ADBA
 
 from .mixed.simulated_annealing import Simulated_annealing
 from .mixed.genetic_algorithm import Genetic_algorithm
+
+from .asynchronous.adba import ADBA

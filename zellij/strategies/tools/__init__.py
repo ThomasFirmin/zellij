@@ -22,6 +22,7 @@ from .geometry import (
     Hypercube,
     Hypersphere,
     Section,
+    Direct,
 )
 
 from .tree_search import (
@@ -46,6 +47,7 @@ from .scoring import (
     Distance_to_the_best,
     Distance_to_the_best_centered,
     Belief,
+    Nothing,
 )
 
 from .measurements import Level, Radius, Sigma2, SigmaInf
