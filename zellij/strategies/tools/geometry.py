@@ -9,7 +9,7 @@
 
 import numpy as np
 import abc
-    from itertools import product
+from itertools import product
 from abc import ABC, abstractmethod
 
 from zellij.core.search_space import Fractal
