@@ -17,72 +17,51 @@ In *Zellij*, FDA is decomposed as follow:
 
 .. code-block:: python
 
-  from zellij.strategies import DBA, ILS, PHS
-  from zellij.strategies.tools import Hypersphere,Move_up, Distance_to_the_best_corrected
-
-  from zellij.core importFloatVar, ArrayVar, Loss
   from zellij.utils.benchmarks import himmelblau
+  from zellij.core import ArrayVar, FloatVar, Loss, Experiment, Threshold
+  from zellij.strategies import PHS, ILS, DBA
+  from zellij.strategies.tools import Hypersphere, Distance_to_the_best, Move_up
+  from zellij.utils.converters    import FloatMinmax, ArrayConverter, Basic
 
-  loss = Loss()(himmelblau)
+  lf = Loss(save=True)(himmelblau)
   values = ArrayVar(
-                    FloatVar("a",-5,5),
-                    FloatVar("b",-5,5)
-                    )
-  # Define FDA algorithm
-  def FDA_al(
-    values, loss, calls, verbose=True, inflation=1.75, level=5
-    ):
-    sp = Hypersphere(
-        values,
-        loss,
-        inflation=inflation,
-        scoring=Distance_to_the_best(),
-    )
+      FloatVar("float_1", -5 , 5, converter=FloatMinmax()),
+      FloatVar("float_2", -5, 5, converter=FloatMinmax()),
+      converter=ArrayConverter(),
+  )
+  sp = Hypersphere(values, lf, converter=Basic())
 
-    explor = PHS(sp)
-    exploi = ILS(sp)
-    stop1 = Threshold(None, "current_calls",3)
-    stop2 = Threshold(None,"current_calls",100)
-    dba = DBA(sp, Move_up(sp,5),(explor,stop1),(exploi,stop2))
-    stop1.target = dba
-    stop2.target = dba
+  explor = PHS(sp, inflation=1.75)
+  exploi = ILS(sp, inflation=1.75)
+  stop1 = Threshold(None, "current_calls", 3)  # set target to None, DBA will automatically asign it.
+  stop2 = Threshold(None,"current_calls", 100)  # set target to None, DBA will automatically asign it.
+  dba = DBA(sp, Move_up(sp,5),(explor,stop1), (exploi,stop2),scoring=Distance_to_the_best())
 
-    stop3 = Threshold(lf, "calls", 5000)
-    exp = Experiment(dba, stop3)
-    exp.run()
+  stop3 = Threshold(lf, "calls",1000)
+  exp = Experiment(dba, stop3, save="exp_fda")
+  exp.run()
+  print(f"Best solution:f({lf.best_point})={lf.best_score}")
 
-    return sp
 
-  sp = FDA_al(values, loss, 1000)
-  best = (sp.loss.best_point, sp.loss.best_score)
-  print(f"Best solution found:f({best[0]})={best[1]}")
 
+  import pandas as pd
   import matplotlib.pyplot as plt
   import numpy as np
+
+  data = pd.read_csv("exp_direct/outputs/all_evaluations.csv")
+  print(data)
 
   fig, ax = plt.subplots()
   x = y = np.linspace(-5, 5, 100)
   X,Y = np.meshgrid(x,y)
-  Z = (X**4-16*X**2+5*X + Y**4-16*Y**2+5*Y)/2
+  Z = (X ** 2 + Y - 11) ** 2 + (X + Y ** 2 - 7) ** 2
+
 
   map = ax.contourf(X,Y,Z,cmap="plasma", levels=100)
   fig.colorbar(map)
-  ax.scatter(
-              np.array(sp.loss.all_solutions)[:,0],
-              np.array(sp.loss.all_solutions)[:,1],
-              s=1,
-              label="Points"
-            )
-  ax.scatter(
-              best[0][0],
-              best[0][1],
-              c="red",
-              s=5,
-              label="Best"
-            )
-  ax.set_title("FDA on 2D Himmelblau function")
-  ax.legend()
-  plt.show()
+
+  plt.scatter(data["float_1"],data["float_2"],c="cyan",s=0.1)
+  plt.plot()
 
 .. image:: ../sources/fda_himmel.png
   :width: 2400

@@ -19,78 +19,49 @@ In *Zellij*, SOO is decomposed as follow:
   
 .. code-block:: python
 
-  from zellij.core.geometry import Soo
-  from zellij.strategies import DBA
-  from zellij.strategies.tools.tree_search import Soo_tree_search
-  from zellij.strategies.tools.scoring import Distance_to_the_best_corrected
-
-  from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar, Loss
   from zellij.utils.benchmarks import himmelblau
+  from zellij.core import ArrayVar, FloatVar, Loss, Experiment, Threshold, BooleanStop
+  from zellij.strategies import DBA, CenterSOO
+  from zellij.strategies.tools import Section, Min, Soo_tree_search
+  from zellij.utils.converters import FloatMinmax, ArrayConverter, Basic
 
-  loss = Loss()(himmelblau)
+  lf = Loss(save=True)(himmelblau)
   values = ArrayVar(
-                    FloatVar("a",-5,5),
-                    FloatVar("b",-5,5)
-                    )
+      FloatVar("float_1", -5 , 5, converter=FloatMinmax()),
+      FloatVar("float_2", -5, 5, converter=FloatMinmax()),
+      converter=ArrayConverter(),
+  )
+  sp = Section(values, lf, section=3, converter=Basic())
 
-  def SOO_al(
-    values,
-    loss,
-    calls,
-    verbose=True,
-    level=600,
-    section=3,
-    force_convert=False,
-    ):
+  explor = CenterSOO(sp)
+  stop1 = BooleanStop(explor, "computed")  # set target to None, DBA will automatically asign it.
+  dba = DBA(sp, Soo_tree_search(sp,600),(explor,stop1), scoring=Min())
 
-    sp = Soo(
-        values,
-        loss,
-        calls,
-        force_convert=force_convert,
-        section=section,
-    )
+  stop3 = Threshold(lf, "calls",1000)
+  exp = Experiment(dba, stop3, save="exp_soo")
+  exp.run()
+  print(f"Best solution:f({lf.best_point})={lf.best_score}")
 
-    dba = DBA(
-        sp,
-        calls,
-        tree_search=Soo_tree_search(sp, level),
-        verbose=verbose,
-    )
-    dba.run()
 
-    return sp
 
-  sp = SOO_al(values, loss, 1000)
-  best = (sp.loss.best_point, sp.loss.best_score)
-  print(f"Best solution found:f({best[0]})={best[1]}")
-
+  import pandas as pd
   import matplotlib.pyplot as plt
   import numpy as np
+
+  data = pd.read_csv("exp_soo/outputs/all_evaluations.csv")
+  print(data)
 
   fig, ax = plt.subplots()
   x = y = np.linspace(-5, 5, 100)
   X,Y = np.meshgrid(x,y)
-  Z = (X**4-16*X**2+5*X + Y**4-16*Y**2+5*Y)/2
+  Z = (X ** 2 + Y - 11) ** 2 + (X + Y ** 2 - 7) ** 2
+
 
   map = ax.contourf(X,Y,Z,cmap="plasma", levels=100)
   fig.colorbar(map)
-  ax.scatter(
-              np.array(sp.loss.all_solutions)[:,0],
-              np.array(sp.loss.all_solutions)[:,1],
-              s=1,
-              label="Points"
-            )
-  ax.scatter(
-              best[0][0],
-              best[0][1],
-              c="red",
-              s=5,
-              label="Best"
-            )
-  ax.set_title("SOO on 2D Himmelblau function")
-  ax.legend()
-  plt.show()
+
+  plt.scatter(data["float_1"],data["float_2"],c="cyan",s=0.1)
+  plt.plot()
 
 .. image:: ../sources/soo_himmel.png
   :width: 2400

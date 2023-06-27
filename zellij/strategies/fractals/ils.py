@@ -133,7 +133,7 @@ class ILS(ContinuousMetaheuristic):
 
         return points, {"algorithm": "ILS"}
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(X, Y)
         Runs one step of ILS.
 

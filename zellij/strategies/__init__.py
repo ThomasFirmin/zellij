@@ -6,7 +6,10 @@
 # @Last modified time: 2023-01-19T10:14:29+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
-from .continuous.bayesian_optimization import Bayesian_optimization
+from .continuous.bayesian_optimization import (
+    Bayesian_optimization,
+    TuRBO,
+)
 from .continuous.chaos_algorithm import CGS, CLS, CFS, Chaotic_optimization
 from .fractals.dba import DBA, DBA_Direct
 from .fractals.ils import ILS, ILS_section
@@ -22,6 +25,6 @@ from .fractals.sampling import (
 from .asynchronous.adba import ADBA
 
 from .mixed.simulated_annealing import Simulated_annealing
-from .mixed.genetic_algorithm import Genetic_algorithm
+from .mixed.genetic_algorithm import Genetic_algorithm, Steady_State_GA
 
 from .asynchronous.adba import ADBA

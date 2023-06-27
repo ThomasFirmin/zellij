@@ -179,7 +179,7 @@ class Simulated_annealing(Metaheuristic):
         return emdst
 
     # RUN SA
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(X, Y)
         Runs one step of Simulated_annealing.
 
@@ -200,15 +200,20 @@ class Simulated_annealing(Metaheuristic):
 
         """
 
-        argmin = np.argmin(Y)
-        # current point
-        x_c = np.array(X[argmin])
-        x_loss_c = Y[argmin]
-
         logger.info("Starting")
 
         # Determine the number of iterations according to the function parameters
         logger.debug("Determining number of iterations")
+
+        if X is None or Y is None:
+            raise ValueError(
+                "Simulated annealing must be initialized by an initial solution, X, Y."
+            )
+        else:
+            argmin = np.argmin(Y)
+            # current point
+            x_c = np.array(X[argmin])
+            x_loss_c = Y[argmin]
 
         if self.initialized:
             # Simulated annealing starting
@@ -221,6 +226,7 @@ class Simulated_annealing(Metaheuristic):
 
         else:
             logger.debug(f"Starting solution: {x_c}, {x_loss_c}")
+
             # best point
             self.x_b = x_c
             self.x_loss_b = x_loss_c

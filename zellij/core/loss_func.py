@@ -75,6 +75,7 @@ class LossFunc(ABC):
         only_score=False,
         kwargs_mode=False,
         default=None,
+        constraint=None,
     ):
         """__init__(model, save=False)
 
@@ -105,6 +106,12 @@ class LossFunc(ABC):
         default : dict, optionnal
             Dictionnary of defaults arguments, kwargs, to pass to the loss function.
             They are not affected by any :ref:`metaheuristic` or other methods.
+        constraint : list[str], default=None
+            Constraints works when the model returns a dictionnary of values.
+            Constraints values returned by the model must be booleans.
+            If a list of strings is passed, constraints values will be passed to
+            the :code:`forward` method of :ref:`meta`.
+
 
         """
         ##############
@@ -115,10 +122,13 @@ class LossFunc(ABC):
         self.objective = objective
 
         self.save = save
+        self.verbose = verbose
+
         self.only_score = only_score
         self.kwargs_mode = kwargs_mode
 
-        self.verbose = verbose
+        self.default = default
+        self.constraint = constraint
 
         #############
         # VARIABLES #
@@ -139,8 +149,6 @@ class LossFunc(ABC):
         self.file_created = False
 
         self._init_time = time.time()
-
-        self.default = default
 
     @property
     def objective(self):
@@ -455,6 +463,7 @@ class SerialLoss(LossFunc):
         only_score=False,
         kwargs_mode=False,
         default=None,
+        constraint=None,
     ):
         """__init__(model, save=False, verbose=True)
 
@@ -470,6 +479,7 @@ class SerialLoss(LossFunc):
             only_score,
             kwargs_mode,
             default,
+            constraint,
         )
 
     def __call__(self, X, stop_obj=None, **kwargs):
@@ -490,11 +500,18 @@ class SerialLoss(LossFunc):
             Return a list of all the scores corresponding to each evaluated solution of X.
 
         """
-        res = []
-        for x in X:
+        res = [None] * len(X)
+        if self.constraint is None:
+            list_constraint = None
+        else:
+            list_constraint = np.ones((len(X), len(self.constraint)), dtype=bool)
+
+        for idx, x in enumerate(X):
             outputs, model = self._compute_loss(x)
 
-            res.append(outputs["objective"])
+            res[idx] = outputs["objective"]
+            if self.constraint:
+                list_constraint[idx] = [outputs[k] for k in self.constraint]  # type: ignore
 
             # Saving
             if self.save:
@@ -506,7 +523,8 @@ class SerialLoss(LossFunc):
                 self._save_file(x, **outputs, **kwargs)
 
             self._save_best(x, outputs["objective"])
-        return X, res
+
+        return X, res, list_constraint
 
     def _save_model(self, score, trained_model):
         # Save model into a file if it is better than the best found one
@@ -536,6 +554,7 @@ class MPILoss(LossFunc):
         asynchronous=False,
         workers=None,
         default=None,
+        constraint=None,
     ):
         """MPILoss
 
@@ -604,6 +623,7 @@ class MPILoss(LossFunc):
             only_score,
             kwargs_mode,
             default,
+            constraint,
         )
 
         #################
@@ -738,9 +758,9 @@ class MPILoss(LossFunc):
             self._strategy = _MonoSynchronous_strat(self, value)
 
     def __call__(self, X, stop_obj=None, **kwargs):
-        new_x, score = self._strategy(X, stop_obj=stop_obj, **kwargs)  # type: ignore
+        new_x, score, constraints = self._strategy(X, stop_obj=stop_obj, **kwargs)  # type: ignore
 
-        return new_x, score
+        return new_x, score, constraints
 
     def master(self, pqueue=None, stop_obj=None):
         """master()
@@ -992,14 +1012,29 @@ class _MonoSynchronous_strat(_Parallel_strat):
         pqueue = Queue()
         for id, x in enumerate(X):
             pqueue.put((x, id, kwargs, None))
+
         self.y = [None] * len(X)
+        if self._lf.constraint is None:
+            self.return_constraint = False
+            self.list_constraint = None
+        else:
+            self.return_constraint = True
+            self.list_constraint = np.ones(
+                (len(X), len(self._lf.constraint)), dtype=bool
+            )
+
         self._lf.master(pqueue, stop_obj=stop_obj)
-        return X, self.y[:]
+
+        return X, self.y[:], self.list_constraint
 
     # Executed by master when it receives a score from a worker
     # Here Meta master and loss master are the same process, so shared memory
     def _process_outputs(self, point, outputs, id, info, source):
         self.y[id] = outputs["objective"]
+
+        if self.return_constraint:
+            self.list_constraint[id] = [outputs[k] for k in self._lf.constraint]  # type: ignore
+
         self._computed += 1
 
         if self._computed < len(self.y):
@@ -1037,12 +1072,20 @@ class _MonoAsynchronous_strat(_Parallel_strat):
 
         self._lf.master(stop_obj=stop_obj)
 
-        new_x, y = (
+        new_x, outputs = (
             self._computed_point[0].copy(),  # type: ignore
             self._computed_point[1].copy(),  # type: ignore
         )
         self._computed_point = (None, None)
-        return [new_x], [y["objective"]]
+
+        if self._lf.constraint is None:
+            return [new_x], [outputs["objective"]], None
+        else:
+            return (
+                [new_x],
+                [outputs["objective"]],
+                [[outputs[k] for k in self._lf.constraint]],
+            )
 
     # Executed by master when it receives a score from a worker
     def _process_outputs(self, point, outputs, id, info, source):
@@ -1064,6 +1107,11 @@ class _MultiSynchronous_strat(_Parallel_strat):
         # score
         y = [None] * len(X)
 
+        if self._lf.constraint is None:
+            list_constraints = None
+        else:
+            list_constraints = np.ones((len(X), len(self._lf.constraint)), dtype=bool)
+
         # send point, point ID and point info
         for i, p in enumerate(X):
             self._send_to_master([p, i, kwargs, self._lf.rank])  # send point
@@ -1083,13 +1131,19 @@ class _MultiSynchronous_strat(_Parallel_strat):
                 logger.debug(f"call() of rank :{self._lf.rank} received a score")
                 # id / score
                 y[msg[1]] = msg[0]
+                if self._lf.constraints is not None:
+                    list_constraints[msg[1]] = msg[2]  # type: ignore
                 nb_recv += 1
 
-        return X, y
+        return X, y, list_constraints
 
     # Executed by master when it receives a score from a worker
     def _process_outputs(self, point, outputs, id, info, source):
-        self.comm.send(dest=source, tag=2, obj=(outputs["objective"], id))
+        self.comm.send(
+            dest=source,
+            tag=2,
+            obj=(outputs["objective"], id, [outputs[k] for k in self._lf.constraint]),
+        )
         return True
 
 
@@ -1133,11 +1187,19 @@ class _MultiAsynchronous_strat(_Parallel_strat):
             )
 
         logger.info("RETURN: ", [new_x], [y])
-        return [new_x], [y]
+
+        if self._lf.constraint is None:
+            return [new_x], [y], None
+        else:
+            return [new_x], [y], [msg[2]]
 
     # Executed by master when it receives a score from a worker
     def _process_outputs(self, point, outputs, id, info, source):
-        self.comm.send(dest=source, tag=2, obj=(outputs["objective"], id))
+        self.comm.send(
+            dest=source,
+            tag=2,
+            obj=(outputs["objective"], id, [outputs[k] for k in self._lf.constraint]),
+        )
         return True
 
 
@@ -1152,6 +1214,7 @@ def Loss(
     kwargs_mode=False,
     workers=None,
     default=None,
+    constraint=None,
 ):
     """Loss
 
@@ -1189,6 +1252,11 @@ def Loss(
     default : dict, optionnal
         Dictionnary of defaults arguments, kwargs, to pass to the loss function.
         They are not affected by any :ref:`metaheuristic` or other methods.
+    constraint : list[str], default=None
+            Constraints works when the model returns a dictionnary of values.
+            Constraints values returned by the model must be booleans.
+            If a list of strings is passed, constraints values will be passed to
+            the :code:`forward` method of :ref:`meta`.
 
     Returns
     -------
@@ -1225,6 +1293,7 @@ def Loss(
                         workers=workers,
                         asynchronous=True,
                         default=default,
+                        constraint=constraint,
                     )
                 elif MPI == "synchronous":
                     return MPILoss(
@@ -1237,6 +1306,7 @@ def Loss(
                         workers=workers,
                         asynchronous=False,
                         default=default,
+                        constraint=constraint,
                     )
                 else:
                     raise NotImplementedError(
@@ -1255,6 +1325,7 @@ def Loss(
                     only_score,
                     kwargs_mode,
                     default=default,
+                    constraint=constraint,
                 )
 
         return wrapper

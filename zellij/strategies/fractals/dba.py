@@ -315,7 +315,7 @@ class DBA(Metaheuristic):
                     self.exploration.search_space = self.current_subspace
             return True
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(X, Y)
         Runs one step of Simulated_annealing.
 
@@ -649,7 +649,7 @@ class DBA_Direct(Metaheuristic):
                     self.exploration.search_space = self.current_subspace
             return True
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(X, Y)
         Runs one step of Simulated_annealing.
 
@@ -678,7 +678,6 @@ class DBA_Direct(Metaheuristic):
 
             if not cnt:  # Early stopping
                 return [], {"algorithm": "end_init"}
-
 
         if self.do_explor:
             # continue, points, info

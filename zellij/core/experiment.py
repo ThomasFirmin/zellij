@@ -15,24 +15,15 @@ from zellij.core.loss_func import (
     _MultiAsynchronous_strat,
 )
 from zellij.core.metaheuristic import Metaheuristic, AMetaheuristic
-from zellij.utils import AutoSave
+from zellij.core.backup import AutoSave
 
 
 import time
-import resource
 import os
 import logging
 import pickle
 
 logger = logging.getLogger("zellij.exp")
-
-try:
-    from mpi4py import MPI
-except ImportError as err:
-    logger.info(
-        "To use MPILoss object you need to install mpi4py and an MPI distribution\n\
-    You can use: pip install zellij[MPI]"
-    )
 
 
 class Experiment(object):
@@ -161,42 +152,49 @@ class RunExperiment(ABC):
         # current solutions
         self._cX = None
         self._cY = None
+        self._cConstraint = None
 
-    def _run_forward_loss(self, meta, stop, X=None, Y=None):
+    def _run_forward_loss(self, meta, stop, X=None, Y=None, constraint=None):
         cnt = True
         if self._cX is None and self._cY is None:
-            self._cX, self._cY = X, Y
+            self._cX = X
+            self._cY = Y
+            self._cConstraint = constraint
 
         X, info = meta.forward(self._cX, self._cY)
         if len(X) < 1:
-            self._cX, self._cY = None, None
-            return None, None, cnt
+            self._cX, self._cY, self._cConstraint = None, None, None
+            return None, None, None, cnt
         else:
             if meta.search_space._convert_sol:
                 # convert from metaheuristic space to loss space
                 X = meta.search_space.converter.reverse(X)
                 # compute loss
-                X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
+                X, Y, constraint = meta.search_space.loss(X, stop_obj=stop, **info)
                 # convert from loss space to metaheuristic space
                 if X is None:
                     cnt = False
                 else:
                     X = meta.search_space.converter.convert(X)
             else:
-                X, Y = meta.search_space.loss(X, stop_obj=stop, **info)
+                X, Y, constraint = meta.search_space.loss(X, stop_obj=stop, **info)
                 if X is None:
                     cnt = False
 
-            self._cX, self._cY = X, Y
+            self._cX = X
+            self._cY = Y
+            self._cConstraint = constraint
 
-            return X, Y, cnt
+            return X, Y, constraint, cnt
 
-    def run(self, meta, stop, X=None, Y=None):
+    def run(self, meta, stop, X=None, Y=None, constraint=None):
         autosave = AutoSave(self.exp)
         try:
             cnt = True
             while not stop() and cnt:
-                X, Y, cnt = self._run_forward_loss(meta, X, Y)
+                X, Y, constraint, cnt = self._run_forward_loss(
+                    meta, stop, X, Y, constraint
+                )
                 if X is None and Y is None:
                     raise ValueError(
                         f"""
@@ -224,7 +222,7 @@ class RunParallelExperiment(RunExperiment):
                 It is not a master nor a worker."""
             )
 
-    def run(self, meta, stop, X=None, Y=None):
+    def run(self, meta, stop, X=None, Y=None, constraint=None):
         if isinstance(
             meta.search_space.loss._strategy, _MonoSynchronous_strat
         ) or isinstance(meta.search_space.loss._strategy, _MonoAsynchronous_strat):
@@ -232,7 +230,9 @@ class RunParallelExperiment(RunExperiment):
                 autosave = AutoSave(self.exp)
                 try:
                     while not stop():
-                        X, Y, cnt = self._run_forward_loss(meta, stop, X, Y)
+                        X, Y, constraint, cnt = self._run_forward_loss(
+                            meta, stop, X, Y, constraint=constraint
+                        )
                 finally:
                     autosave.stop()
             else:
@@ -246,7 +246,9 @@ class RunParallelExperiment(RunExperiment):
                 meta.update_state(state)
 
                 while cnt and not stop():
-                    X, Y, cnt = self._run_forward_loss(meta, stop, X, Y)
+                    X, Y, constraint, cnt = self._run_forward_loss(
+                        meta, stop, X, Y, constraint=constraint
+                    )
                     if X is None and Y is None and cnt:
                         meta._wsend_state(meta.master_rank)
                         state, cnt = meta._recv_msg()  # type: ignore

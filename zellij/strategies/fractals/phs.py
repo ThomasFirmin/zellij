@@ -94,7 +94,7 @@ class PHS(ContinuousMetaheuristic):
             )
             self.radius[1] = -self.radius[1]
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(X, Y)
         Runs one step of PHS.
 

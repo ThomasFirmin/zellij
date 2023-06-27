@@ -18,3 +18,4 @@ from .objective import Minimizer, Maximizer, Lambda
 
 from .experiment import Experiment
 from .stop import Calls, Convergence, Combined, Threshold, BooleanStop
+from .backup import AutoSave, load_backup

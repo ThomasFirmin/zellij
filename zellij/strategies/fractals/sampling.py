@@ -79,7 +79,7 @@ class Center(ContinuousMetaheuristic):
             else:
                 self.center = (value.upper + value.lower) / 2
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """run(X, Y)
 
         Parameters
@@ -170,7 +170,7 @@ class CenterSOO(ContinuousMetaheuristic):
             else:
                 self.center = (value.lower + value.upper) / 2
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """run(X, Y)
 
         Parameters
@@ -273,7 +273,7 @@ class Diagonal(ContinuousMetaheuristic):
             else:
                 self.center = (value.lower + value.upper) / 2
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """run(H=None, n_process=1)
 
         Parameters
@@ -375,7 +375,7 @@ class Chaos(ContinuousMetaheuristic):
         else:
             self._map = value(self.samples, len(self.search_space)).map
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """run(X, Y)
 
         Parameters
@@ -478,7 +478,7 @@ class Chaos_Hypersphere(ContinuousMetaheuristic):
         else:
             self._map = value(self.samples, len(self.search_space)).map
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """run(X, Y)
 
         Parameters
@@ -571,7 +571,7 @@ class DirectSampling(ContinuousMetaheuristic):
             else:
                 self.center = (value.upper + value.lower) / 2
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """run(X, Y)
 
         Parameters

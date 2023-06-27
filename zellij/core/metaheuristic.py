@@ -69,7 +69,7 @@ class Metaheuristic(ABC):
         self._search_space = value
 
     @abstractmethod
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint):
         """forward
 
         Abstract method describing one step of the :ref:`meta`.
@@ -81,6 +81,8 @@ class Metaheuristic(ABC):
         Y : list
             List of loss value linked to :code:`X`.
             :code:`X` and :code:`Y` must have the same length.
+        constraint : list
+            :code:`constraint` contains a list of boolean. See :ref:`lf` for more info.
 
         Returns
         -------
@@ -143,7 +145,7 @@ class ContinuousMetaheuristic(Metaheuristic):
 
         if not (hasattr(value, "lower") and hasattr(value, "upper")):
             raise AttributeError(
-                "Search space must have lower and upper bounds attributes, got {value}."
+                f"Search space must have lower and upper bounds attributes, got {value}."
             )
 
 
@@ -262,7 +264,7 @@ class AMetaheuristic(Metaheuristic):
                 loss._strategy = _MultiSynchronous_strat(loss, loss._master_rank)  # type: ignore
 
     @abstractmethod
-    def forward(self, X, Y) -> tuple:
+    def forward(self, X, Y, constraint) -> tuple:
         """forward
 
         Abstract method describing one step of the :ref:`meta`.
@@ -274,6 +276,8 @@ class AMetaheuristic(Metaheuristic):
         Y : list
             List of loss value linked to :code:`X`.
             :code:`X` and :code:`Y` must have the same length.
+        constraint : list
+            :code:`constraint` contains a list of boolean. See :ref:`lf` for more info.
 
         Returns
         -------

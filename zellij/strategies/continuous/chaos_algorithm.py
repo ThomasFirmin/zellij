@@ -119,7 +119,7 @@ class CGS(ContinuousMetaheuristic):
         self.radius = np.multiply(0.5, self.up_m_lo)
         self.center_m_lo_bounds = self.center - self.search_space.lower
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(x, Y)
         Runs one step of CGS.
 
@@ -293,7 +293,7 @@ class CLS(ContinuousMetaheuristic):
         self.radius = np.multiply(0.5, self.up_m_lo)
         self.center_m_lo_bounds = self.center - value.lower
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(X, Y)
 
         Runs one step of CLS.
@@ -481,7 +481,7 @@ class CFS(ContinuousMetaheuristic):
 
         return z
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(X, Y)
 
         Runs one step of CFS.
@@ -733,7 +733,7 @@ class Chaotic_optimization(ContinuousMetaheuristic):
 
         return self.cfs.forward(X, Y)
 
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraint=None):
         """forward(H=None, n_process=1)
 
         Runs one step of BO.
