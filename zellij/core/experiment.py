@@ -161,7 +161,7 @@ class RunExperiment(ABC):
             self._cY = Y
             self._cConstraint = constraint
 
-        X, info = meta.forward(self._cX, self._cY)
+        X, info = meta.forward(self._cX, self._cY, self._cConstraint)
         if len(X) < 1:
             self._cX, self._cY, self._cConstraint = None, None, None
             return None, None, None, cnt
