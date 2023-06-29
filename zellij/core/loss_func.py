@@ -504,7 +504,7 @@ class SerialLoss(LossFunc):
         if self.constraint is None:
             list_constraint = None
         else:
-            list_constraint = np.ones((len(X), len(self.constraint)), dtype=bool)
+            list_constraint = np.ones((len(X), len(self.constraint)), dtype=float)
 
         for idx, x in enumerate(X):
             outputs, model = self._compute_loss(x)
@@ -1020,7 +1020,7 @@ class _MonoSynchronous_strat(_Parallel_strat):
         else:
             self.return_constraint = True
             self.list_constraint = np.ones(
-                (len(X), len(self._lf.constraint)), dtype=bool
+                (len(X), len(self._lf.constraint)), dtype=float
             )
 
         self._lf.master(pqueue, stop_obj=stop_obj)
@@ -1110,7 +1110,7 @@ class _MultiSynchronous_strat(_Parallel_strat):
         if self._lf.constraint is None:
             list_constraints = None
         else:
-            list_constraints = np.ones((len(X), len(self._lf.constraint)), dtype=bool)
+            list_constraints = np.ones((len(X), len(self._lf.constraint)), dtype=float)
 
         # send point, point ID and point info
         for i, p in enumerate(X):
