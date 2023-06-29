@@ -6,10 +6,8 @@
 # @Last modified time: 2023-01-19T10:14:29+01:00
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
-from .continuous.bayesian_optimization import (
-    Bayesian_optimization,
-    TuRBO,
-)
+from .continuous.bayesian_optimization import Bayesian_optimization
+from .continuous.turbo import TuRBO, SCBO
 from .continuous.chaos_algorithm import CGS, CLS, CFS, Chaotic_optimization
 from .fractals.dba import DBA, DBA_Direct
 from .fractals.ils import ILS, ILS_section
