@@ -9,7 +9,6 @@
 
 from zellij.core.metaheuristic import Metaheuristic
 from zellij.strategies.tools.cooling import Cooling
-import zellij.utils.progress_bar as pb
 import numpy as np
 import os
 
