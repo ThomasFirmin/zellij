@@ -15,6 +15,7 @@ from abc import ABC, abstractmethod
 from zellij.core.objective import Minimizer
 import logging
 from queue import PriorityQueue, Queue
+from datetime import datetime
 
 logger = logging.getLogger("zellij.loss")
 
@@ -71,7 +72,7 @@ class LossFunc(ABC):
         model,
         objective=Minimizer,
         save=False,
-        verbose=True,
+        record_time=False,
         only_score=False,
         kwargs_mode=False,
         default=None,
@@ -94,8 +95,9 @@ class LossFunc(ABC):
             function will be maximized.
         save : str, optionnal
             If a :code:`str` is given, then outputs will be saved in :code:`save`.
-        verbose : bool, default=False
-            Verbosity of the loss function.
+        record_time : boolean, default=False
+            If True, :code:`start_time`, :code:`end_time`, :code:`start_date`, :code:`end_date` will be recorded
+            and saved in the save file for each :code:`__call__`.
         only_score : bool, default=False
             If True, then only the score of evaluated solutions are saved.
             Otherwise, all infos returned by the :ref:`lf` and :ref:`meta` are
@@ -112,7 +114,6 @@ class LossFunc(ABC):
             If a list of strings is passed, constraints values will be passed to
             the :code:`forward` method of :ref:`meta`.
 
-
         """
         ##############
         # PARAMETERS #
@@ -122,7 +123,7 @@ class LossFunc(ABC):
         self.objective = objective
 
         self.save = save
-        self.verbose = verbose
+        self.record_time = record_time
 
         self.only_score = only_score
         self.kwargs_mode = kwargs_mode
@@ -211,14 +212,24 @@ class LossFunc(ABC):
                 new_kwargs.update(self.default)
 
             start = time.time()
-            res, trained_model = self._build_return(self.model(**new_kwargs))  # type: ignore
-            end = time.time()
+            start_date = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
 
-            res["eval_time"] = end - start
-            res["start_time"] = start - self._init_time
-            res["end_time"] = end - self._init_time
+            # compute loss
+            res, trained_model = self._build_return(self.model(**new_kwargs))  # type: ignore
+
+            end = time.time()
+            end_date = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+
+            if self.record_time:
+                res["eval_time"] = end - start
+                res["start_time"] = start - self._init_time
+                res["end_time"] = end - self._init_time
+                res["start_date"] = start_date
+                res["end_date"] = end_date
         else:
             start = time.time()
+            start_date = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
+
             if self.default:
                 lossv = self.model(point, **self.default)  # type: ignore
             else:
@@ -226,10 +237,14 @@ class LossFunc(ABC):
 
             res, trained_model = self._build_return(lossv)
             end = time.time()
+            end_date = datetime.today().strftime("%Y-%m-%d %H:%M:%S")
 
-            res["eval_time"] = end - start
-            res["start_time"] = start - self._init_time
-            res["end_time"] = end - self._init_time
+            if self.record_time:
+                res["eval_time"] = end - start
+                res["start_time"] = start - self._init_time
+                res["end_time"] = end - self._init_time
+                res["start_date"] = start_date
+                res["end_date"] = end_date
 
         return res, trained_model
 
@@ -263,10 +278,8 @@ class LossFunc(ABC):
         # Create a valid folder
         try:
             os.makedirs(self.folder_name)
-        except FileExistsError as error:
-            logger.warning(
-                f"Saving folder already exists, {self.folder_name}. Results will still be saved in it."
-            )
+        except FileExistsError:
+            pass
 
         # Create ouputs folder
         self.outputs_path = os.path.join(self.folder_name, "outputs")
@@ -459,11 +472,12 @@ class SerialLoss(LossFunc):
         model,
         objective=Minimizer,
         save=False,
-        verbose=True,
+        record_time=False,
         only_score=False,
         kwargs_mode=False,
         default=None,
         constraint=None,
+        **kwargs,
     ):
         """__init__(model, save=False, verbose=True)
 
@@ -475,7 +489,7 @@ class SerialLoss(LossFunc):
             model,
             objective,
             save,
-            verbose,
+            record_time,
             only_score,
             kwargs_mode,
             default,
@@ -548,13 +562,14 @@ class MPILoss(LossFunc):
         model,
         objective=Minimizer,
         save=False,
-        verbose=True,
+        record_time=False,
         only_score=False,
         kwargs_mode=False,
-        asynchronous=False,
+        strategy="synchronous",
         workers=None,
         default=None,
         constraint=None,
+        **kwargs,
     ):
         """MPILoss
 
@@ -587,13 +602,17 @@ class MPILoss(LossFunc):
         kwargs_mode : bool, default=False
             If True, then solutions are passed as kwargs to :ref:`lf`. Keys, are
             the names of the :ref:`var` within the :ref:`sp`.
-        asynchronous : bool, default=False
-            Asynchronous mode. If True then :code:`__call__` will return
-            the result from an evluation of a solution assoon as it receives a
+        strategy : str, default=synchronous
+            if :code:`strategy='synchronous`: then :code:`__call__` will return all results from all
+            solutions passed, once all of them have been evaluated.
+            if :code:`strategy='asynchronous`: then :code:`__call__` will return
+            the result from an evaluation of a solution assoon as it receives a
             result from a worker. Other solutions, are still being evaluated in
             background.
-            If False, then :code:`__call__` will return all results from all
-            solutions passed, once all of them have been evaluated.
+            if :code:`strategy='flexible`: then :code:`__call__` will return
+            all computed results, only if the number of remaining uncomputed solutions
+            is below a certain threshold. Pass: :code:`threshold=int` kwarg, to :code:`Loss`
+            or :code:`MPILoss`.
         workers : int, optionnal
             Number of workers among the total number of processes spawned by
             MPI. At least, one process is dedicated to the master.
@@ -614,18 +633,6 @@ class MPILoss(LossFunc):
         LossFunc : Inherited class
         SerialLoss : Basic version of LossFunc
         """
-
-        super().__init__(
-            model,
-            objective,
-            save,
-            verbose,
-            only_score,
-            kwargs_mode,
-            default,
-            constraint,
-        )
-
         #################
         # MPI VARIABLES #
         #################
@@ -645,13 +652,25 @@ class MPILoss(LossFunc):
 
             raise err
 
+        ###############
+        # PAARAMETERS #
+        ###############
+
+        super().__init__(
+            model,
+            objective,
+            save,
+            record_time,
+            only_score,
+            kwargs_mode,
+            default,
+            constraint,
+        )
+
         if workers:
             self.workers_size = workers
         else:
-            if asynchronous:
-                self.workers_size = self.p - 1
-            else:
-                self.workers_size = self.p - 1
+            self.workers_size = self.p - 1
 
         self.recv_msg = 0
         self.sent_msg = 0
@@ -660,9 +679,11 @@ class MPILoss(LossFunc):
             os.path.join(self.folder_name, "tmp_wks"), f"worker{self.rank}"
         )
 
-        self.asynchronous = asynchronous
+        self.strat_name = strategy
 
-        self._pqueue_mode = False
+        # Strategy kwargs
+        self.skwargs = kwargs
+
         self.pqueue = Queue()
 
         # list of idle workers
@@ -681,6 +702,24 @@ class MPILoss(LossFunc):
         # Property, defines parallelisation strategy
         self._master_rank = 0  # type: ignore
 
+    @property
+    def save(self):
+        return self._save
+
+    @save.setter
+    def save(self, value):
+        self._save = value
+        if isinstance(value, str):
+            self.folder_name = value
+            self._personnal_folder = os.path.join(
+                os.path.join(self.folder_name, "tmp_wks"), f"worker{self.rank}"
+            )
+        else:
+            self.folder_name = f"{self.model.__class__.__name__}_zlj_save"
+            self._personnal_folder = os.path.join(
+                os.path.join(self.folder_name, "tmp_wks"), f"worker{self.rank}"
+            )
+
     def __getstate__(self):
         state = self.__dict__.copy()
         del state["comm"]
@@ -689,7 +728,6 @@ class MPILoss(LossFunc):
         del state["rank"]
         del state["p"]
         del state["_personnal_folder"]
-        del state["_pqueue_mode"]
         del state["pqueue"]
         del state["idle"]
         del state["p_historic"]
@@ -722,7 +760,6 @@ class MPILoss(LossFunc):
 
         self._personnal_folder = os.path.join("tmp_wks", f"worker{self.rank}")
 
-        self._pqueue_mode = False
         self.pqueue = Queue()
 
         # list of idle workers
@@ -752,10 +789,20 @@ class MPILoss(LossFunc):
         if self.rank == value:
             self.is_master = True
 
-        if self.asynchronous:
-            self._strategy = _MonoAsynchronous_strat(self, value)
+        if self.strat_name == "asynchronous":
+            self._strategy = _MonoAsynchronous_strat(self, value, **self.skwargs)
+        elif self.strat_name == "synchronous":
+            self._strategy = _MonoSynchronous_strat(self, value, **self.skwargs)
+        elif self.strat_name == "flexible":
+            self._strategy = _MonoFlexible_strat(self, value, **self.skwargs)
         else:
-            self._strategy = _MonoSynchronous_strat(self, value)
+            raise NotImplementedError(
+                f"""
+                    {self.strat_name} parallelisation is not implemented.
+                    Use MPI='asynchronous', 'synchronous', 'flexible', or False for non
+                    distributed loss function.
+                    """
+            )
 
     def __call__(self, X, stop_obj=None, **kwargs):
         new_x, score, constraints = self._strategy(X, stop_obj=stop_obj, **kwargs)  # type: ignore
@@ -785,7 +832,6 @@ class MPILoss(LossFunc):
         cnt = True
 
         if pqueue:
-            self._pqueue_mode = True
             self.pqueue = pqueue
 
         while not stopping() and cnt:
@@ -802,12 +848,10 @@ class MPILoss(LossFunc):
                     msg, self.pqueue, self.p_historic, self.idle, self.status
                 )
 
-        if self._pqueue_mode:
-            logger.debug(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
-        else:
-            logger.debug(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
+        logger.debug(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
 
         if stopping():
+            logger.debug(f"MASTER{self.rank}, sending STOP")
             self._stop()
 
     def _parse_message(self, msg, pqueue, historic, idle, status):
@@ -922,9 +966,7 @@ class MPILoss(LossFunc):
 
         # Save model into a file if it is better than the best found one
         if score < self.best_score:
-            master_path = os.path.join(
-                self.model_path, f"{self.model.__class__.__name__}_best"
-            )
+            master_path = os.path.join(self.model_path, f"{self.folder_name}_best")
             worker_path = os.path.join(
                 os.path.join(self.folder_name, "tmp_wks"), f"worker{source}"
             )
@@ -986,7 +1028,7 @@ class MPILoss(LossFunc):
 
 
 class _Parallel_strat:
-    def __init__(self, loss, master_rank):
+    def __init__(self, loss, master_rank, **kwargs):
         super().__init__()
         self.master_rank = master_rank
         try:
@@ -1051,11 +1093,10 @@ class _MonoSynchronous_strat(_Parallel_strat):
 
 
 class _MonoAsynchronous_strat(_Parallel_strat):
-    def __init__(self, loss, master_rank):
-        super().__init__(loss, master_rank)
+    def __init__(self, loss, master_rank, **kwargs):
+        super().__init__(loss, master_rank, **kwargs)
         self._current_points = {}
         self._computed_point = (None, None)
-        self._lf._pqueue_mode = True
 
     # send a point to loss master
     def _send_to_master(self, point, **kwargs):
@@ -1091,6 +1132,57 @@ class _MonoAsynchronous_strat(_Parallel_strat):
     def _process_outputs(self, point, outputs, id, info, source):
         self._computed_point = (point, outputs)
         return False
+
+
+class _MonoFlexible_strat(_Parallel_strat):
+    def __init__(self, loss, master_rank, threshold):
+        super().__init__(loss, master_rank)
+        self._current_points = {}
+
+        self._flex_x = []
+        self._flex_y = []
+        self._flex_c = []
+
+        # When queue size is < threshold, the loss master stop, so meta can return new points
+        self.threshold = threshold
+
+    # send a point to loss master
+    def _send_to_master(self, point, **kwargs):
+        id = self._computed  # number of computed points used as id
+        self._current_points[id] = point
+        self._lf.pqueue.put((point, id, kwargs, None))
+        self._computed += 1
+
+    # Executed by Experiment to compute X
+    def __call__(self, X, stop_obj=None, **kwargs):
+        self._flex_x = []
+        self._flex_y = []
+        self._flex_c = []
+
+        # send point, point ID and point info
+        for point in X:
+            self._send_to_master(point, **kwargs)  # send point
+
+        self._lf.master(stop_obj=stop_obj)
+
+        if self._lf.constraint is None:
+            return self._flex_x, self._flex_y, None
+        else:
+            return self._flex_x, self._flex_y, self._flex_c
+
+    # Executed by master when it receives a score from a worker
+    def _process_outputs(self, point, outputs, id, info, source):
+        print(
+            f"FLEXIBLE: {len(self._flex_x)},{len(self._flex_y)},{len(self._flex_c)} | SIZE : {self._lf.pqueue.qsize()} <= {self.threshold}"
+        )
+        self._flex_x.append(point)
+        self._flex_y.append(outputs["objective"])
+        self._flex_c.append([outputs[k] for k in self._lf.constraint])
+
+        if self._lf.pqueue.qsize() <= self.threshold:
+            return False  # Stop master
+        else:
+            return True  # Continue master
 
 
 # Multi Synchronous -> Save score into groups, return groups to meta worker
@@ -1208,13 +1300,14 @@ def Loss(
     model=None,
     objective=Minimizer,
     save=False,
-    verbose=True,
+    record_time=False,
     MPI=False,
     only_score=False,
     kwargs_mode=False,
     workers=None,
     default=None,
     constraint=None,
+    **kwargs,
 ):
     """Loss
 
@@ -1235,8 +1328,9 @@ def Loss(
         function will be maximized.
     save : str, optionnal
         If a :code:`str` is given, then outputs will be saved in :code:`save`.
-    verbose : bool, default=False
-        Verbosity of the loss function.
+    record_time : boolean, default=False
+            If True, :code:`start_time`, :code:`end_time`, :code:`start_date`, :code:`end_date` will be recorded
+            and saved in the save file for each :code:`__call__`.
     only_score : bool, default=False
         If True, then only the score of evaluated solutions are saved.
         Otherwise, all infos returned by the :ref:`lf` and :ref:`meta` are
@@ -1244,8 +1338,18 @@ def Loss(
     kwargs_mode : bool, default=False
         If True, then solutions are passed as kwargs to :ref:`lf`. Keys are
         the names of the :ref:`var` within the :ref:`sp`.
-    MPI : {False, asynchronous, synchronous}, optional
+    MPI : {False, 'asynchronous', 'synchronous', 'flexible'}, optional
         Wrap the function with :code:`MPILoss` if True, with SerialLoss else.
+        if :code:`strategy='synchronous`: then :code:`__call__` will return all results from all
+        solutions passed, once all of them have been evaluated.
+        if :code:`strategy='asynchronous`: then :code:`__call__` will return
+        the result from an evaluation of a solution assoon as it receives a
+        result from a worker. Other solutions, are still being evaluated in
+        background.
+        if :code:`strategy='flexible`: then :code:`__call__` will return
+        all computed results, only if the number of remaining uncomputed solutions
+        is below a certain threshold. Pass: :code:`threshold=int` kwarg, to :code:`Loss`
+        or :code:`MPILoss`.
     workers : int, optionnal
         Number of workers among the total number of processes spawned by
         MPI. At least, one process is dedicated to the master.
@@ -1282,50 +1386,30 @@ def Loss(
 
         def wrapper(model):
             if MPI:
-                if MPI == "asynchronous":
-                    return MPILoss(
-                        model,
-                        objective,
-                        save,
-                        verbose,
-                        only_score,
-                        kwargs_mode,
-                        workers=workers,
-                        asynchronous=True,
-                        default=default,
-                        constraint=constraint,
-                    )
-                elif MPI == "synchronous":
-                    return MPILoss(
-                        model,
-                        objective,
-                        save,
-                        verbose,
-                        only_score,
-                        kwargs_mode,
-                        workers=workers,
-                        asynchronous=False,
-                        default=default,
-                        constraint=constraint,
-                    )
-                else:
-                    raise NotImplementedError(
-                        f"""
-                    {MPI} parallelisation is not implemented.
-                    Use MPI='asynchronous', 'synchronous', or False, for non
-                    distributed loss function.
-                    """
-                    )
+                return MPILoss(
+                    model,
+                    objective,
+                    save,
+                    record_time,
+                    only_score,
+                    kwargs_mode,
+                    workers=workers,
+                    strategy=MPI,  # type: ignore
+                    default=default,
+                    constraint=constraint,
+                    **kwargs,
+                )
             else:
                 return SerialLoss(
                     model,
                     objective,
                     save,
-                    verbose,
+                    record_time,
                     only_score,
                     kwargs_mode,
                     default=default,
                     constraint=constraint,
+                    **kwargs,
                 )
 
         return wrapper

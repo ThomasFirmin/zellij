@@ -11,6 +11,7 @@ from zellij.core.loss_func import (
     MPILoss,
     _MonoSynchronous_strat,
     _MonoAsynchronous_strat,
+    _MonoFlexible_strat,
     _MultiSynchronous_strat,
     _MultiAsynchronous_strat,
 )
@@ -223,9 +224,11 @@ class RunParallelExperiment(RunExperiment):
             )
 
     def run(self, meta, stop, X=None, Y=None, constraint=None):
-        if isinstance(
-            meta.search_space.loss._strategy, _MonoSynchronous_strat
-        ) or isinstance(meta.search_space.loss._strategy, _MonoAsynchronous_strat):
+        if (
+            isinstance(meta.search_space.loss._strategy, _MonoSynchronous_strat)
+            or isinstance(meta.search_space.loss._strategy, _MonoAsynchronous_strat)
+            or isinstance(meta.search_space.loss._strategy, _MonoFlexible_strat)
+        ):
             if meta.search_space.loss.is_master:
                 autosave = AutoSave(self.exp)
                 try:
