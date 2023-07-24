@@ -497,3 +497,177 @@ class Direct(Fractal):
             }
         )
         return infos
+
+
+class LatinHypercube(Fractal):
+    """LatinHypercube
+
+    Subspaces are built according to a Latin Hypercube Sampling.
+
+
+    See Also
+    --------
+    LossFunc : Defines what a loss function is
+    Tree_search : Defines how to explore and exploit a fractal partition tree.
+    SearchSpace : Initial search space used to build fractal.
+    Fractal : Parent class. Basic object to define what a fractal is.
+    Hypersphere : Another hypervolume, with different properties
+    """
+
+    def __init__(
+        self,
+        variables,
+        loss,
+        measure=None,
+        ndist=1,
+        grid_size=2,
+        orthogonal=False,
+        symmetric=True,
+        **kwargs,
+    ):
+        """__init__
+
+        Parameters
+        ----------
+        variables : ArrayVar
+            Determines the bounds of the search space.
+            For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
+            of `FloatVar`.
+            The :ref:`sp` will then manipulate this array.
+
+        loss : LossFunc
+            Callable of type `LossFunc`. See :ref:`lf` for more information.
+            `loss` will be used by the :ref:`sp` object and by optimization
+            algorithms.
+
+        grid_size : int, default=2
+            Size of the grid for LHS. :code:`self.size * grid_size` hypercubes will
+            be sampled. Given value must be :code:`grid_size > 1`.
+
+        ndist : int default=1
+            Number of sampled distributions.
+
+        orthogonal : boolean, default=False
+            If True, performs an orthoganal LHS.
+
+        symmetric : boolean, default=True
+            Apply a symmetrization on the LatinHypercube distribution.
+
+        measure : Measurement, default=None
+            Defines the measure of a fractal.
+
+        **kwargs : dict
+            Kwargs are the different addons one want to add to a `Variable`.
+            Common addons are:
+            * converter : Converter
+                * Will be called when converting a solution to another space is needed.
+            * neighbor : Neighborhood
+                * Will be called when a neighborhood is needed.
+            * distance: Distance, default, Mixed
+                * Will be called when computing a distance is needed
+            * And other operators linked to the optimization algorithms (crossover, mutation,...)
+        """
+
+        super(LatinHypercube, self).__init__(variables, loss, measure, **kwargs)
+
+        if isinstance(grid_size, int):
+            assert grid_size > 1, f"grid_size must be >1, got {grid_size}"
+            self.grid_size = lambda level: grid_size
+        else:
+            self.grid_size = grid_size
+
+        if isinstance(ndist, int):
+            assert ndist > 0, f"ndist must be >0, got {ndist}"
+            self.ndist = lambda level: ndist
+        else:
+            self.ndist = ndist
+
+        self.orthogonal = orthogonal
+        self.symmetric = symmetric
+
+        self.lower = np.zeros(self.size)
+        self.upper = np.ones(self.size)
+
+    def _compute_bounds(self):
+        pass
+
+    def create_children(self):
+        """create_children(self)
+
+        Partition function.
+
+        attention collision grille paire
+        """
+
+        ndist = self.ndist(self.level)
+        grid_size = self.grid_size(self.level)
+
+        if self.symmetric:
+            sym_factor = 2
+        else:
+            sym_factor = 1
+
+        children = super().create_children(
+            sym_factor * ndist * grid_size,
+            orthogonal=self.orthogonal,
+            grid_size=self.grid_size,
+            ndist=self.ndist,
+            **self._all_addons,
+        )
+
+        for nd in range(ndist):
+            A = np.zeros((self.size, grid_size), dtype=int)
+
+            R = np.zeros((grid_size + 1, self.size))
+            r = (self.upper - self.lower) / grid_size
+
+            for k in range(self.size):
+                A[k] = np.array(list(range(grid_size)), dtype=int)
+                np.random.shuffle(A[k])
+
+            A = A.T
+
+            for k in range(grid_size):
+                for i in range(self.size):
+                    R[k, i] = (
+                        self.lower[i]
+                        + (self.upper[i] - self.lower[i]) * (k) / grid_size
+                    )
+
+            Bd = np.zeros((grid_size, self.size))
+
+            if self.symmetric:
+                SBd = np.copy(Bd)
+                for k in range(grid_size):
+                    for i in range(self.size):
+                        Bd[k, i] = R[A[k, i], i]
+                        SBd[k, i] = self.upper[i] + self.lower[i] - Bd[k, i] - r[i]
+            else:
+                for k in range(grid_size):
+                    for i in range(self.size):
+                        Bd[k, i] = R[A[k, i], i]
+
+            cidx = sym_factor * grid_size * nd  # which children to select
+            end_idx = cidx + grid_size
+            for child, l in zip(children[cidx:end_idx], Bd):
+                child.lower = l
+                child.upper = l + r
+                child._update_measure()
+
+            if self.symmetric:
+                end_idx2 = end_idx * grid_size
+                for child, l in zip(children[end_idx:end_idx2], SBd):
+                    child.lower = l
+                    child.upper = l + r
+                    child._update_measure()
+
+        return children
+
+    def _modify(self, upper, lower, level, father, f_id, c_id, score, measure):
+        super()._modify(level, father, f_id, c_id, score, measure)
+        self.upper, self.lower = upper, lower
+
+    def _essential_info(self):
+        infos = super()._essential_info()
+        infos.update({"upper": self.upper, "lower": self.lower})
+        return infos
