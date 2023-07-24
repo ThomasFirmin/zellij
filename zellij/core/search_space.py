@@ -484,12 +484,23 @@ class ContinuousSearchspace(Searchspace):
             for idx, v in enumerate(variables):
                 self.lower[idx] = v.lower
                 self.upper[idx] = v.upper
+            self._convert_sol = False
+        else:
+            self._convert_sol = True
 
         self.distance = kwargs.pop("distance", Euclidean(self))
         assert isinstance(self.distance, Distance), logger.error(
             f"Kwargs `distance` must be of type `Distance`, got {self.distance}"
         )
         self.distance.target = self
+
+    # Return a random point of the search space
+    def random_point(self, size=1):
+        if self._convert_sol:
+            points = self.converter.convert(super().random_point(size=size))  # type: ignore
+        else:
+            points = super().random_point(size=size)
+        return points
 
     @Searchspace.loss.setter
     def loss(self, value):
@@ -696,7 +707,7 @@ class BaseFractal(Searchspace):
         """
         super(BaseFractal, self).__init__(variables, loss, **kwargs)
 
-        self._compute_mesure = measure
+        self._compute_measure = measure
         self.measure = float("nan")
 
         self.level = 0
@@ -726,8 +737,8 @@ class BaseFractal(Searchspace):
         cls.__init__ = init_measurement
 
     def _update_measure(self):
-        if self._compute_mesure:
-            self.measure = self._compute_mesure(self)
+        if self._compute_measure:
+            self.measure = self._compute_measure(self)
         else:
             self.measure = float("nan")
 
@@ -765,9 +776,9 @@ class BaseFractal(Searchspace):
 
         children = [
             type(self)(
-                self.variables,
-                self.loss,
-                self._compute_mesure,
+                variables=self.variables,
+                loss=self.loss,
+                measure=self._compute_measure,
                 *args,
                 **kwargs,
             )
@@ -979,9 +990,9 @@ class Fractal(BaseFractal):
 
         children = [
             type(self)(
-                self.variables,
-                self.loss,
-                self._compute_mesure,
+                variables=self.variables,
+                loss=self.loss,
+                measure=self._compute_measure,
                 *args,
                 **kwargs,
             )

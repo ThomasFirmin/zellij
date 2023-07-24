@@ -167,7 +167,7 @@ class IntVar(Variable):
             Return an int if :code:`size`=1, a :code:`list[int]` else.
 
         """
-        return self.sampler(self.lower, self.upper, size, dtype=int)
+        return self.sampler(low=self.lower, high=self.upper, size=size)
 
     def isconstant(self):
         """isconstant()
@@ -295,7 +295,7 @@ class FloatVar(Variable):
             Return a float if :code:`size`=1, a :code:`list[float]` else.
 
         """
-        return self.sampler(self.lower, self.upper, size)
+        return self.sampler(low=self.lower, high=self.upper, size=size)
 
     def isconstant(self):
         """isconstant()
