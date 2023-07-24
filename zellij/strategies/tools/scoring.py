@@ -263,7 +263,7 @@ class Distance_to_the_best_centered(Scoring):
             distances = [
                 fractal.distance(s, best_ind) + 1e-20 for s in fractal.solutions
             ]
-            res = np.min(
+            res = -np.max(
                 (np.array(fractal.losses) - fractal.loss.best_score) / distances
             )
             return res
