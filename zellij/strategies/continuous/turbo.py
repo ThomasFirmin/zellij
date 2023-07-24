@@ -672,6 +672,7 @@ class SCBO(ContinuousMetaheuristic):
     def __init__(
         self,
         search_space,
+        turbo_state,
         verbose=True,
         surrogate=SingleTaskGP,
         mll=ExactMarginalLogLikelihood,
@@ -679,6 +680,7 @@ class SCBO(ContinuousMetaheuristic):
         batch_size=4,
         n_candidates=None,
         initial_size=10,
+        beam=2000,
         gpu=False,
         **kwargs,
     ):
@@ -688,6 +690,8 @@ class SCBO(ContinuousMetaheuristic):
         ----------
         search_space : Searchspace
             Search space object containing bounds of the search space
+        turbo_state : CTurboState
+            Constrained TuRBO state object dataclass.
         verbose : bool
             If False, there will be no print.
         surrogate : botorch.models.model.Model, default=SingleTaskGP
@@ -728,6 +732,8 @@ class SCBO(ContinuousMetaheuristic):
         self.n_candidates = n_candidates
         self.initial_size = initial_size
 
+        self.beam = beam
+
         self.kwargs = kwargs
 
         #############
@@ -735,16 +741,7 @@ class SCBO(ContinuousMetaheuristic):
         #############
         self.nconstraint = len(self.search_space.loss.constraint)
 
-        self.turbo_state = CTurboState(
-            self.search_space.size,
-            best_constraint_values=(
-                torch.ones(
-                    self.nconstraint,
-                )
-                * torch.inf
-            ),
-            batch_size=batch_size,
-        )
+        self.turbo_state = turbo_state
 
         # Determine if BO is initialized or not
         self.initialized = False
@@ -784,23 +781,33 @@ class SCBO(ContinuousMetaheuristic):
             for key, value in self.kwargs.items()
             if key in self.surrogate.__init__.__code__.co_varnames
         }
+
+        for m in self.model_kwargs.values():
+            if isinstance(m, torch.nn.Module):
+                m.to(self.device)
+
         self.likelihood_kwargs = {
             key: value
             for key, value in self.kwargs.items()
             if key in self.likelihood.__init__.__code__.co_varnames
         }
+        for m in self.likelihood_kwargs.values():
+            if isinstance(m, torch.nn.Module):
+                m.to(self.device)
+
         self.mll_kwargs = {
             key: value
             for key, value in self.kwargs.items()
             if key in self.mll.__init__.__code__.co_varnames
         }
+        for m in self.mll_kwargs.values():
+            if isinstance(m, torch.nn.Module):
+                m.to(self.device)
+
         print(self.model_kwargs, self.likelihood_kwargs, self.mll_kwargs)
 
     def _generate_initial_data(self):
-        X_init = self.sobol.draw(n=self.initial_size).to(
-            dtype=self.dtype, device=self.device
-        )
-        return X_init.detach()
+        return self.search_space.random_point(self.initial_size)
 
     #
     def _initialize_model(self, train_x, train_obj, state_dict=None):
@@ -818,17 +825,25 @@ class SCBO(ContinuousMetaheuristic):
             **self.model_kwargs,
         )
 
-        mll = self.mll(
-            model.likelihood,
-            model,
-            **self.mll_kwargs,
-        )
+        model.to(self.device)
+
+        if "num_data" in self.mll.__init__.__code__.co_varnames:
+            mll = self.mll(
+                model.likelihood,
+                model.model,
+                num_data=train_x.shape[-2],
+                **self.mll_kwargs,
+            )
+        else:
+            mll = self.mll(
+                model.likelihood,
+                model,
+                **self.mll_kwargs,
+            )
 
         # load state dict if it is passed
         if state_dict is not None:
             model.load_state_dict(state_dict)
-
-        model.to(self.device)
 
         return mll, model, train_obj
 
@@ -923,36 +938,70 @@ class SCBO(ContinuousMetaheuristic):
             # call helper functions to generate initial training data and initialize model
             train_x = self._generate_initial_data()
             self.initialized = True
-            return train_x.cpu().numpy(), {
+            return train_x, {
                 "iteration": self.iteration,
                 "algorithm": "InitCTuRBO",
             }
         else:
+            torch.cuda.empty_cache()
             if (X is not None and Y is not None) and (len(X) > 0 and len(Y) > 0):
                 self.iteration += 1
 
-                X = np.array(X)
-                Y = np.array(Y)  # negate Y, BoTorch -> max, Zellij -> min
-                constraint = np.array(constraint)
+                new_x = torch.tensor(X, dtype=self.dtype, device=self.device)
+                new_obj = torch.tensor(
+                    Y, dtype=self.dtype, device=self.device
+                ).unsqueeze(-1)
+                new_c = torch.tensor(constraint, dtype=self.dtype, device=self.device)
 
-                if len(Y) > 0:
-                    new_x = torch.tensor(X, dtype=self.dtype, device=self.device)
-                    new_obj = torch.tensor(
-                        Y, dtype=self.dtype, device=self.device
-                    ).unsqueeze(-1)
-                    new_c = torch.tensor(
-                        constraint, dtype=self.dtype, device=self.device
-                    )
+                # update training points
+                self.train_x = torch.cat([self.train_x, new_x], dim=0)
+                self.train_obj = torch.cat([self.train_obj, new_obj], dim=0)
+                self.train_c = torch.cat([self.train_c, new_c], dim=0)
 
+                if len(self.train_x) > self.beam:
+                    sidx = torch.argsort(self.train_obj)
+
+                    self.train_x = self.train_x[sidx]
+                    self.train_obj = self.train_obj[sidx]
+                    self.train_c = self.train_c[sidx]
+
+                    violation = self.train_c.sum(dim=1)
+                    nvidx = violation < 0
+
+                    new_x = self.train_x[nvidx][: self.beam]
+                    new_obj = self.train_obj[nvidx][: self.beam]
+                    new_c = self.train_c[nvidx][: self.beam]
+
+                    if len(new_x) < self.beam:
+                        nfill = self.beam - len(new_x)
+                        violeted = torch.logical_not(nvidx)
+                        v_x = self.train_x[violeted]
+                        v_obj = self.train_obj[violeted]
+                        v_c = self.train_c[violeted]
+
+                        scidx = torch.argsort(v_c)[nfill]
+
+                        # update training points
+                        self.train_x = torch.cat([new_x, v_x[scidx]], dim=0)
+                        self.train_obj = torch.cat([new_obj, v_obj[scidx]], dim=0)
+                        self.train_c = torch.cat([new_c, v_c[scidx]], dim=0)
+                    else:
+                        self.train_x = new_x
+                        self.train_obj = new_obj
+                        self.train_c = new_c
+
+                print(
+                    f"TRAIN SIZE: {len(self.train_x)},{len(self.train_obj)},{len(self.train_c)}"
+                )
+                if len(self.train_obj) < self.initial_size:
+                    return [self.search_space.random_point(1)], {
+                        "iteration": self.iteration,
+                        "algorithm": "AddInitCTuRBO",
+                    }
+                else:
                     self.turbo_state = update_c_state(
                         state=self.turbo_state, Y_next=new_obj, C_next=new_c
                     )
-
-                    # update training points
-                    self.train_x = torch.cat([self.train_x, new_x])
-                    self.train_obj = torch.cat([self.train_obj, new_obj])
-                    self.train_c = torch.cat([self.train_c, new_c])
-
                     with gpytorch.settings.max_cholesky_size(float("inf")):
                         # reinitialize the models so they are ready for fitting on next iteration
                         # use the current state dict to speed up fitting
@@ -980,7 +1029,7 @@ class SCBO(ContinuousMetaheuristic):
                         try:
                             fit_gpytorch_mll(mll)
                         except ModelFittingError:
-                            return self.sobol.draw(n=len(Y)).cpu().numpy(), {
+                            return self.search_space.random_point(len(Y)), {
                                 "iteration": self.iteration,
                                 "algorithm": "FailedCTuRBO",
                             }
@@ -999,13 +1048,8 @@ class SCBO(ContinuousMetaheuristic):
                             "iteration": self.iteration,
                             "algorithm": "CTuRBO",
                         }
-                else:
-                    return self.sobol.draw(n=len(Y)).cpu().numpy(), {
-                        "iteration": self.iteration,
-                        "algorithm": "ResampleCTuRBO",
-                    }
             else:
-                return self.sobol.draw(n=1).cpu().numpy(), {
+                return [self.search_space.random_point(1)], {
                     "iteration": self.iteration,
                     "algorithm": "ResampleCTuRBO",
                 }
@@ -1340,9 +1384,9 @@ class MORBO(ContinuousMetaheuristic):
                     )
 
                     # update training points
-                    self.train_x = torch.cat([self.train_x, new_x])
-                    self.train_obj = torch.cat([self.train_obj, new_obj])
-                    self.train_c = torch.cat([self.train_c, new_c])
+                    self.train_x = torch.cat([self.train_x, new_x], dim=0)
+                    self.train_obj = torch.cat([self.train_obj, new_obj], dim=0)
+                    self.train_c = torch.cat([self.train_c, new_c], dim=0)
 
                     with gpytorch.settings.max_cholesky_size(float("inf")):
                         # reinitialize the models so they are ready for fitting on next iteration
