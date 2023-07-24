@@ -92,8 +92,8 @@ class Benchmark(ABC):
 class Sphere(Benchmark):
     def __init__(
         self,
-        lower=-100.0,
-        upper=100.0,
+        lower=0.0,
+        upper=10.0,
         optimum=0,
         shift=None,
         rotate=None,
@@ -104,6 +104,8 @@ class Sphere(Benchmark):
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
 
+        self.poptimum = 0.0
+
     def __call__(self, y):
         z = self.transform(y)
         if self.shuffle is not None:
@@ -111,7 +113,11 @@ class Sphere(Benchmark):
         return np.sum(np.square(z)) + self.bias
 
 
-class Schwefel_problem(Benchmark):
+class Schwefel_2_21(Benchmark):
+    """
+    2.21
+    """
+
     def __init__(
         self,
         lower=-100.0,
@@ -122,9 +128,11 @@ class Schwefel_problem(Benchmark):
         shuffle=None,
         bias=0,
     ):
-        super(Schwefel_problem, self).__init__(
+        super(Schwefel_2_21, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -136,8 +144,8 @@ class Schwefel_problem(Benchmark):
 class Rosenbrock(Benchmark):
     def __init__(
         self,
-        lower=-100,
-        upper=100,
+        lower=-30,
+        upper=30,
         optimum=0,
         shift=None,
         rotate=None,
@@ -147,6 +155,8 @@ class Rosenbrock(Benchmark):
         super(Rosenbrock, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+
+        self.poptimum = 1.0
 
     def __call__(self, y):
         z = self.transform(y) + 1
@@ -158,8 +168,8 @@ class Rosenbrock(Benchmark):
 class Rastrigin(Benchmark):
     def __init__(
         self,
-        lower=-5,
-        upper=5,
+        lower=-5.12,
+        upper=5.12,
         optimum=0,
         shift=None,
         rotate=None,
@@ -169,6 +179,8 @@ class Rastrigin(Benchmark):
         super(Rastrigin, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -180,8 +192,8 @@ class Rastrigin(Benchmark):
 class Griewank(Benchmark):
     def __init__(
         self,
-        lower=-600,
-        upper=600,
+        lower=-100,
+        upper=100,
         optimum=0,
         shift=None,
         rotate=None,
@@ -191,6 +203,8 @@ class Griewank(Benchmark):
         super(Griewank, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -207,8 +221,8 @@ class Griewank(Benchmark):
 class Ackley(Benchmark):
     def __init__(
         self,
-        lower=-32,
-        upper=32,
+        lower=-35,
+        upper=35,
         optimum=0,
         shift=None,
         rotate=None,
@@ -218,6 +232,8 @@ class Ackley(Benchmark):
         super(Ackley, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -232,20 +248,22 @@ class Ackley(Benchmark):
         )
 
 
-class Schwefel_problem_2_22(Benchmark):
+class Schwefel_2_22(Benchmark):
     def __init__(
         self,
-        lower=-10,
-        upper=10,
+        lower=-100,
+        upper=100,
         optimum=0,
         shift=None,
         rotate=None,
         shuffle=None,
         bias=0,
     ):
-        super(Schwefel_problem_2_22, self).__init__(
+        super(Schwefel_2_22, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -255,20 +273,21 @@ class Schwefel_problem_2_22(Benchmark):
         return np.sum(z) + np.prod(z) + self.bias
 
 
-class Schwefel_problem_1_2(Benchmark):
+class Schwefel_1_2(Benchmark):
     def __init__(
         self,
-        lower=-65.536,
-        upper=65.536,
+        lower=-100,
+        upper=100,
         optimum=0,
         shift=None,
         rotate=None,
         shuffle=None,
         bias=0,
     ):
-        super(Schwefel_problem_1_2, self).__init__(
+        super(Schwefel_1_2, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -387,7 +406,7 @@ class Styblinsky_tang(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum(z**4 - 16 * z**2 + 5 * z) / 2 + self.bias
+        return np.sum(z**4 - 16 * z**2 + 5 * z) / len(z) + self.bias
 
 
 class Alpine(Benchmark):
@@ -404,6 +423,8 @@ class Alpine(Benchmark):
         super(Alpine, self).__init__(
             lower, upper, optimum, shift, rotate, shuffle, bias
         )
+
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -502,6 +523,8 @@ class Brown(Benchmark):
         bias=0,
     ):
         super(Brown, self).__init__(lower, upper, optimum, shift, rotate, shuffle, bias)
+
+        self.poptimum = 0.0
 
     def __call__(self, y):
         z = self.transform(y)
@@ -1415,7 +1438,7 @@ class CF10F7_25(Benchmark):
         bias=0,
     ):
         self.g1 = Bohachevsky(shift=None, rotate=None, shuffle=None)
-        self.g2 = Schwefel_problem_2_22(shift=None, rotate=None, shuffle=None)
+        self.g2 = Schwefel_2_22(shift=None, rotate=None, shuffle=None)
         super(CF10F7_25, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.25
@@ -1615,7 +1638,7 @@ class CF10F7_75(Benchmark):
         bias=0,
     ):
         self.g1 = Bohachevsky(shift=None, rotate=None, shuffle=None)
-        self.g2 = Schwefel_problem_2_22(shift=None, rotate=None, shuffle=None)
+        self.g2 = Schwefel_2_22(shift=None, rotate=None, shuffle=None)
         super(CF10F7_75, self).__init__(lower, upper, optimum, None, None, None, bias)
 
         self.p = 0.75
