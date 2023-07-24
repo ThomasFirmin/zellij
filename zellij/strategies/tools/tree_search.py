@@ -321,7 +321,7 @@ class Best_first_search(Tree_search):
         maximum depth of the partition tree.
 
     Q : int, default=1
-        Q-Best_first_search, at each get_next, tries to return Q nodes.
+        Q-Best_first_search, at each :code:`get_next`, tries to return Q nodes.
 
     reverse : boolean, default=False
         if False do a descending sort the open list, else do an ascending sort
@@ -827,11 +827,10 @@ class Potentially_Optimal_Rectangle(Tree_search):
 
 
 class Locally_biased_POR(Tree_search):
-
     """Locally_biased_POR
 
-    Locally_biased_POR, is a the selection strategy
-    comming from Locally Biased DIRECT.
+    Locally_biased_POR, is a the selection strategy comming from Locally Biased DIRECT.
+
     Attributes
     ----------
 
