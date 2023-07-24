@@ -23,6 +23,7 @@ from .geometry import (
     Hypersphere,
     Section,
     Direct,
+    LatinHypercube,
 )
 
 from .tree_search import (
