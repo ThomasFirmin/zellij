@@ -17,5 +17,5 @@ from .variables import IntVar, FloatVar, CatVar, ArrayVar, Constant, Variable
 from .objective import Minimizer, Maximizer, Lambda
 
 from .experiment import Experiment
-from .stop import Calls, Convergence, Combined, Threshold, BooleanStop
+from .stop import Calls, Convergence, Combined, Threshold, IThreshold, BooleanStop
 from .backup import AutoSave, load_backup
