@@ -141,6 +141,31 @@ class Threshold(Stopping):
         return getattr(self.target, self.attribute) >= self.threshold  # type: ignore
 
 
+class IThreshold(Stopping):
+    """IThreshold
+
+    Stoppping criterion based on a budget. If the observed value
+    is below a threshold, then it returns False.
+
+    Parameters
+    ----------
+    threshold : int
+        Int describing the maximum value
+        that the observed value should not cross.
+
+    Attributes
+    ----------
+    threshold
+    """
+
+    def __init__(self, target, attribute, threshold):
+        super(IThreshold, self).__init__(target, attribute)
+        self.threshold = threshold
+
+    def __call__(self):
+        return getattr(self.target, self.attribute) <= self.threshold  # type: ignore
+
+
 class Calls(Threshold):
     """Calls
 
