@@ -480,7 +480,7 @@ class ContinuousSearchspace(Searchspace):
         self.lower = np.zeros(self.size)
         self.upper = np.ones(self.size)
 
-        if cont_condition:
+        if cont_condition and not conv_condition:
             for idx, v in enumerate(variables):
                 self.lower[idx] = v.lower
                 self.upper[idx] = v.upper
@@ -601,11 +601,25 @@ class DiscreteSearchspace(Searchspace):
         # ASSERTIONS #
         ##############
 
-        assert isinstance(variables, ArrayVar) and all(
-            isinstance(v, IntVar) for v in variables
+        cont_condition = all(isinstance(v, IntVar) for v in variables)
+        conv_condition = all(hasattr(v, "converter") for v in variables)
+
+        assert isinstance(variables, ArrayVar) and (
+            cont_condition or conv_condition
         ), logger.error(
-            f"`variables` must be be an `ArrayVar` of `FloatVar`, got {variables}"
+            f"`variables` must be be an `ArrayVar` of `IntVar`, got {variables}"
         )
+
+        self.lower = np.zeros(self.size)
+        self.upper = np.ones(self.size)
+
+        if cont_condition and not conv_condition:
+            for idx, v in enumerate(variables):
+                self.lower[idx] = v.lower
+                self.upper[idx] = v.upper
+            self._convert_sol = False
+        else:
+            self._convert_sol = True
 
         self.distance = kwargs.pop("distance", Euclidean(self))
         assert isinstance(self.distance, Distance), logger.error(
