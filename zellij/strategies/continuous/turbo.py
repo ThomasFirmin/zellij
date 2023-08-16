@@ -25,6 +25,7 @@ from botorch.fit import fit_gpytorch_mll
 from botorch.exceptions import ModelFittingError
 
 import math
+import os
 from dataclasses import dataclass
 
 from torch.quasirandom import SobolEngine
@@ -75,6 +76,18 @@ class CTurboState:
         self.failure_tolerance = math.ceil(
             max([4.0 / self.batch_size, float(self.dim) / self.batch_size])
         )
+
+    def reset(self):
+        self.best_constraint_values *= torch.inf
+        self.length = 0.8
+        self.length_min = 0.5**7
+        self.length_max = 1.6
+        self.failure_counter = 0
+        self.failure_tolerance = float("nan")  # type: ignore
+        self.success_counter = 0
+        self.success_tolerance = 3  # Note: The original paper uses 3
+        self.best_value = -float("inf")
+        self.restart_triggered = False
 
 
 @dataclass
@@ -567,7 +580,7 @@ class TuRBO(ContinuousMetaheuristic):
 
                 mask = np.isfinite(Y)
                 X = np.array(X)
-                Y = np.array(Y)  # negate Y, BoTorch -> max, Zellij -> min
+                Y = -np.array(Y)  # negate Y, BoTorch -> max, Zellij -> min
 
                 mx = X[mask]
                 my = Y[mask]
@@ -680,6 +693,7 @@ class SCBO(ContinuousMetaheuristic):
         batch_size=4,
         n_candidates=None,
         initial_size=10,
+        cholesky_size=800,
         beam=2000,
         gpu=False,
         **kwargs,
@@ -775,6 +789,13 @@ class SCBO(ContinuousMetaheuristic):
 
         self.cmodels_list = [None] * self.nconstraint
 
+        # Count generated models
+        self.models_number = 0
+
+        self.cholesky_size = cholesky_size
+
+        self.iterations = 0
+
     def _build_kwargs(self):
         self.model_kwargs = {
             key: value
@@ -863,8 +884,15 @@ class SCBO(ContinuousMetaheuristic):
 
         # Scale the TR to be proportional to the lengthscales
         x_center = X[Y.argmax(), :].clone()
-        tr_lb = torch.clamp(x_center - state.length / 2.0, 0.0, 1.0)
-        tr_ub = torch.clamp(x_center + state.length / 2.0, 0.0, 1.0)
+
+        # Add weights based trust region
+        weights = model.covar_module.base_kernel.lengthscale.squeeze().detach()
+        weights = weights / weights.mean()
+        weights = weights / torch.prod(weights.pow(1.0 / len(weights)))
+        ################################
+
+        tr_lb = torch.clamp(x_center - weights * state.length / 2.0, 0.0, 1.0)
+        tr_ub = torch.clamp(x_center + weights * state.length / 2.0, 0.0, 1.0)
 
         dim = X.shape[-1]
         sobol = SobolEngine(dim, scramble=True)
@@ -932,23 +960,28 @@ class SCBO(ContinuousMetaheuristic):
 
         """
 
-        if not self.initialized:
-            self.iteration = 1
+        if self.turbo_state.restart_triggered:
+            self.initialized = False
+            self.turbo_state.reset()
 
+        if not self.initialized:
             # call helper functions to generate initial training data and initialize model
             train_x = self._generate_initial_data()
             self.initialized = True
             return train_x, {
-                "iteration": self.iteration,
-                "algorithm": "InitCTuRBO",
+                "iteration": self.iterations,
+                "algorithm": "InitSCBO",
+                "length": 1.0,
+                "trestart": self.turbo_state.restart_triggered,
+                "model": -1,
             }
         else:
             torch.cuda.empty_cache()
             if (X is not None and Y is not None) and (len(X) > 0 and len(Y) > 0):
-                self.iteration += 1
+                self.iterations += 1
 
                 new_x = torch.tensor(X, dtype=self.dtype, device=self.device)
-                new_obj = torch.tensor(
+                new_obj = -torch.tensor(
                     Y, dtype=self.dtype, device=self.device
                 ).unsqueeze(-1)
                 new_c = torch.tensor(constraint, dtype=self.dtype, device=self.device)
@@ -990,19 +1023,19 @@ class SCBO(ContinuousMetaheuristic):
                         self.train_obj = new_obj
                         self.train_c = new_c
 
-                print(
-                    f"TRAIN SIZE: {len(self.train_x)},{len(self.train_obj)},{len(self.train_c)}"
-                )
                 if len(self.train_obj) < self.initial_size:
                     return [self.search_space.random_point(1)], {
-                        "iteration": self.iteration,
-                        "algorithm": "AddInitCTuRBO",
+                        "iteration": self.iterations,
+                        "algorithm": "AddInitSCBO",
+                        "length": 1.0,
+                        "trestart": self.turbo_state.restart_triggered,
+                        "model": -1,
                     }
                 else:
                     self.turbo_state = update_c_state(
                         state=self.turbo_state, Y_next=new_obj, C_next=new_c
                     )
-                    with gpytorch.settings.max_cholesky_size(float("inf")):
+                    with gpytorch.settings.max_cholesky_size(self.cholesky_size):
                         # reinitialize the models so they are ready for fitting on next iteration
                         # use the current state dict to speed up fitting
                         mll, model, train_Y = self._initialize_model(
@@ -1023,15 +1056,18 @@ class SCBO(ContinuousMetaheuristic):
 
                             except ModelFittingError:
                                 print(
-                                    f"In CTuRBO, ModelFittingError for constraint: {self.search_space.loss.constraint[i]}, previous fitted model will be used."
+                                    f"In SCBO, ModelFittingError for constraint: {self.search_space.loss.constraint[i]}, previous fitted model will be used."
                                 )
 
                         try:
                             fit_gpytorch_mll(mll)
                         except ModelFittingError:
                             return self.search_space.random_point(len(Y)), {
-                                "iteration": self.iteration,
-                                "algorithm": "FailedCTuRBO",
+                                "iteration": self.iterations,
+                                "algorithm": "FailedSCBO",
+                                "length": 1.0,
+                                "trestart": self.turbo_state.restart_triggered,
+                                "model": -1,
                             }
 
                         # optimize and get new observation
@@ -1044,14 +1080,23 @@ class SCBO(ContinuousMetaheuristic):
                             n_candidates=self.n_candidates,
                             constraint_model=ModelListGP(*self.cmodels_list),
                         )
+
+                        self.save(model, self.cmodels_list)
+
                         return new_x.cpu().numpy(), {
-                            "iteration": self.iteration,
-                            "algorithm": "CTuRBO",
+                            "iteration": self.iterations,
+                            "algorithm": "SCBO",
+                            "length": self.turbo_state.length,
+                            "trestart": self.turbo_state.restart_triggered,
+                            "model": self.models_number,
                         }
             else:
                 return [self.search_space.random_point(1)], {
-                    "iteration": self.iteration,
-                    "algorithm": "ResampleCTuRBO",
+                    "iteration": self.iterations,
+                    "algorithm": "ResampleSCBO",
+                    "length": 1.0,
+                    "trestart": self.turbo_state.restart_triggered,
+                    "model": -1,
                 }
 
     def __getstate__(self):
@@ -1062,6 +1107,23 @@ class SCBO(ContinuousMetaheuristic):
     def __setstate__(self, state):
         self.__dict__.update(state)
         self.cmodels_list = [None] * len(self.search_space.loss.constraint)
+
+    def save(self, model, cmodels):
+        path = self.search_space.loss.folder_name
+        foldername = os.path.join(path, "scbo")
+        if not os.path.exists(foldername):
+            os.makedirs(foldername)
+
+        torch.save(
+            model.state_dict(),
+            os.path.join(foldername, f"{self.models_number}_model.pth"),
+        )
+        for idx, m in enumerate(cmodels):
+            torch.save(
+                m.state_dict(),
+                os.path.join(foldername, f"{self.models_number}_c{idx}model.pth"),
+            )
+        self.models_number += 1
 
 
 class MORBO(ContinuousMetaheuristic):
