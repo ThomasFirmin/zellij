@@ -718,11 +718,9 @@ class Potentially_Optimal_Rectangle(Tree_search):
         #############
         # VARIABLES #
         #############
-        self.max_i1 = np.full(self.maxdiv, -float("inf"), dtype=float)
-        self.min_i2 = np.full(self.maxdiv, float("inf"), dtype=float)
 
         self.next_frontier = []
-        self.best_score = np.min([c.score for c in self.open])
+        self.best_score = float("inf")
 
     def add(self, c):
         self.next_frontier.append(c)
@@ -733,18 +731,16 @@ class Potentially_Optimal_Rectangle(Tree_search):
         if len(self.next_frontier) > 0:
             # sort potentially optimal rectangle by length (increasing)
             # then by score
-            self.open += sorted(self.next_frontier, key=lambda x: (x.measure, x.score))
-            # clip open list to maxdiv
-            self.open = sorted(self.open, key=lambda x: (x.measure, x.score))[
-                : self.maxdiv
-            ]
+            self.open.extend(self.next_frontier)
             self.next_frontier = []
+            # clip open list to maxdiv (oldest subspace are prunned)
+            self.open = self.open[-self.maxdiv :]
+            self.open = sorted(self.open, key=lambda x: (x.measure, x.score))
 
         if len(self.open):
-            self.max_i1.fill(-float("inf"))
-            self.min_i2.fill(float("inf"))
-
+            # I3 groups
             groups = groupby(self.open, lambda x: x.measure)
+
             idx = self.optimal(groups)
             if idx:
                 for i in reversed(idx):
@@ -769,59 +765,70 @@ class Potentially_Optimal_Rectangle(Tree_search):
             subgroup = list(value)
             current_score = subgroup[0].score
             idx = 0
-            while (
-                idx < len(subgroup)
-                and np.abs(subgroup[idx].score - current_score) <= 1e-13
-            ):
-                current_score = subgroup[idx].score
-                selected = subgroup[idx]
-                current_idx = group_size + idx
-                for jdx in range(current_idx + 1, len(self.open)):
-                    c = self.open[jdx]
+            selected = subgroup[idx]
+            current_idx = group_size + idx
 
-                    if c.measure < selected.measure:
-                        denom = selected.measure - c.measure
-                        num = selected.score - c.score
-                        if denom != 0:
-                            low_k = (num) / (denom)
-                        else:
-                            low_k = -float("inf")
+            is_potopt = False
 
-                        if low_k > self.max_i1[current_idx]:
-                            self.max_i1[current_idx] = low_k
-                        elif low_k < self.min_i2[jdx]:
-                            self.min_i2[jdx] = low_k
+            max_i1 = -float("inf")
+            min_i2 = float("inf")
 
-                    elif c.measure > selected.measure:
-                        denom = c.measure - selected.measure
-                        num = c.score - selected.score
-                        if denom != 0:
-                            up_k = (num) / (denom)
-                        else:
-                            up_k = float("inf")
+            for jdx in range(current_idx + 1, len(self.open)):
+                c = self.open[jdx]
 
-                        if up_k < self.min_i2[current_idx]:
-                            self.min_i2[current_idx] = up_k
-                        elif up_k > self.max_i1[jdx]:
-                            self.max_i1[jdx] = up_k
-
-                if self.min_i2[current_idx] > 0 and (
-                    self.max_i1[current_idx] <= self.min_i2[current_idx]
-                ):
-                    if self.best_score != 0:
-                        num = self.best_score - selected.score
-                        denum = np.abs(self.best_score)
-                        scnd_part = selected.measure / denum * self.min_i2[current_idx]
-
-                        if self.error <= num / denum + scnd_part:
-                            potoptidx.append(current_idx)
+                # I1 group
+                if c.measure < selected.measure:
+                    num = selected.score - c.score
+                    denom = selected.measure - c.measure
+                    if denom != 0:
+                        low_k = num / denom
                     else:
-                        scnd_part = selected.measure * self.min_i2[current_idx]
+                        low_k = -float("inf")
 
-                        if selected.score <= scnd_part:
-                            potoptidx.append(current_idx)
+                    if low_k > max_i1:
+                        max_i1 = low_k
+                    elif low_k < min_i2:
+                        min_i2 = low_k
 
+                # I2 group
+                elif c.measure > selected.measure:
+                    denom = c.measure - selected.measure
+                    num = c.score - selected.score
+                    if denom != 0:
+                        up_k = (num) / (denom)
+                    else:
+                        up_k = float("inf")
+
+                    if up_k < min_i2:
+                        min_i2 = up_k
+                    elif up_k > max_i1:
+                        max_i1 = up_k
+
+            if min_i2 > 0 and (max_i1 <= min_i2):
+                if self.best_score != 0:
+                    num = self.best_score - selected.score
+                    denum = np.abs(self.best_score)
+                    scnd_part = selected.measure / denum * min_i2
+
+                    if self.error <= num / denum + scnd_part:
+                        is_potopt = True
+                else:
+                    scnd_part = selected.measure * min_i2
+
+                    if selected.score <= scnd_part:
+                        is_potopt = True
+
+            if is_potopt:
+                potoptidx.append(current_idx)
                 idx += 1
+                while (
+                    idx < len(subgroup)
+                    and np.abs(subgroup[idx].score - current_score) <= 1e-13
+                ):
+                    current_idx = group_size + idx
+                    potoptidx.append(current_idx)
+                    idx += 1
+
             group_size += len(subgroup)
         return potoptidx
 
@@ -865,7 +872,7 @@ class Locally_biased_POR(Tree_search):
     """
 
     def __init__(self, open, max_depth=600, save_close=True, error=1e-4, maxdiv=3000):
-        """__init__(self, open, max_depth, Q=1, reverse=False, error=1e-4)
+        """__init__
 
         Parameters
         ----------
@@ -881,7 +888,8 @@ class Locally_biased_POR(Tree_search):
         error : float, default=1e-4
             Small value which determines when an evaluation should be considered
             as good as the best solution found so far.
-
+        maxdiv : int, default=3000
+            Prunning parameter. Maximum number of fractals to store.
         """
         super().__init__(open, max_depth, save_close)
 
@@ -895,12 +903,9 @@ class Locally_biased_POR(Tree_search):
         #############
         # VARIABLES #
         #############
-        self.max_i1 = np.full(self.maxdiv, -float("inf"), dtype=float)
-        self.min_i2 = np.full(self.maxdiv, float("inf"), dtype=float)
 
         self.next_frontier = []
-        min = [c.score for c in self.open]
-        self.best_score = np.min(min)
+        self.best_score = float("inf")
 
     def add(self, c):
         self.next_frontier.append(c)
@@ -909,19 +914,18 @@ class Locally_biased_POR(Tree_search):
 
     def get_next(self):
         if len(self.next_frontier) > 0:
-            self.open += sorted(
-                self.next_frontier, key=lambda x: (-x.lengmeasureth, x.score)
-            )
-            self.open = sorted(self.open, key=lambda x: (-x.measure, x.score))[
-                : self.maxdiv
-            ]
+            # sort potentially optimal rectangle by length (increasing)
+            # then by score
+            self.open.extend(self.next_frontier)
             self.next_frontier = []
+            # clip open list to maxdiv (oldest subspace are prunned)
+            self.open = self.open[-self.maxdiv :]
+            self.open = sorted(self.open, key=lambda x: (x.measure, x.score))
 
         if len(self.open):
-            self.max_i1.fill(-float("inf"))
-            self.min_i2.fill(float("inf"))
-
+            # I3 groups
             groups = groupby(self.open, lambda x: x.measure)
+
             idx = self.optimal(groups)
             if idx:
                 for i in reversed(idx):
@@ -935,72 +939,91 @@ class Locally_biased_POR(Tree_search):
             return False, -1
 
     def optimal(self, groups):
+        # see DIRECT Optimization Algorithm User Guide Daniel E. Finkel
+        # for explanation
+
+        # found potopt rectangle at level x
+        found_levels = [False] * self.max_depth
+
         # Potentially optimal index
-        potoptidx = defaultdict(None)
+        potoptidx = []
 
         group_size = 0
         for key, value in groups:
             subgroup = list(value)
-            current_score = subgroup[0].score
             idx = 0
-            while (
-                idx < len(subgroup)
-                and np.abs(subgroup[idx].score - current_score) <= 1e-13
-            ):
-                current_score = subgroup[idx].score
-                selected = subgroup[idx]
-                current_idx = group_size + idx
-                for jdx in range(current_idx + 1, len(self.open)):
-                    c = self.open[jdx]
 
-                    if c.measure < selected.measure:
-                        denom = selected.measure - c.measure
-                        num = selected.score - c.score
-                        if denom != 0:
-                            low_k = (num) / (denom)
-                        else:
-                            low_k = -float("inf")
+            selected = subgroup[idx]
+            current_idx = group_size + idx
+            current_score = subgroup[idx].score
 
-                        if low_k > self.max_i1[current_idx]:
-                            self.max_i1[current_idx] = low_k
-                        elif low_k < self.min_i2[jdx]:
-                            self.min_i2[jdx] = low_k
+            is_potopt = False
 
-                    elif c.measure > selected.measure:
-                        denom = c.measure - selected.measure
-                        num = c.score - selected.score
-                        if denom != 0:
-                            up_k = (num) / (denom)
-                        else:
-                            up_k = float("inf")
+            max_i1 = -float("inf")
+            min_i2 = float("inf")
 
-                        if up_k < self.min_i2[current_idx]:
-                            self.min_i2[current_idx] = up_k
-                        elif up_k > self.max_i1[jdx]:
-                            self.max_i1[jdx] = up_k
+            for jdx in range(current_idx + 1, len(self.open)):
+                c = self.open[jdx]
 
-                if not (selected.measure in potoptidx):
-                    if self.min_i2[current_idx] > 0 and (
-                        self.max_i1[current_idx] <= self.min_i2[current_idx]
-                    ):
-                        if self.best_score != 0:
-                            num = self.best_score - selected.score
-                            denum = np.abs(self.best_score)
-                            scnd_part = (
-                                selected.measure / denum * self.min_i2[current_idx]
-                            )
+                # I1 group
+                if c.measure < selected.measure:
+                    num = selected.score - c.score
+                    denom = selected.measure - c.measure
+                    if denom != 0:
+                        low_k = num / denom
+                    else:
+                        low_k = -float("inf")
 
-                            if self.error <= num / denum + scnd_part:
-                                potoptidx[selected.measure] = current_idx
-                        else:
-                            scnd_part = selected.measure * self.min_i2[current_idx]
+                    if low_k > max_i1:
+                        max_i1 = low_k
+                    elif low_k < min_i2:
+                        min_i2 = low_k
 
-                            if selected.score <= scnd_part:
-                                potoptidx[selected.measure] = current_idx
+                # I2 group
+                elif c.measure > selected.measure:
+                    denom = c.measure - selected.measure
+                    num = c.score - selected.score
+                    if denom != 0:
+                        up_k = (num) / (denom)
+                    else:
+                        up_k = float("inf")
 
+                    if up_k < min_i2:
+                        min_i2 = up_k
+                    elif up_k > max_i1:
+                        max_i1 = up_k
+
+            if min_i2 > 0 and (max_i1 <= min_i2):
+                if self.best_score != 0:
+                    num = self.best_score - selected.score
+                    denum = np.abs(self.best_score)
+                    scnd_part = selected.measure / denum * min_i2
+
+                    if self.error <= num / denum + scnd_part:
+                        is_potopt = True
+                else:
+                    scnd_part = selected.measure * min_i2
+
+                    if selected.score <= scnd_part:
+                        is_potopt = True
+
+            if is_potopt and not found_levels[selected.level]:
+                potoptidx.append(current_idx)
+                found_levels[selected.level] = True
                 idx += 1
+                while (
+                    idx < len(subgroup)
+                    and np.abs(subgroup[idx].score - current_score) <= 1e-13
+                ):
+                    current_idx = group_size + idx
+                    selected = subgroup[idx]
+                    if not found_levels[selected.level]:
+                        potoptidx.append(current_idx)
+                        found_levels[selected.level] = True
+                    idx += 1
+
             group_size += len(subgroup)
-        return list(potoptidx.values())
+        return potoptidx
 
 
 class Adaptive_POR(Tree_search):
@@ -1082,12 +1105,8 @@ class Adaptive_POR(Tree_search):
         #############
         # VARIABLES #
         #############
-        self.max_i1 = np.full(self.maxdiv, -float("inf"), dtype=float)
-        self.min_i2 = np.full(self.maxdiv, float("inf"), dtype=float)
-
         self.next_frontier = []
-        min = [c.score for c in self.open]
-        self.best_score = np.min(min)
+        self.best_score = float("inf")
         self.new_best_score = float("inf")
 
         self.stagnation = 0
@@ -1100,11 +1119,11 @@ class Adaptive_POR(Tree_search):
 
     def get_next(self):
         if len(self.next_frontier) > 0:
-            self.open += sorted(self.next_frontier, key=lambda x: (-x.measure, x.score))
-            self.open = sorted(self.open, key=lambda x: (-x.measure, x.score))[
-                : self.maxdiv
-            ]
+            self.open.extend(self.next_frontier)
             self.next_frontier = []
+            # clip open list to maxdiv (oldest subspace are prunned)
+            self.open = self.open[-self.maxdiv :]
+            self.open = sorted(self.open, key=lambda x: (-x.measure, x.score))
 
         if self.best_score - self.new_best_score >= 1e-4 * np.abs(
             np.median(self.open[0].scores) - self.best_score
@@ -1122,9 +1141,6 @@ class Adaptive_POR(Tree_search):
                 self.error = 0.0
 
         if len(self.open) > 1:
-            self.max_i1.fill(-float("inf"))
-            self.min_i2.fill(float("inf"))
-
             groups = groupby(self.open, lambda x: x.measure)
             idx = self.optimal(groups)
             if idx:
@@ -1141,187 +1157,6 @@ class Adaptive_POR(Tree_search):
             return False, -1
 
     def optimal(self, groups):
-        # Potentially optimal index
-        potoptidx = []
-
-        group_size = 0
-        for key, value in groups:
-            subgroup = list(value)
-            current_score = subgroup[0].score
-            idx = 0
-            while (
-                idx < len(subgroup)
-                and np.abs(subgroup[idx].score - current_score) <= 1e-13
-            ):
-                current_score = subgroup[idx].score
-                selected = subgroup[idx]
-                current_idx = group_size + idx
-                for jdx in range(current_idx + 1, len(self.open)):
-                    c = self.open[jdx]
-
-                    if c.measure < selected.measure:
-                        denom = selected.measure - c.measure
-                        num = selected.score - c.score
-                        if denom != 0:
-                            low_k = (num) / (denom)
-                        else:
-                            low_k = -float("inf")
-
-                        if low_k > self.max_i1[current_idx]:
-                            self.max_i1[current_idx] = low_k
-                        elif low_k < self.min_i2[jdx]:
-                            self.min_i2[jdx] = low_k
-
-                    elif c.measure > selected.measure:
-                        denom = c.measure - selected.measure
-                        num = c.score - selected.score
-                        if denom != 0:
-                            up_k = (num) / (denom)
-                        else:
-                            up_k = float("inf")
-
-                        if up_k < self.min_i2[current_idx]:
-                            self.min_i2[current_idx] = up_k
-                        elif up_k > self.max_i1[jdx]:
-                            self.max_i1[jdx] = up_k
-
-                if self.min_i2[current_idx] > 0 and (
-                    self.max_i1[current_idx] <= self.min_i2[current_idx]
-                ):
-                    if self.best_score != 0:
-                        num = self.best_score - selected.score
-                        denum = np.abs(self.best_score)
-                        scnd_part = selected.measure / denum * self.min_i2[current_idx]
-
-                        if self.error <= num / denum + scnd_part:
-                            potoptidx.append(current_idx)
-                    else:
-                        scnd_part = selected.measure * self.min_i2[current_idx]
-
-                        if selected.score <= scnd_part:
-                            potoptidx.append(current_idx)
-
-                idx += 1
-            group_size += len(subgroup)
-        return potoptidx
-
-
-class Potentially_Optimal_Hypersphere(Tree_search):
-    """Potentially_Optimal_Hypersphere
-
-    Potentially Optimal Hypersphere algorithm (POH),
-    is a the selection strategy comming from DIRECT adapted for Hyperspheres.
-
-    Attributes
-    ----------
-
-    open : list[Fractal]
-        Initial Open list containing not explored nodes from the partition tree.
-
-    max_depth : int
-        maximum depth of the partition tree.
-
-    Q : int, default=1
-        Q-Best_first_search, at each get_next, tries to return Q nodes.
-
-    reverse : boolean, default=False
-        if False do a descending sort the open list, else do an ascending sort
-
-    Methods
-    -------
-    add(self,c)
-        Add a node c to the fractal tree
-
-    get_next(self)
-        Get the next node to evaluate
-
-    See Also
-    --------
-    Fractal : Abstract class defining what a fractal is.
-    FDA : Fractal Decomposition Algorithm
-    Tree_search : Base class
-    Beam_search : Memory efficient tree search algorithm based on BestFS
-    Cyclic_best_first_search : Hybrid between DFS and BestFS
-    """
-
-    def __init__(self, open, max_depth=600, save_close=True, error=1e-4, maxdiv=3000):
-        """__init__(self, open, max_depth, Q=1, reverse=False, error=1e-4)
-
-        Parameters
-        ----------
-        open : list[Fractal]
-            Initial Open list containing not explored nodes from the partition tree.
-
-        max_depth : int
-            maximum depth of the partition tree.
-
-        save_close : boolean, default=True
-            If True save expanded, explored and scored fractal within a :code:`close` list. tree.
-
-        Q : int, default=1
-            Q-Best_first_search, at each get_next, tries to return Q nodes.
-
-        reverse : boolean, default=False
-            if False do a descending sort the open list, else do an ascending sort
-
-        error : float, default=1e-4
-            Small value which determines when an evaluation should be considered
-            as good as the best solution found so far.
-
-        """
-        super().__init__(open, max_depth, save_close)
-
-        ##############
-        # PARAMETERS #
-        ##############
-
-        self.error = error
-        self.maxdiv = maxdiv
-
-        #############
-        # VARIABLES #
-        #############
-        self.max_i1 = np.full(self.maxdiv, -float("inf"), dtype=float)
-        self.min_i2 = np.full(self.maxdiv, float("inf"), dtype=float)
-
-        self.next_frontier = []
-        min = [c.score for c in self.open]
-        self.best_score = np.min(min)
-
-    def add(self, c):
-        self.next_frontier.append(c)
-        if c.score < self.best_score:
-            self.best_score = c.score
-
-    def get_next(self):
-        if len(self.next_frontier) > 0:
-            # sort potentially optimal rectangle by radius (incresing)
-            # then by score
-            self.open += sorted(self.next_frontier, key=lambda x: (-x.radius, x.score))
-            # clip open list to maxdiv
-            self.open = sorted(self.open, key=lambda x: (-x.radius, x.score))[
-                : self.maxdiv
-            ]
-            self.next_frontier = []
-
-        if len(self.open):
-            self.max_i1.fill(-float("inf"))
-            self.min_i2.fill(float("inf"))
-
-            groups = groupby(self.open, lambda x: x.radius)
-            idx = self.optimal(groups)
-            if idx:
-                for i in reversed(idx):
-                    self.close.append(self.open.pop(i))
-
-                return True, self.close[-len(idx) :]
-            else:
-                self.close.append(self.open.pop(0))
-                return True, self.close[-1:]
-        else:
-            return False, -1
-
-    def optimal(self, groups):
         # see DIRECT Optimization Algorithm User Guide Daniel E. Finkel
         # for explanation
 
@@ -1333,59 +1168,70 @@ class Potentially_Optimal_Hypersphere(Tree_search):
             subgroup = list(value)
             current_score = subgroup[0].score
             idx = 0
-            while (
-                idx < len(subgroup)
-                and np.abs(subgroup[idx].score - current_score) <= 1e-13
-            ):
-                current_score = subgroup[idx].score
-                selected = subgroup[idx]
-                current_idx = group_size + idx
-                for jdx in range(current_idx + 1, len(self.open)):
-                    c = self.open[jdx]
+            selected = subgroup[idx]
+            current_idx = group_size + idx
 
-                    if c.radius < selected.radius:
-                        denom = selected.radius - c.radius
-                        num = selected.score - c.score
-                        if denom != 0:
-                            low_k = (num) / (denom)
-                        else:
-                            low_k = -float("inf")
+            is_potopt = False
 
-                        if low_k > self.max_i1[current_idx]:
-                            self.max_i1[current_idx] = low_k
-                        elif low_k < self.min_i2[jdx]:
-                            self.min_i2[jdx] = low_k
+            max_i1 = -float("inf")
+            min_i2 = float("inf")
 
-                    elif c.radius > selected.radius:
-                        denom = c.radius - selected.radius
-                        num = c.score - selected.score
-                        if denom != 0:
-                            up_k = (num) / (denom)
-                        else:
-                            up_k = float("inf")
+            for jdx in range(current_idx + 1, len(self.open)):
+                c = self.open[jdx]
 
-                        if up_k < self.min_i2[current_idx]:
-                            self.min_i2[current_idx] = up_k
-                        elif up_k > self.max_i1[jdx]:
-                            self.max_i1[jdx] = up_k
-
-                if self.min_i2[current_idx] > 0 and (
-                    self.max_i1[current_idx] <= self.min_i2[current_idx]
-                ):
-                    if self.best_score != 0:
-                        num = self.best_score - selected.score
-                        denum = np.abs(self.best_score)
-                        scnd_part = selected.radius / denum * self.min_i2[current_idx]
-
-                        if self.error <= num / denum + scnd_part:
-                            potoptidx.append(current_idx)
+                # I1 group
+                if c.measure < selected.measure:
+                    num = selected.score - c.score
+                    denom = selected.measure - c.measure
+                    if denom != 0:
+                        low_k = num / denom
                     else:
-                        scnd_part = selected.radius * self.min_i2[current_idx]
+                        low_k = -float("inf")
 
-                        if selected.score <= scnd_part:
-                            potoptidx.append(current_idx)
+                    if low_k > max_i1:
+                        max_i1 = low_k
+                    elif low_k < min_i2:
+                        min_i2 = low_k
 
+                # I2 group
+                elif c.measure > selected.measure:
+                    denom = c.measure - selected.measure
+                    num = c.score - selected.score
+                    if denom != 0:
+                        up_k = (num) / (denom)
+                    else:
+                        up_k = float("inf")
+
+                    if up_k < min_i2:
+                        min_i2 = up_k
+                    elif up_k > max_i1:
+                        max_i1 = up_k
+
+            if min_i2 > 0 and (max_i1 <= min_i2):
+                if self.best_score != 0:
+                    num = self.best_score - selected.score
+                    denum = np.abs(self.best_score)
+                    scnd_part = selected.measure / denum * min_i2
+
+                    if self.error <= num / denum + scnd_part:
+                        is_potopt = True
+                else:
+                    scnd_part = selected.measure * min_i2
+
+                    if selected.score <= scnd_part:
+                        is_potopt = True
+
+            if is_potopt:
+                potoptidx.append(current_idx)
                 idx += 1
+                while (
+                    idx < len(subgroup)
+                    and np.abs(subgroup[idx].score - current_score) <= 1e-13
+                ):
+                    current_idx = group_size + idx
+                    potoptidx.append(current_idx)
+                    idx += 1
+
             group_size += len(subgroup)
         return potoptidx
 

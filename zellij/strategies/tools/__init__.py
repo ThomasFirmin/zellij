@@ -37,6 +37,7 @@ from .tree_search import (
     Adaptive_POR,
     Soo_tree_search,
     Move_up,
+    Cyclic_best_first_search,
 )
 
 
