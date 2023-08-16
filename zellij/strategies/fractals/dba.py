@@ -65,14 +65,13 @@ class DBA(Metaheuristic):
     >>> lf = Loss()(himmelblau)
     >>> sp = Hypersphere(
                     ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),
-                    lf,
-                    scoring=Distance_to_the_best())
+                    lf)
     ...
     >>> explor = PHS(sp)
     >>> exploi = ILS(sp)
     >>> stop1 = Threshold(None, "current_calls", 3)  # set target to None, DBA will automatically asign it.
     >>> stop2 = Threshold(None,"current_calls", 100)  # set target to None, DBA will automatically asign it.
-    >>> dba = DBA(sp, Move_up(sp,5),(explor,stop1),(exploi,stop2))
+    >>> dba = DBA(sp, Move_up(sp,5),(explor,stop1),(exploi,stop2), scoring=Distance_to_the_best())
     >>> stop1.target = dba
     >>> stop2.target = dba
     ...
