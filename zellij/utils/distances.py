@@ -7,6 +7,7 @@
 # @License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
 
+from typing import Any
 from zellij.core.addons import Distance
 from zellij.core.variables import FloatVar, IntVar, CatVar, Constant
 from scipy.spatial import distance
@@ -82,6 +83,27 @@ class Manhattan(Distance):
 
     def __call__(self, point_a, point_b):
         return distance.cityblock(point_a, point_b, self.weights)
+
+
+######################
+# MIXED
+######################
+
+
+class _Float_int_dist:
+    def __init__(self, var):
+        self.var = var
+
+    def __call__(self, x, y):
+        return np.abs(x - y) / (self.var.upper - self.var.lower)
+
+
+def cat_dist(x, y):
+    return 1 if x == y else 0
+
+
+def constant_dist(x, y):
+    return 0
 
 
 class Mixed(Distance):
@@ -172,9 +194,8 @@ class Mixed(Distance):
 
             for v in self._target.variables:  # type: ignore
                 if isinstance(v, FloatVar) or isinstance(v, IntVar):
-                    up, lo = v.upper, v.lower
-                    self.operations.append(lambda x, y: np.abs(x - y) / (up - lo))
+                    self.operations.append(_Float_int_dist(v))
                 elif isinstance(v, CatVar):
-                    self.operations.append(lambda x, y: 1 if x == y else 0)
+                    self.operations.append(cat_dist)
                 elif isinstance(v, Constant):
-                    self.operations.append(lambda x, y: 0)
+                    self.operations.append(constant_dist)
