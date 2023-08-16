@@ -64,6 +64,7 @@ class PHS(ContinuousMetaheuristic):
         """
 
         self.inflation = inflation
+        self.computed = False
         super().__init__(search_space, verbose)
 
     @ContinuousMetaheuristic.search_space.setter
@@ -123,4 +124,10 @@ class PHS(ContinuousMetaheuristic):
         points[1:] += self.radius
         points[1:] = np.clip(points[1:], 0.0, 1.0)
 
+        self.computed = True
+
         return points, {"algorithm": "PHS"}
+
+    def reset(self):
+        super().reset()
+        self.computed = False
