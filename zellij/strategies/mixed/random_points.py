@@ -72,7 +72,7 @@ class Random(Metaheuristic):
         self.size = size
 
     # Run Random
-    def forward(self, X, Y):
+    def forward(self, X, Y, constraints):
         """forward(X, Y)
         Runs one step of Random.
 
