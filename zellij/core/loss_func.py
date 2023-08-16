@@ -1177,7 +1177,8 @@ class _MonoFlexible_strat(_Parallel_strat):
         )
         self._flex_x.append(point)
         self._flex_y.append(outputs["objective"])
-        self._flex_c.append([outputs[k] for k in self._lf.constraint])
+        if self._lf.constraint is not None:
+            self._flex_c.append([outputs[k] for k in self._lf.constraint])
 
         if self._lf.pqueue.qsize() <= self.threshold:
             return False  # Stop master
@@ -1231,10 +1232,14 @@ class _MultiSynchronous_strat(_Parallel_strat):
 
     # Executed by master when it receives a score from a worker
     def _process_outputs(self, point, outputs, id, info, source):
+        if self._lf.constraint is not None:
+            constraints = [outputs[k] for k in self._lf.constraint]
+        else:
+            constraints = []
         self.comm.send(
             dest=source,
             tag=2,
-            obj=(outputs["objective"], id, [outputs[k] for k in self._lf.constraint]),
+            obj=(outputs["objective"], id, constraints),
         )
         return True
 
@@ -1287,10 +1292,14 @@ class _MultiAsynchronous_strat(_Parallel_strat):
 
     # Executed by master when it receives a score from a worker
     def _process_outputs(self, point, outputs, id, info, source):
+        if self._lf.constraint is not None:
+            constraints = [outputs[k] for k in self._lf.constraint]
+        else:
+            constraints = []
         self.comm.send(
             dest=source,
             tag=2,
-            obj=(outputs["objective"], id, [outputs[k] for k in self._lf.constraint]),
+            obj=(outputs["objective"], id, constraints),
         )
         return True
 
