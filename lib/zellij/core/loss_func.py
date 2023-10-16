@@ -81,6 +81,7 @@ class LossFunc(ABC):
         verbose=True,
         only_score=False,
         kwargs_mode=False,
+        labels = None
     ):
 
         """__init__(model, save=False)
@@ -137,8 +138,9 @@ class LossFunc(ABC):
         self.calls = 0
         # Must be private, à voir
         self.new_best = False
-
-        self.labels = []
+        if labels is None:
+            labels = []
+        self.labels = labels
 
         if isinstance(self.save, str):
             self.folder_name = self.save
@@ -415,7 +417,6 @@ class LossFunc(ABC):
         self.calls = 0
         # Must be private, à voir
         self.new_best = False
-
         self.labels = []
 
         if isinstance(self.save, str):
@@ -488,6 +489,7 @@ class MPILoss(LossFunc):
         verbose=True,
         only_score=False,
         kwargs_mode=False,
+        labels=None
     ):
 
         """__init__(model, historic=True, save=False, verbose=True)
@@ -497,7 +499,7 @@ class MPILoss(LossFunc):
         """
 
         super().__init__(
-            model, objective, historic, save, verbose, only_score, kwargs_mode
+            model, objective, historic, save, verbose, only_score, kwargs_mode, labels
         )
 
         #################
@@ -530,7 +532,7 @@ class MPILoss(LossFunc):
         # else:
         #     self.worker()
 
-    def __call__(self, X, label=[], **kwargs):
+    def __call__(self, X, **kwargs):
 
         """__call__(X, label=[], **kwargs)
 
@@ -787,6 +789,7 @@ class SerialLoss(LossFunc):
         verbose=True,
         only_score=False,
         kwargs_mode=False,
+        labels=None
     ):
 
         """__init__(model, historic=True, save=False, verbose=True)
@@ -796,7 +799,7 @@ class SerialLoss(LossFunc):
         """
 
         super().__init__(
-            model, objective, historic, save, verbose, only_score, kwargs_mode
+            model, objective, historic, save, verbose, only_score, kwargs_mode, labels
         )
 
     def __call__(self, X, **kwargs):
@@ -826,8 +829,10 @@ class SerialLoss(LossFunc):
         for x in X:
             if self.kwargs_mode:
                 new_kwargs = {key: value for key, value in zip(self.labels, x)}
+                for key, value in kwargs.items():
+                    new_kwargs[key] = value
                 outputs, trained_model = self._build_return(
-                    self.model(**new_kwargs)
+                    self.model(new_kwargs)
                 )
             else:
                 outputs, trained_model = self._build_return(self.model(x))
@@ -877,6 +882,7 @@ def Loss(
     MPI=False,
     only_score=False,
     kwargs_mode=False,
+    labels=None
 ):
     """Loss(model=None, save=False, verbose=True, MPI=False, only_score=False, kwargs_mode=False)
 
@@ -941,6 +947,7 @@ def Loss(
                     verbose,
                     only_score,
                     kwargs_mode,
+                    labels
                 )
             else:
                 return SerialLoss(
@@ -951,6 +958,7 @@ def Loss(
                     verbose,
                     only_score,
                     kwargs_mode,
+                    labels
                 )
 
         return wrapper
