@@ -832,7 +832,7 @@ class SerialLoss(LossFunc):
                 for key, value in kwargs.items():
                     new_kwargs[key] = value
                 outputs, trained_model = self._build_return(
-                    self.model(**new_kwargs)
+                    self.model(new_kwargs)
                 )
             else:
                 outputs, trained_model = self._build_return(self.model(x))
