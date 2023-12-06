@@ -91,7 +91,7 @@ class PHS(ContinuousMetaheuristic):
                     self.inflation * self.search_space.radius,
                     (2, 1),
                 )
-                / self.search_space.size
+                / np.sqrt(self.search_space.size)
             )
             self.radius[1] = -self.radius[1]
 
