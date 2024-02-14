@@ -1,18 +1,32 @@
-# @Author: Thomas Firmin <tfirmin>
-# @Date:   2022-05-12T11:18:26+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-04-26T15:03:37+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
-
-from zellij.core.addons import VarAddon
+from __future__ import annotations
 from abc import ABC, abstractmethod
-import math
+from typing import Optional, Callable, Union, List, TYPE_CHECKING
+from dataclasses import dataclass
+
+from zellij.core.addons import (
+    VarConverter,
+    VarNeighborhood,
+    IntConverter,
+    FloatConverter,
+    CatConverter,
+    ArrayConverter,
+    PermutationConverter,
+    IntNeighborhood,
+    FloatNeighborhood,
+    CatNeighborhood,
+    ArrayNeighborhood,
+    PermutationNeighborhood,
+)
+
+from zellij.core.errors import InitializationError
+
 import numpy as np
 import random
-import copy
 
 import logging
 
@@ -30,64 +44,85 @@ class Variable(ABC):
     ----------
     label : str
         Name of the variable.
-    kwargs : dict
-        Kwargs will be the different addons you want to add to a :ref:`var`.
-        Known addons are:
-        * converter : VarConverter
-        * neighbor : VarNeighborhood
+    converter : VarConverter, optional
+        :code:`VarConverter` use to convert a given value from a :ref:`var` to another.
+    neighborhood : VarNeighborhood, optional
+        :code:`VarNeighborhood` used to define the neighborhood of a given value for a :ref:`var`.
+        Used in :ref:`meta` using neighborhood. Such as :code:`SimulatedAnnealing`.
 
     Attributes
     ----------
     label
+    converter
+    neighborhood
     """
 
-    def __init__(self, label, **kwargs):
-        assert isinstance(
-            label, str
-        ), f"""
-        Label must be a string, got {label}
-        """
-
+    def __init__(
+        self,
+        label: str,
+        converter: Optional[VarConverter] = None,
+        neighborhood: Optional[VarNeighborhood] = None,
+    ):
         self.label = label
-        self.kwargs = kwargs
+        self.converter = converter
+        self.neighborhood = neighborhood
 
-        self._add_addons(**kwargs)
+    @property
+    def label(self) -> str:
+        return self._label
+
+    @label.setter
+    def label(self, value: str):
+        if isinstance(value, str):
+            self._label = value
+        else:
+            raise InitializationError(f"Label must be a string. Got {type(value)}.")
+
+    @property
+    def converter(self) -> Optional[VarConverter]:
+        return self._converter
+
+    @converter.setter
+    @abstractmethod
+    def converter(self, value: Optional[VarConverter]):
+        pass
+
+    @property
+    def neighborhood(self) -> Optional[VarNeighborhood]:
+        return self._neighborhood
+
+    @neighborhood.setter
+    @abstractmethod
+    def neighborhood(self, value: Optional[VarNeighborhood]):
+        pass
+
+    def _converter_setter(self, value: Optional[VarConverter], atype: type):
+        if isinstance(value, atype) or (value is None):
+            self._converter = value
+            if self._converter:
+                self._converter.target = self
+        else:
+            raise InitializationError(
+                f"In Variable, converter must be of type {atype} or NoneType. Got {type(value)}"
+            )
+
+    def _neighborhood_setter(self, value: Optional[VarNeighborhood], atype: type):
+        if isinstance(value, atype) or (value is None):
+            self._neighborhood = value
+            if self._neighborhood:
+                self._neighborhood.target = self
+        else:
+            raise InitializationError(
+                f"In Variable, neighborhood must be of type {atype} or NoneType. Got {type(value)}"
+            )
 
     @abstractmethod
     def random(self, size=None):
         pass
 
     @abstractmethod
-    def isconstant(self):
+    def __len__(self):
         pass
-
-    @abstractmethod
-    def subset(self):
-        pass
-
-    # @abstractmethod
-    # def header(self):
-    #     pass
-    #
-    # @abstractmethod
-    # def save(self, x):
-    #     pass
-
-    def _add_addons(self, **kwargs):
-        for k in kwargs:
-            assert isinstance(
-                kwargs[k], VarAddon
-            ), f"""
-            Kwargs must be of type `VarAddon`, got {k}:{kwargs[k]}
-            """
-            if kwargs[k]:
-                setattr(self, k, copy.copy(kwargs[k]))
-                addon = getattr(self, k)
-                addon.target = self
-            else:
-                setattr(self, k, kwargs[k])
-                addon = getattr(self, k)
-                addon.target = self
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.label}, "
@@ -108,8 +143,13 @@ class IntVar(Variable):
         Lower bound of the variable
     upper : int
         Upper bound of the variable
-    sampler : Callable, default=np.random.randint
+    sampler : Callable[low, high, size], default=np.random.randint
         Function that takes lower bound, upper bound and a size as parameters.
+    converter : IntConverter, optional
+        :code:`IntConverter` use to convert a given value from a :ref:`var` to another.
+    neighborhood : IntNeighborhood, optional
+        :code:`IntNeighborhood` used to define the neighborhood of a given value for a :ref:`var`.
+        Used in :ref:`meta` using neighborhood. Such as :code:`SimulatedAnnealing`.
 
     Attributes
     ----------
@@ -120,46 +160,78 @@ class IntVar(Variable):
 
     Examples
     --------
-    >>> from zellij.core.variables import IntVar
-    >>> a = IntVar("test", 0, 5)
+    >>> from zellij.core import IntVar
+    >>> a = IntVar("i1",0,5)
     >>> print(a)
     IntVar(test, [0;5])
+    >>> print(a.label, a.lower, a.upper)
+    i1 0 5
     >>> a.random()
     1
-
+    >>> a.random(5)
+    array([1, 5, 4, 2, 4])
     """
 
-    def __init__(self, label, lower, upper, sampler=np.random.randint, **kwargs):
-        super(IntVar, self).__init__(label, **kwargs)
+    def __init__(
+        self,
+        label,
+        lower: int,
+        upper: int,
+        sampler: Callable[
+            [int, int, Optional[int]], Union[int, List[int], np.ndarray]
+        ] = np.random.randint,
+        converter: Optional[IntConverter] = None,
+        neighborhood: Optional[IntNeighborhood] = None,
+    ):
+        self._lower = float("-inf")
+        self._upper = float("inf")
 
-        assert isinstance(
-            upper, (int, np.integer)
-        ), f"""
-        Upper bound must be an int, got {upper}
-        """
-
-        assert isinstance(
-            lower, (int, np.integer)
-        ), f"""
-        Lower bound must be an int, got {lower}
-        """
-
-        assert (
-            lower < upper
-        ), f"""Lower bound must be
-        strictly inferior to upper bound,  got {lower}<{upper}"""
-
+        self.upper = upper
         self.lower = lower
-        self.upper = upper + 1
+
         self.sampler = sampler
 
-    def random(self, size=None):
+        super(IntVar, self).__init__(
+            label, converter=converter, neighborhood=neighborhood
+        )
+
+    @Variable.converter.setter
+    def converter(self, value: Optional[IntConverter]):
+        self._converter_setter(value, IntConverter)
+
+    @Variable.neighborhood.setter
+    def neighborhood(self, value: Optional[IntNeighborhood]):
+        self._neighborhood_setter(value, IntNeighborhood)
+
+    @property
+    def lower(self) -> int:
+        return self._lower  # type: ignore
+
+    @lower.setter
+    def lower(self, value: int):
+        if isinstance(value, int) and value < self._upper:
+            self._lower = value
+        else:
+            raise InitializationError(f"Lower must be an int and < upper. Got {value}")
+
+    @property
+    def upper(self) -> int:
+        return self._upper  # type: ignore
+
+    @upper.setter
+    def upper(self, value: int):
+        if isinstance(value, int) and value > self._lower:
+            self._upper = value
+        else:
+            raise InitializationError(f"Upper must be an int and > lower. Got {value}")
+
+    def random(self, size: Optional[int] = None):
         """random(size=None)
 
         Parameters
         ----------
-        size : int, default=None
-            Number of draws.
+        size : int, optional
+            Number of draws. If None, returns a single int.
 
         Returns
         -------
@@ -167,46 +239,7 @@ class IntVar(Variable):
             Return an int if :code:`size`=1, a :code:`list[int]` else.
 
         """
-        return self.sampler(low=self.lower, high=self.upper, size=size)
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: boolean
-            Return True, if this :ref:`var` is a constant
-            (:code:`lower`==:code:`upper`),\
-            False otherwise.
-
-        """
-        return self.upper == self.lower
-
-    def subset(self, lower, upper):
-        assert isinstance(
-            upper, (int, np.integer)
-        ), f"""Upper bound must be an int, got {upper}"""
-        assert isinstance(
-            lower, (int, np.integer)
-        ), f"""Upper bound must be an int, got {lower}"""
-        assert (
-            lower >= self.lower
-        ), f"""
-        Subset lower bound must be higher than the initial lower bound,
-         got {lower}>{self.lower}
-        """
-
-        assert (
-            upper <= self.upper
-        ), f"""
-        Subset upper bound must be lower than the initial upper bound,
-         got {lower}<{upper}
-        """
-
-        if upper == lower:
-            return Constant(self.label, lower)
-        else:
-            return IntVar(self.label, lower, upper)
+        return self.sampler(self.lower, self.upper, size)
 
     def __len__(self):
         return 1
@@ -229,8 +262,13 @@ class FloatVar(Variable):
         Lower bound of the variable
     upper : {int,float}
         Upper bound of the variable
-    sampler : Callable, default=np.random.uniform
+    sampler : Callable[low, high, size], default=np.random.uniform
         Function that takes lower bound, upper bound and a size as parameters.
+    converter : FloatConverter, optional
+        :code:`FloatConverter` use to convert a given value from a :ref:`var` to another.
+    neighborhood : FloatNeighborhood, optional
+        :code:`FloatNeighborhood` used to define the neighborhood of a given value for a :ref:`var`.
+        Used in :ref:`meta` using neighborhood. Such as :code:`SimulatedAnnealing`.
 
     Attributes
     ----------
@@ -241,115 +279,86 @@ class FloatVar(Variable):
 
     Examples
     --------
-    >>> from zellij.core.variables import FloatVar
-    >>> a = FloatVar("test", 0, 5.0)
+    >>> from zellij.core import FloatVar
+    >>> a = FloatVar("f1",0,5)
     >>> print(a)
-    FloatVar(test, [0;5.0])
+    FloatVar(f1, [0.0;5.0])
+    >>> print(a.label, a.lower, a.upper)
+    f1 0.0 5.0
     >>> a.random()
-    2.2011985711663056
-
+    1.4650916221213444
+    >>> a.random(5)
+    array([4.37946741 4.12848337 3.50995715 1.16979835 3.46117219])
     """
 
     def __init__(
         self,
         label,
-        lower,
-        upper,
-        sampler=np.random.uniform,
-        tolerance=1e-14,
-        **kwargs,
+        lower: float,
+        upper: float,
+        sampler: Callable[
+            [float, float, Optional[int]], Union[float, List[float], np.ndarray]
+        ] = np.random.uniform,
+        converter: Optional[FloatConverter] = None,
+        neighborhood: Optional[FloatNeighborhood] = None,
     ):
-        super(FloatVar, self).__init__(label, **kwargs)
-
-        assert isinstance(
-            upper, (float, int, np.integer, np.floating)
-        ), f"""Upper bound must be an int or a float, got {upper}"""
-
-        assert isinstance(
-            lower, (float, int, np.integer, np.floating)
-        ), f"""Lower bound must be an int or a float, got {lower}"""
-
-        assert (
-            lower < upper
-        ), f"""Lower bound must be
-         strictly inferior to upper bound, got {lower}<{upper}"""
-
-        assert tolerance >= 0, f"""Tolerance must be > 0, got{tolerance}"""
+        self._lower = float("-inf")
+        self._upper = float("inf")
 
         self.upper = upper
         self.lower = lower
-        self.sampler = sampler
-        self.tolerance = tolerance
 
-    def random(self, size=None):
-        """random(size=None)
+        self.sampler = sampler
+
+        super(FloatVar, self).__init__(
+            label, converter=converter, neighborhood=neighborhood
+        )
+
+    @Variable.converter.setter
+    def converter(self, value: Optional[FloatConverter]):
+        self._converter_setter(value, FloatConverter)
+
+    @Variable.neighborhood.setter
+    def neighborhood(self, value: Optional[FloatNeighborhood]):
+        self._neighborhood_setter(value, FloatNeighborhood)
+
+    @property
+    def lower(self) -> float:
+        return self._lower
+
+    @lower.setter
+    def lower(self, value: float | int):
+        if isinstance(value, (float, int)) and value < self._upper:
+            self._lower = float(value)
+        else:
+            raise InitializationError(f"Lower must be a float and < upper. Got {value}")
+
+    @property
+    def upper(self) -> float:
+        return self._upper
+
+    @upper.setter
+    def upper(self, value: float | int):
+        if isinstance(value, (float, int)) and value > self._lower:
+            self._upper = float(value)
+        else:
+            raise InitializationError(f"Upper must be an int and > lower. Got {value}")
+
+    def random(self, size: Optional[int] = None):
+        """random
 
         Parameters
         ----------
-        size : int, default=None
-            Number of draws.
+        size : int, optional
+            Number of draws. If None, returns a single float.
 
         Returns
         -------
         out: float or list[float]
-            Return a float if :code:`size`=1, a :code:`list[float]` else.
+            Return a float if :code:`size`=None, a :code:`list[float]` else.
 
         """
-        return self.sampler(low=self.lower, high=self.upper, size=size)
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: boolean
-            Return True, if this :ref:`var` is a constant
-            (:code:`lower`==:code:`upper`),\
-            False otherwise.
-
-        """
-        return self.upper == self.lower
-
-    def subset(self, lower, upper):
-        assert isinstance(
-            upper, (float, int, np.integer, np.floating)
-        ), f"""
-        Upper bound must be an int, got {upper}
-        """
-
-        assert isinstance(lower, int) or isinstance(
-            lower, (float, int, np.integer, np.floating)
-        ), f"""
-        Upper bound must be an int, got {lower}
-        """
-
-        assert (
-            lower - self.lower >= -self.tolerance
-            and lower - self.upper <= self.tolerance
-        ), f"""
-        Subset lower bound must be higher than the initial lower bound,
-        got {lower}>={self.lower}
-        """
-
-        assert (
-            upper - self.upper <= self.tolerance
-            and upper - self.lower >= -self.tolerance
-        ), f"""
-        Subset upper bound must be lower than the initial upper bound,
-        got {upper}<={self.upper}
-        """
-
-        if math.isclose(upper, lower, abs_tol=self.tolerance):
-            return Constant(self.label, float(lower))
-        else:
-            return FloatVar(
-                self.label,
-                lower,
-                upper,
-                sampler=self.sampler,
-                tolerance=self.tolerance,
-                **self.kwargs,
-            )
+        return self.sampler(self.lower, self.upper, size)
 
     def __len__(self):
         return 1
@@ -370,9 +379,14 @@ class CatVar(Variable):
         Name of the variable.
     features : list
         List of all possible features.
-    weights : list[float]
+    weights : ndarray[float], optional
         Weights associated to each elements of :code:`features`. The sum of all
         positive elements of this list, must be equal to 1.
+    converter : CatConverter, optional
+        :code:`CatConverter` use to convert a given value from a :ref:`var` to another.
+    neighborhood : CatNeighborhood, optional
+        :code:`CatNeighborhood` used to define the neighborhood of a given value for a :ref:`var`.
+        Used in :ref:`meta` using neighborhood. Such as :code:`SimulatedAnnealing`.
 
     Attributes
     ----------
@@ -381,110 +395,90 @@ class CatVar(Variable):
 
     Examples
     --------
-    >>> from zellij.core.variables import CatVar, IntVar
-    >>> a = CatVar("test", ['a', 1, 2.56, IntVar("int", 100 , 200)])
+    >>> from zellij.core import CatVar
+    >>> a = CatVar("c1",["a","b","c"])
     >>> print(a)
-    CatVar(test, ['a', 1, 2.56, IntVar(int, [100;200])])
-    >>> a.random(10)
-    ['a', 180, 2.56, 'a', 'a', 2.56, 185, 2.56, 105, 1]
-
+    CatVar(c1, ['a', 'b', 'c'])
+    >>> print(a.label, a.features)
+    c1 ['a', 'b', 'c']
+    >>> a.random()
+    'a'
+    >>> a.random(5)
+    ['c', 'c', 'c', 'a', 'b']
     """
 
-    def __init__(self, label, features, weights=None, **kwargs):
-        super(CatVar, self).__init__(label, **kwargs)
-
-        assert isinstance(
-            features, list
-        ), f"""
-        Features must be a list with a length > 0, got{features}
-        """
-
-        assert (
-            len(features) > 1
-        ), f"""
-        Features must be a list with a length > 1,
-        got length= {len(features)}
-        """
-
+    def __init__(
+        self,
+        label: str,
+        features: list,
+        weights: Optional[Union[List[float], np.ndarray]] = None,
+        converter: Optional[CatConverter] = None,
+        neighborhood: Optional[CatNeighborhood] = None,
+    ):
         self.features = features
+        self.weights = weights
 
-        assert (
-            isinstance(weights, (list, np.ndarray)) or weights == None
-        ), f"""`weights` must be a list or equal to None, got {weights}"""
+        super(CatVar, self).__init__(
+            label, converter=converter, neighborhood=neighborhood
+        )
 
-        if weights:
-            self.weights = weights
+    @Variable.converter.setter
+    def converter(self, value: Optional[CatConverter]):
+        self._converter_setter(value, CatConverter)
+
+    @Variable.neighborhood.setter
+    def neighborhood(self, value: Optional[CatNeighborhood]):
+        self._neighborhood_setter(value, CatNeighborhood)
+
+    @property
+    def features(self) -> list:
+        return self._features
+
+    @features.setter
+    def features(self, value: list):
+        if isinstance(value, list) and len(value) > 1:
+            self._features = value
         else:
-            self.weights = [1 / len(features)] * len(features)
+            raise InitializationError(
+                f"Features must be a list with a length > 0, got{value}"
+            )
 
-    def random(self, size=1):
-        """random(size=1)
+    @property
+    def weights(self) -> List[float]:
+        return self._weights
+
+    @weights.setter
+    def weights(self, value: Optional[Union[List[float], np.ndarray]]):
+        if value is None:
+            size = len(self.features)
+            self.weights = [1 / size] * size
+        elif isinstance(value, (list, np.ndarray)) and len(value) == len(self.features):
+            self._weights = list(value)
+        else:
+            raise InitializationError(
+                "weights must be a list of float, a numpy.ndarray, or None. Length of weights must be equal to length of features."
+            )
+
+    def random(self, size: Optional[int] = None):
+        """random
 
         Parameters
         ----------
-        size : int, default=1
-            Number of draws.
+        size : int, optional
+            Number of draws. If None, returns a single value.
 
         Returns
         -------
-        out: float or list[float]
-            Return a feature if :code:`size`=1, a :code:`list[features]` else.
-            Features can be :ref:`var`. When seleted, it will return
-            a random point from this :ref:`var`.
-
+        out: object
+            Return a random feature or list of random features.
         """
 
-        if size == 1:
-            res = random.choices(self.features, weights=self.weights, k=size)[0]
-            if isinstance(res, Variable):
-                res = res.random()
-        else:
+        if size:
             res = random.choices(self.features, weights=self.weights, k=size)
-
-            for i, v in enumerate(res):
-                if isinstance(v, Variable):
-                    res[i] = v.random()
+        else:
+            res = random.choices(self.features, weights=self.weights, k=1)[0]
 
         return res
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: boolean
-            Return True, if this :ref:`var` is a constant
-            (:code:`len(feature)==1`),\
-            False otherwise.
-
-        """
-
-        return len(self.features) == 1
-
-    def subset(self, lower, upper):
-        assert (
-            upper in self.features
-        ), f"""
-        Upper bound is not in features of CatVar, got {upper}"""
-
-        assert (
-            lower in self.features
-        ), f"""
-        Lower bound is not in features of CatVar, got {lower}"""
-
-        if upper == lower:
-            return Constant(self.label, lower)
-        else:
-            lo_idx = self.features.index(lower)
-            up_idx = self.features.index(upper)
-
-            if lo_idx > up_idx:
-                return CatVar(
-                    self.label,
-                    self.features[lo_idx:] + self.features[: up_idx + 1],
-                )
-            else:
-                return CatVar(self.label, self.features[lo_idx : up_idx + 1])
 
     def __len__(self):
         return 1
@@ -493,115 +487,126 @@ class CatVar(Variable):
         return super(CatVar, self).__repr__() + f"{self.features})"
 
 
+class IterableVar(Variable):
+    @abstractmethod
+    def random(self, size: Optional[int]) -> list:
+        pass
+
+    @abstractmethod
+    def __len__(self) -> int:
+        pass
+
+
 # Array of variables
-class ArrayVar(Variable):
-    """ArrayVar(Variable)
+class ArrayVar(IterableVar):
+    """ArrayVar
 
     :code:`ArrayVar` is a :ref:`var` describing a list of :ref:`var`. This class is
     iterable.
 
     Parameters
     ----------
+    args : list[Variable]
+        Elements of the :code:`ArrayVar`. All elements must be of type :ref:`var`
     label : str
         Name of the variable.
-    *args : list[Variable]
-        Elements of the :code:`ArrayVar`. All elements must be of type :ref:`var`
+    converter : ArrayConverter, optional
+        :code:`ArrayConverter` use to convert a given value from a :ref:`var` to another.
+    neighborhood : ArrayNeighborhood, optional
+        :code:`ArrayNeighborhood` used to define the neighborhood of a given value for a :ref:`var`.
+        Used in :ref:`meta` using neighborhood. Such as :code:`SimulatedAnnealing`.
 
     Examples
     --------
-    >>> from zellij.core.variables import ArrayVar, IntVar, FloatVar, CatVar
-    >>> a = ArrayVar(IntVar("int_1", 0,8),
-    ...              IntVar("int_2", 4,45),
-    ...              FloatVar("float_1", 2,12),
-    ...              CatVar("cat_1", ["Hello", 87, 2.56]))
+    >>> from zellij.core import ArrayVar, IntVar, FloatVar, CatVar
+    >>> a = ArrayVar(IntVar("i1", 0,8),
+    ...              IntVar("i2", 30,40),
+    ...              FloatVar("f1", 10,20),
+    ...              CatVar("c1", ["Hello", 87, 2.56]))
     >>> print(a)
-    ArrayVar(, [IntVar(int_1, [0;8]),
-                IntVar(int_2, [4;45]),
-                FloatVar(float_1, [2;12]),
-                CatVar(cat_1, ['Hello', 87, 2.56])])
+    ArrayVar(, [IntVar(i1, [0;8]),IntVar(i2, [30;40]),FloatVar(f1, [10.0;20.0]),CatVar(c1, ['Hello', 87, 2.56])])
+    >>> print(f"Label {a.label}, Length {len(a)}, Variables {a.variables}")
+    Label , Length 4, Variables [IntVar(i1, [0;8]), IntVar(i2, [30;40]), FloatVar(f1, [10.0;20.0]), CatVar(c1, ['Hello', 87, 2.56])]
     >>> a.random()
-    [5, 15, 8.483221226216427, 'Hello']
+    [6, 35, 12.920699881017159, 'Hello']
+    >>> a.random(5)
+    [[1, 31, 13.402872157435267, 'Hello'], [0, 38, 12.955169573740326, 'Hello'], [4, 30, 18.54926067947143, 'Hello'], [1, 32, 17.905372329473572, 'Hello'], [8, 34, 19.446512508103357, 'Hello']]
+    >>> for v in a:
+    ...     print(v)
+    IntVar(i1, [0;8])
+    IntVar(i2, [30;40])
+    FloatVar(f1, [10.0;20.0])
+    CatVar(c1, ['Hello', 87, 2.56])
+    >>> new = IntVar("i3", 100,200)
+    >>> a.append(new)
+    >>> print(a)
+    ArrayVar(, [IntVar(i1, [0;8]), IntVar(i2, [30;40]), FloatVar(f1, [10.0;20.0]), CatVar(c1, ['Hello', 87, 2.56]), IntVar(i3, [100;200])])
     """
 
-    def __init__(self, *args, label="", **kwargs):
-        if args and len(args) > 1 and args[0]:
-            assert all(
-                isinstance(v, Variable) for v in args
-            ), f"""
-            All elements must inherit from :ref:`var`,
-            got {args}
-            """
+    def __init__(
+        self,
+        *args: Variable,
+        label: str = "",
+        converter: Optional[ArrayConverter] = None,
+        neighborhood: Optional[ArrayNeighborhood] = None,
+    ):
+        self.variables = list(args)
+        self._index = 0
 
-            self.variables = list(args)
-            for idx, v in enumerate(self.variables):
-                setattr(v, "_idx", idx)
+        super(ArrayVar, self).__init__(
+            label, converter=converter, neighborhood=neighborhood
+        )
+
+    @Variable.converter.setter
+    def converter(self, value: Optional[ArrayConverter]):
+        self._converter_setter(value, ArrayConverter)
+
+    @Variable.neighborhood.setter
+    def neighborhood(self, value: Optional[ArrayNeighborhood]):
+        self._neighborhood_setter(value, ArrayNeighborhood)
+
+    @property
+    def variables(self) -> List[Variable]:
+        return self._variables
+
+    @variables.setter
+    def variables(self, value: List[Variable]):
+        if isinstance(value, list) and len(value) > 1:
+            if all(isinstance(v, Variable) for v in value):
+                self._variables = list(value)
+            else:
+                raise InitializationError(
+                    f"All elements must inherit from :ref:`var`,got {value}"
+                )
         else:
-            self.variables = []
+            self._variables = []
 
-        super(ArrayVar, self).__init__(label, **kwargs)
-
-    def random(self, size=1):
-        """random(size=1)
+    def random(self, size: Optional[int] = None) -> list:
+        """random
 
         Parameters
         ----------
-        size : int, default=None
-            Number of draws.
+        size : int, optional
+            Number of draws. If None, returns a single list.
 
         Returns
         -------
-        out: float or list[float]
-            Return a list composed of the variables returned by each :ref:`var` of
-            :code:`ArrayVar`. If :code:`size`>1, return a list of list
-
+        out: list
+            Return a single list if size is None, list of values from :code:`variables` else.
         """
 
-        if size == 1:
-            return [v.random() for v in self.variables]
-        else:
+        if size:
             res = []
             for _ in range(size):
                 res.append([v.random() for v in self.variables])
-
             return res
+        else:
+            return [v.random() for v in self.variables]
 
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: boolean
-            Return True, if this :ref:`var` is a constant (all elements are
-            constants), False otherwise.
-
-        """
-        return all(v.isconstant for v in self.variables)
-
-    def subset(self, lower, upper):
-        assert isinstance(lower, (list, np.ndarray)) and (
-            len(lower) == len(self)
-        ), f"""
-            Lower bound must be a list containing lower bound of each
-            :ref:`var` composing :code:`ArrayVar`, got {lower}
-            """
-
-        assert isinstance(upper, (list, np.ndarray)) and (
-            len(upper) == len(self)
-        ), f"""
-        Upper bound must be a list containing lower bound of each
-        :ref:`var` composing :code:`ArrayVar`, got {upper}
-        """
-
-        new_vars = []
-        for v, l, u in zip(self.variables, lower, upper):
-            new_vars.append(v.subset(l, u))
-
-        return ArrayVar(*new_vars, label=self.label, **self.kwargs)
-
-    def index(self, var):
+    def index(self, var: Variable):
         """index(var)
 
-        Return the index inside the :code::code:`ArrayVar` of a given :code:`var`.
+        Return the index inside the :code:`ArrayVar` of a given :code:`var`.
 
         Parameters
         ----------
@@ -614,12 +619,12 @@ class ArrayVar(Variable):
             Index of :code:`var`.
 
         """
-        return var._idx
+        return self.variables.index(var)
 
-    def append(self, v):
+    def append(self, v: Variable):
         """append(v)
 
-        Append a :ref:`Variables` to the :code::code:`ArrayVar`.
+        Append a :ref:`var` to the :code:`ArrayVar`.
 
         Parameters
         ----------
@@ -628,7 +633,6 @@ class ArrayVar(Variable):
 
         """
         if isinstance(v, Variable):
-            setattr(v, "_idx", len(self.variables))
             self.variables.append(v)
         else:
             raise ValueError(
@@ -639,19 +643,19 @@ class ArrayVar(Variable):
             )
 
     def __iter__(self):
-        self.index = 0
+        self._index = 0
         return self
 
-    def __next__(self):
-        if self.index >= len(self.variables):
+    def __next__(self) -> Variable:
+        if self._index >= len(self.variables):
             raise StopIteration
 
-        res = self.variables[self.index]
-        self.index += 1
+        res = self.variables[self._index]
+        self._index += 1
         return res
 
-    def __getitem__(self, item):
-        return self.variables[item]
+    def __getitem__(self, key):
+        return self.variables[key]
 
     def __len__(self):
         return len(self.variables)
@@ -664,273 +668,113 @@ class ArrayVar(Variable):
         return super(ArrayVar, self).__repr__() + f"[{vars_reprs[:-1]}])"
 
 
-# Block of variable, fixed size
-class Block(Variable):
-    """Block(Variable)
-
-    A `Block` is a :ref:`var` which will repeat multiple times a :ref:`var`.
-
-    Parameters
-    ----------
-    label : str
-        Name of the variable.
-    var : Variable
-        :ref:`var` that will be repeated
-    repeat : int
-        Number of repeats.
-
-    Examples
-    --------
-    >>> from zellij.core.variables import Block, ArrayVar, FloatVar, IntVar
-    >>> content = ArrayVar("test",
-    ...                     IntVar("int_1", 0,8),
-    ...                     IntVar("int_2", 4,45),
-    ...                     FloatVar("float_1", 2,12))
-    >>> a = Block("size 3 Block", content, 3)
-    >>> print(a)
-    Block(size 3 Block, [IntVar(int_1, [0;8]),
-                         IntVar(int_2, [4;45]),
-                         FloatVar(float_1, [2;12]),])
-    >>> a.random(3)
-    [[[7, 22, 6.843164591359903],
-        [5, 18, 10.608957810018786],
-        [4, 21, 10.999649079045858]],
-    [[5, 9, 9.773288692746476],
-        [1, 12, 6.1909724243671445],
-        [4, 12, 9.404313234593669]],
-    [[4, 10, 2.72648188721585],
-        [1, 44, 5.319257221471118],
-        [4, 24, 9.153357213126071]]]
-
-    """
-
-    def __init__(self, label, var, repeat, **kwargs):
-        super(Block, self).__init__(label, **kwargs)
-
-        assert isinstance(
-            var, Variable
-        ), f"""
-        var must inherit from :ref:`var`, got {var}
-        """
-
-        self.var = var
-
-        assert (
-            isinstance(repeat, int) and repeat > 0
-        ), f"""
-        `repeat` must be a strictly positive int, got {repeat}.
-        """
-
-        self.repeat = repeat
-
-    def random(self, size=1):
-        """random(size=1)
-
-        Parameters
-        ----------
-        size : int, default=None
-            Number of draws.
-
-        Returns
-        -------
-        out: float or list[float]
-            Return a list composed of the results from the :ref:`var` `random()`
-            method, repeated `repeat` times. If size > 1, return a list of list.
-
-        """
-
-        res = []
-
-        if size > 1:
-            for _ in range(size):
-                block = []
-                for _ in range(self.repeat):
-                    block.append([v.random() for v in self.var])
-                res.append(block)
-        else:
-            for _ in range(self.repeat):
-                res.append([v.random() for v in self.var])
-
-        return res
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: boolean
-            Return True, if this :ref:`var` is a constant (the repeated
-            :ref:`var` is constant), False otherwise.
-
-        """
-
-        return self.var.isconstant()
-
-    def subset(self, lower, upper):
-        new_vars = self.var.subset(lower, upper)
-
-        return Block(self.label, new_vars)
-
-    def __repr__(self):
-        vars_reprs = ""
-        for v in self.var:
-            vars_reprs += v.__repr__() + ","
-
-        return super(Block, self).__repr__() + f"[{vars_reprs}])"
+@dataclass
+class _PermElem:
+    label: str
 
 
-# Block of variables, with random size.
-class DynamicBlock(Block):
-    """DynamicBlock(Block)
+# Array of variables
+class PermutationVar(IterableVar):
+    """PermutationVar
 
-    A `DynamicBlock` is a `Block` with a random number of repeats.
+    :code:`ArrayVar` is a :ref:`var` describing a list permutation of unique integers. This class is
+    iterable.
 
     Parameters
     ----------
+    n : int
+        Number of elements within the permutation.
     label : str
         Name of the variable.
-    var : Variable
-        :ref:`var` that will be repeated
-    repeat : int
-        Maximum number of repeats.
+    converter : PermutationConverter, optional
+        :code:`PermutationConverter` use to convert a given value from a :ref:`var` to another.
+    neighborhood : PermutationNeighborhood, optional
+        :code:`PermutationNeighborhood` used to define the neighborhood of a given value for a :ref:`var`.
+        Used in :ref:`meta` using neighborhood. Such as :code:`SimulatedAnnealing`.
 
     Examples
     --------
-    >>> from zellij.core.variables import DynamicBlock, ArrayVar, FloatVar, IntVar
-    >>> content = ArrayVar(IntVar("int_1", 0,8),
-    ...                    IntVar("int_2", 4,45),
-    ...                    FloatVar("float_1", 2,12))
-    >>> a = DynamicBlock("max size 10 Block", content, 10)
+    >>> from zellij.core import PermutationVar
+    >>> a = PermutationVar(10,"cities")
     >>> print(a)
-    DynamicBlock(max size 10 Block, [IntVar(int_1, [0;8]),
-                                     IntVar(int_2, [4;45]),
-                                     FloatVar(float_1, [2;12]),])
+    PermutationVar(cities, 10)
+    >>> print(f"Label {a.label}, Length {len(a)}, Variable {a.variable}")
+    Label cities, Length 10, Variable 10
     >>> a.random()
-    [[[3, 12, 10.662362255103403],
-          [7, 9, 5.496860842510198],
-          [3, 37, 7.25449459082227],
-          [4, 28, 4.912883181322568]],
-    [[3, 23, 5.150228671772998]],
-    [[6, 30, 6.1181372194738515]]]
-
+    [5, 8, 9, 3, 0, 6, 4, 7, 2, 1]
+    >>> a.random(5)
+    [[1, 3, 0, 2, 4, 6, 7, 5, 9, 8],
+     [7, 8, 2, 4, 0, 9, 5, 6, 1, 3],
+     [7, 4, 3, 2, 5, 9, 6, 0, 1, 8],
+     [0, 8, 6, 1, 3, 5, 4, 7, 9, 2],
+     [5, 3, 8, 9, 7, 2, 6, 1, 0, 4]]
     """
 
-    def __init__(self, label, var, repeat, **kwargs):
-        super(DynamicBlock, self).__init__(label, var, repeat, **kwargs)
+    def __init__(
+        self,
+        n: int,
+        label: str,
+        converter: Optional[PermutationConverter] = None,
+        neighborhood: Optional[PermutationNeighborhood] = None,
+    ):
+        self.n = n
+        self._index = 0
+        super().__init__(label, converter, neighborhood)
 
-    def random(self, size=1):
-        """random(size=1)
+    @Variable.converter.setter
+    def converter(self, value: Optional[PermutationConverter]):
+        self._converter_setter(value, PermutationConverter)
+
+    @Variable.neighborhood.setter
+    def neighborhood(self, value: Optional[PermutationNeighborhood]):
+        self._neighborhood_setter(value, PermutationNeighborhood)
+
+    @property
+    def n(self) -> int:
+        return self._n
+
+    @n.setter
+    def n(self, value: int):
+        if value > 1:
+            self._n = value
+        else:
+            raise InitializationError(f"In PermutationVar, n must be >1. Got {value}.")
+
+    def random(self, size: Optional[int] = None) -> list:
+        """random
 
         Parameters
         ----------
-        size : int, default=None
-            Number of draws.
+        size : int, optional
+            Number of draws. If None, returns a single list.
 
         Returns
         -------
-        out: float or list[float]
-            Return a list composed of the results from the :ref:`var` `random()`
-            method, repeated `repeat` times. If size > 1, return a list of list.
-
+        out: list
+            Return a single list if size is None, list of values from :code:`variables` else.
         """
-        res = []
 
-        if size > 1:
-            for _ in range(size):
-                block = []
-                n_repeat = np.random.randint(1, self.repeat)
-                for _ in range(n_repeat):
-                    block.append([v.random() for v in self.var])
-                res.append(block)
+        if size:
+            res = np.tile(np.arange(self.n), (size, 1))
+            for v in res:
+                v = np.random.permutation(v)
+            return res.tolist()
         else:
-            n_repeat = np.random.randint(1, self.repeat)
-            for _ in range(n_repeat):
-                res.append([v.random() for v in self.var])
+            return np.random.permutation(np.arange(self.n)).tolist()
 
-        return res
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: False
-            Return False, a dynamic block cannot be constant. (It is a binary)
-
-        """
-        return False
-
-
-# Constant
-class Constant(Variable):
-    """Constant
-
-    :code:`Constant` is a :ref:`var` discribing a constant of any type.
-
-    Parameters
-    ----------
-    label : str
-        Name of the variable.
-    value : object
-        Constant value
-
-    Attributes
-    ----------
-    label : str
-        Name of the variable.
-    var : object
-        Constant var
-
-    Examples
-    --------
-    >>> from zellij.core.variables import Constant
-    >>> a = Constant("test", 5)
-    >>> print(a)
-    Constant(test, 5)
-    >>> a.random()
-    5
-
-    """
-
-    def __init__(self, label, value, **kwargs):
-        super(Constant, self).__init__(label, **kwargs)
-        assert not isinstance(
-            value, Variable
-        ), f"Element must not be of Variable type, got {value}"
-        self.value = value
-
-    def random(self, size=1):
-        """random(size=None)
-
-        Parameters
-        ----------
-        size : int, default=None
-            Number of draws.
-
-        Returns
-        -------
-        out: int or list[int]
-            Return an int if :code:`size`=1, a :code:`list[self.var]` else.
-
-        """
-        if size > 1:
-            return [self.value] * size
-        else:
-            return self.value
-
-    def isconstant(self):
-        """isconstant()
-
-        Returns
-        -------
-        out: boolean
-            Return True
-
-        """
-        return True
-
-    def subset(self, l, u):
+    def __iter__(self):
+        self._index = 0
         return self
 
+    def __next__(self) -> object:
+        if self._index >= self.n:
+            raise StopIteration
+        res = _PermElem(f"{self.label}_{self._index}")
+        self._index += 1
+        return res
+
+    def __len__(self):
+        return self.n
+
     def __repr__(self):
-        return super(Constant, self).__repr__() + f"{self.value})"
+        return f"{super().__repr__()}{self.n})"
