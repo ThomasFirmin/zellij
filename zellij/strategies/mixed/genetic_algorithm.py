@@ -1,14 +1,18 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-04-06T17:28:46+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
-
+from __future__ import annotations
 from zellij.core.metaheuristic import Metaheuristic
-from zellij.core.addons import Mutator, Selector, Crossover
+from zellij.core.errors import InputError
+
+from typing import List, Tuple, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from zellij.core.addons import Mutation, Selection, Crossover
+    from zellij.core.search_space import Searchspace
+
 from deap import creator, base, tools
 import numpy as np
 
@@ -23,30 +27,25 @@ creator.create("FitnessMin", base.Fitness, weights=(-1.0,))
 creator.create("Individual", list, fitness=creator.FitnessMin)  # type: ignore
 
 
-class Genetic_algorithm(Metaheuristic):
+class GeneticAlgorithm(Metaheuristic):
 
-    """Genetic_algorithm
+    """GeneticAlgorithm
 
-    Genetic_algorithm (GA) implements a classic genetic algorithm.
+    GeneticAlgorithm (GA) implements a usual genetic algorithm.
 
     It uses `DEAP <https://deap.readthedocs.io/>`__.
     See :ref:`meta` for more info.
 
     Attributes
     ----------
-
     search_space : Searchspace
         Search space object containing bounds of the search space.
-
     pop_size : int
         Population size.
-
     elitism : float
         Percentage of the best parents to keep in the next population by replacing the worst children.
-
     verbose : boolean, default=True
         Algorithm verbosity
-
     init_pop : boolean, default=None
         If a a initial population (list of individuals) is given.
         The population will be initialized with :code:`init_pop`,
@@ -61,107 +60,112 @@ class Genetic_algorithm(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core import Loss, Threshold, Experiment
-    >>> from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar
-    >>> from zellij.utils.neighborhoods import FloatInterval, ArrayInterval, Intervals
-    >>> from zellij.strategies.genetic_algorithm import Genetic_algorithm
-    >>> from zellij.utils.operators import NeighborMutation, DeapTournament, DeapOnePoint
-    >>> from zellij.utils.benchmarks import himmelblau
-    ...
-    >>> lf = Loss()(himmelblau)
-    >>> sp = ContinuousSearchspace(ArrayVar(
-    ...                           FloatVar("a",-5,5, neighbor=FloatInterval(0.5)),
-    ...                           FloatVar("b",-5,5,neighbor=FloatInterval(0.5)),
-    ...                           neighbor=ArrayInterval())
-    ...                         ,lf, neighbor=Intervals(),
-    ...                         mutation = NeighborMutation(0.5),
-    ...                         selection = DeapTournament(3),
-    ...                         crossover = DeapOnePoint())
-    ...
-    >>> stop = Threshold(lf, 'calls', 100)
-    >>> ga = Genetic_algorithm(sp, pop_size=25,elitism=0.5)
-    >>> exp = Experiment(ga, stop)
+    >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.mixed import GeneticAlgorithm
+    >>> from zellij.strategies.tools import DeapOnePoint, DeapTournament, NeighborMutation
+    >>> from zellij.utils import ArrayDefaultN, FloatInterval
+
+    >>> @Loss(objective=Minimizer("obj"))
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     return {"obj": res}
+    >>> a = ArrayVar(
+    ...     FloatVar("f1", -5, 5, neighborhood=FloatInterval(0.5)),
+    ...     FloatVar("i2", -5, 5, neighborhood=FloatInterval(0.5)),
+    ...     neighborhood=ArrayDefaultN(),
+    ... )
+    >>> sp = ContinuousSearchspace(a)
+    >>> selection = DeapTournament(4)
+    >>> mutation = NeighborMutation(1.0)
+    >>> crossover = DeapOnePoint()
+    >>> opt = GeneticAlgorithm(sp, selection, mutation, crossover, 20)
+    >>> stop = Calls(himmelblau, 400)
+    >>> exp = Experiment(opt, himmelblau, stop)
     >>> exp.run()
-    >>> print(f"Best solution:f({lf.best_point})={lf.best_score}")
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([2.9854881033107623, 1.9529960098733676])=0.058047272291031515
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 400
     """
 
     def __init__(
         self,
-        search_space,
-        pop_size=10,
-        elitism=0.5,
-        verbose=True,
-        init_pop=None,
+        search_space: Searchspace,
+        selection: Selection,
+        mutation: Mutation,
+        crossover: Crossover,
+        pop_size: int = 10,
+        elitism: float = 0.5,
+        verbose: bool = True,
     ):
         """__init__(search_space, pop_size = 10, verbose=True)
-
-        Initialize Genetic_algorithm class
 
         Parameters
         ----------
         search_space : Searchspace
             Search space object containing bounds of the search space.
-
         pop_size : int
             Population size.
-
         elitism : float
             Percentage of the best parents to keep in the next population by replacing the worst children.
-
         verbose : boolean, default=True
             Algorithm verbosity
 
-        init_pop : boolean, default=None
-            If a a initial population (list of individuals) is given.
-            The population will be initialized with :code:`init_pop`,
-            otherwise randomly .
-
         """
-
         super().__init__(search_space, verbose)
-        assert hasattr(search_space, "mutation") and isinstance(
-            search_space.mutation, Mutator
-        ), f"""When using :ref:`ga`, :ref:`sp` must have a `mutation` operator
-        and of type: Mutator, use `mutation` kwarg when defining the :ref:`sp`
-        ex:\n
-        >>> ContinuousSearchspace(values, loss, mutation=...)"""
-
-        assert hasattr(search_space, "selection") and isinstance(
-            search_space.selection, Selector
-        ), f"""When using :ref:`ga`, :ref:`sp` must have a `selection` operator
-        and of type: Selector, use `mutation` kwarg when defining the :ref:`sp`
-        ex:\n
-        >>> ContinuousSearchspace(values, loss, selection=...)"""
-
-        assert hasattr(search_space, "crossover") and isinstance(
-            search_space.crossover, Crossover
-        ), f"""When using :ref:`ga`, :ref:`sp` must have a `mutation` operator
-        and of type: Selector, use `crossover` kwarg when defining the :ref:`sp`
-        ex:\n
-        >>> ContinuousSearchspace(values, loss, crossover=...)"""
 
         ##############
         # PARAMETERS #
         ##############
-
         self.pop_size = pop_size
         self.elitism = elitism
-        self.init_pop = init_pop
+        logger.info("Making tools...")
+        # toolbox contains all the operator of GA. (mutate, select, crossover...)
+        self.toolbox = base.Toolbox()
+
+        self.selection = selection
+        self.mutation = mutation
+        self.crossover = crossover
 
         #############
         # VARIABLES #
         #############
-
         self.initialized = False
         self.first_offspring = False
         self.pop = []
 
         self.g = 0
 
-        logger.info("Constructing tools...")
+    @property
+    def mutation(self) -> Mutation:
+        return self._mutation
 
-        # toolbox contains all the operator of GA. (mutate, select, crossover...)
-        self.toolbox = base.Toolbox()
+    @mutation.setter
+    def mutation(self, value: Mutation):
+        value.target = self.search_space
+        value._build(self.toolbox)
+        self._mutation = value
+
+    @property
+    def selection(self) -> Selection:
+        return self._selection
+
+    @selection.setter
+    def selection(self, value: Selection):
+        value.target = self.search_space
+        value._build(self.toolbox)
+        self._selection = value
+
+    @property
+    def crossover(self) -> Crossover:
+        return self._crossover
+
+    @crossover.setter
+    def crossover(self, value: Crossover):
+        value.target = self.search_space
+        value._build(self.toolbox)
+        self._crossover = value
 
     @property
     def toolbox(self):
@@ -170,12 +174,6 @@ class Genetic_algorithm(Metaheuristic):
     @toolbox.setter
     def toolbox(self, value):
         self._toolbox = value
-
-        # Create operators
-        self.search_space.mutation._build(value)
-        self.search_space.selection._build(value)
-        self.search_space.crossover._build(value)
-
         # Create a tool to select best individuals from a population
         bpn = int(self.pop_size * self.elitism)
         bcn = self.pop_size - bpn
@@ -242,18 +240,18 @@ class Genetic_algorithm(Metaheuristic):
         self.initialized = False
         self.first_offspring = False
 
-    # Run GA
-    def forward(self, X, Y):
-        """forward(X, Y)
-        Runs one step of Genetic_algorithm.
+    # Run Random
+    def forward(
+        self,
+        X: Optional[list] = None,
+        Y: Optional[np.ndarray] = None,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ) -> Tuple[List[list], dict]:
+        """
+        Runs one step of GA.
 
-        Parameters
-        ----------
-        X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+        Secondary, or constraints are not necessary.
 
         Returns
         -------
@@ -268,82 +266,84 @@ class Genetic_algorithm(Metaheuristic):
 
         if not self.initialized:
             self.g = 0
+            self.initialized = True
             # Start from a saved population
-            if self.init_pop:
-                logger.info("Creation of the initial population...")
-                pop = self.toolbox.population_guess(self.init_pop)
-
-            # Start from a random population
-            else:
+            if X is None and Y is None:
                 # Build the population
                 logger.info("Creation of the initial population...")
                 pop = self.toolbox.population(n=self.pop_size)
 
-            logger.info("Evaluating the initial population...")
-            solutions = [p[0] for p in pop]
+                logger.info("Evaluating the initial population...")
+                solutions = [p[0] for p in pop]
+                return solutions, {"algorithm": "GA", "generation": 0}
 
-            self.initialized = True
-
-            return solutions, {"algorithm": "GA", "generation": 0}
-
-        o_fitnesses = Y
-        offspring = self.toolbox.population_guess(X)
-
-        # Map computed fitness to individual fitness value
-        for ind, fit in zip(offspring, o_fitnesses):
-            ind.fitness.values = (fit,)
-
-        if self.first_offspring:
-            # Build new population
-            self.pop[:] = self.toolbox.best_p(self.pop) + self.toolbox.best_c(offspring)
-
+        if X is None:
+            raise InputError(
+                "In GeneticAlgorithm,  X and Y cannot be of NoneType after initialization."
+            )
+        elif Y is None:
+            return X, {"algorithm": "GA", "generation": 0}
         else:
-            # Initialize computed population
-            self.pop = offspring[:]
-            self.first_offspring = True
+            o_fitnesses = Y
+            offspring = self.toolbox.population_guess(X)
 
-        self.g += 1
+            # Map computed fitness to individual fitness value
+            for ind, fit in zip(offspring, o_fitnesses):
+                ind.fitness.values = (fit,)
 
-        logger.debug(f"Generation: {self.g}")
+            if self.first_offspring:
+                # Build new population
+                self.pop[:] = self.toolbox.best_p(self.pop) + self.toolbox.best_c(
+                    offspring
+                )
 
-        # Selection operator
-        logger.debug("Selection...")
+            else:
+                # Initialize computed population
+                self.pop = offspring[:]
+                self.first_offspring = True
 
-        offspring = self.search_space.selection(self.pop, k=len(self.pop))
+            self.g += 1
 
-        children = []
+            logger.debug(f"Generation: {self.g}")
 
-        # Crossover operator
-        logger.debug("Crossover...")
+            # Selection operator
+            logger.debug("Selection...")
 
-        i = 0
-        for child1, child2 in zip(offspring[::2], offspring[1::2]):
-            # Clone individuals from crossover
-            children1 = self.toolbox.clone(child1)
-            children2 = self.toolbox.clone(child2)
+            offspring = self.selection(self.pop, k=len(self.pop))
 
-            # Apply crossover
-            self.search_space.crossover(children1[0], children2[0])
-            # Delete children fitness inherited from the parents
-            del children1.fitness.values
-            del children2.fitness.values
+            children = []
 
-            # Add new children to list
-            children.append(children1)
-            children.append(children2)
+            # Crossover operator
+            logger.debug("Crossover...")
 
-        # Mutate children
-        logger.debug("Mutation...")
+            i = 0
+            for child1, child2 in zip(offspring[::2], offspring[1::2]):
+                # Clone individuals from crossover
+                children1 = self.toolbox.clone(child1)
+                children2 = self.toolbox.clone(child2)
 
-        for mutant in children:
-            self.toolbox.mutate(mutant[0])
+                # Apply crossover
+                self.crossover(children1[0], children2[0])
+                # Delete children fitness inherited from the parents
+                del children1.fitness.values
+                del children2.fitness.values
 
-        solutions = [p[0] for p in children]
+                # Add new children to list
+                children.append(children1)
+                children.append(children2)
 
-        # End population evaluation
-        logger.info(f"Evaluating n°{self.g}...")
+            # Mutate children
+            logger.debug("Mutation...")
 
-        return solutions, {"algorithm": "GA", "generation": self.g}
+            for mutant in children:
+                self.mutation(mutant[0])
+
+            solutions = [p[0] for p in children]
+
+            # End population evaluation
+            logger.info(f"Evaluating n°{self.g}...")
+
+            return solutions, {"algorithm": "GA", "generation": self.g}
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -355,9 +355,9 @@ class Genetic_algorithm(Metaheuristic):
         self.toolbox = base.Toolbox()
 
 
-class Steady_State_GA(Metaheuristic):
+class SteadyStateGA(Metaheuristic):
 
-    """Steady_State_GA
+    """SteadyStateGA
 
     Steady State genetic algorithm.
 
@@ -366,16 +366,8 @@ class Steady_State_GA(Metaheuristic):
 
     Attributes
     ----------
-
     pop_size : int
         Initial population size.
-
-    generation : int
-        Generation number of the GA.
-
-    elitism : float, default=0.5
-        Percentage of the best parents to keep in the next population by replacing the worst children.
-        Default 50%.
 
 
     See Also
@@ -386,90 +378,113 @@ class Steady_State_GA(Metaheuristic):
 
     Examples
     --------
-    >>> from zellij.core import Loss
-    >>> from zellij.core import ContinuousSearchspace
-    >>> from zellij.core import FloatVar, ArrayVar
-    >>> from zellij.utils.neighborhoods import FloatInterval, ArrayInterval, Intervals
-    >>> from zellij.strategies.genetic_algorithm import Genetic_algorithm
-    >>> from zellij.utils.operators import NeighborMutation, DeapTournament, DeapOnePoint
-    >>> from zellij.utils.benchmarks import himmelblau
-    ...
-    >>> lf = Loss()(himmelblau)
-    >>> sp = ContinuousSearchspace(ArrayVar(
-    ...                           FloatVar("a",-5,5, neighbor=FloatInterval(0.5)),
-    ...                           FloatVar("b",-5,5,neighbor=FloatInterval(0.5)),
-    ...                           neighbor=ArrayInterval())
-    ...                         ,lf, neighbor=Intervals(),
-    ...                         mutation = NeighborMutation(0.5),
-    ...                         selection = DeapTournament(3),
-    ...                         crossover = DeapOnePoint())
-    ...
-    >>> ga = Genetic_algorithm(sp, 1000, pop_size=25, generation=40,elitism=0.5)
-    >>> ga.run()
+    >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.mixed import SteadyStateGA
+    >>> from zellij.strategies.tools import DeapOnePoint, DeapTournament, NeighborMutation
+    >>> from zellij.utils import ArrayDefaultN, FloatInterval
+
+    >>> @Loss(objective=Minimizer("obj"))
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     return {"obj": res}
+    >>> a = ArrayVar(
+    ...     FloatVar("f1", -5, 5, neighborhood=FloatInterval(0.5)),
+    ...     FloatVar("i2", -5, 5, neighborhood=FloatInterval(0.5)),
+    ...     neighborhood=ArrayDefaultN(),
+    ... )
+    >>> sp = ContinuousSearchspace(a)
+    >>> selection = DeapTournament(4)
+    >>> mutation = NeighborMutation(1.0)
+    >>> crossover = DeapOnePoint()
+    >>> opt = SteadyStateGA(sp, selection, mutation, crossover, 20)
+    >>> stop = Calls(himmelblau, 400)
+    >>> exp = Experiment(opt, himmelblau, stop)
+    >>> exp.run()
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([3.0211050307215714, 2.005915799414448])=0.01969404306327753
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 400
+
     """
 
     def __init__(
         self,
-        search_space,
-        pop_size=10,
-        verbose=True,
+        search_space: Searchspace,
+        selection: Selection,
+        mutation: Mutation,
+        crossover: Crossover,
+        pop_size: int = 10,
+        elitism: float = 0.5,
+        verbose: bool = True,
     ):
         """__init__(search_space, pop_size = 10, verbose=True)
-
-        Initialize Genetic_algorithm class
 
         Parameters
         ----------
         search_space : Searchspace
             Search space object containing bounds of the search space.
-
         pop_size : int
             Population size.
-
+        elitism : float
+            Percentage of the best parents to keep in the next population by replacing the worst children.
         verbose : boolean, default=True
             Algorithm verbosity
 
         """
-
         super().__init__(search_space, verbose)
-        assert hasattr(search_space, "mutation") and isinstance(
-            search_space.mutation, Mutator
-        ), f"""When using :ref:`ga`, :ref:`sp` must have a `mutation` operator
-        and of type: Mutator, use `mutation` kwarg when defining the :ref:`sp`
-        ex:\n
-        >>> ContinuousSearchspace(values, loss, mutation=...)"""
-
-        assert hasattr(search_space, "selection") and isinstance(
-            search_space.selection, Selector
-        ), f"""When using :ref:`ga`, :ref:`sp` must have a `selection` operator
-        and of type: Selector, use `mutation` kwarg when defining the :ref:`sp`
-        ex:\n
-        >>> ContinuousSearchspace(values, loss, selection=...)"""
-
-        assert hasattr(search_space, "crossover") and isinstance(
-            search_space.crossover, Crossover
-        ), f"""When using :ref:`ga`, :ref:`sp` must have a `mutation` operator
-        and of type: Selector, use `crossover` kwarg when defining the :ref:`sp`
-        ex:\n
-        >>> ContinuousSearchspace(values, loss, crossover=...)"""
 
         ##############
         # PARAMETERS #
         ##############
-
         self.pop_size = pop_size
-        self.pop = []
+        self.elitism = elitism
+        logger.info("Making tools...")
+        # toolbox contains all the operator of GA. (mutate, select, crossover...)
+        self.toolbox = base.Toolbox()
+
+        self.selection = selection
+        self.mutation = mutation
+        self.crossover = crossover
+
         #############
         # VARIABLES #
         #############
-
         self.initialized = False
         self.first_offspring = False
+        self.pop = []
 
-        logger.info("Constructing tools...")
+        self.g = 0
 
-        # toolbox contains all the operator of GA. (mutate, select, crossover...)
-        self.toolbox = base.Toolbox()
+    @property
+    def mutation(self) -> Mutation:
+        return self._mutation
+
+    @mutation.setter
+    def mutation(self, value: Mutation):
+        value.target = self.search_space
+        value._build(self.toolbox)
+        self._mutation = value
+
+    @property
+    def selection(self) -> Selection:
+        return self._selection
+
+    @selection.setter
+    def selection(self, value: Selection):
+        value.target = self.search_space
+        value._build(self.toolbox)
+        self._selection = value
+
+    @property
+    def crossover(self) -> Crossover:
+        return self._crossover
+
+    @crossover.setter
+    def crossover(self, value: Crossover):
+        value.target = self.search_space
+        value._build(self.toolbox)
+        self._crossover = value
 
     @property
     def toolbox(self):
@@ -478,11 +493,11 @@ class Steady_State_GA(Metaheuristic):
     @toolbox.setter
     def toolbox(self, value):
         self._toolbox = value
-
-        # Create operators
-        self.search_space.mutation._build(value)
-        self.search_space.selection._build(value)
-        self.search_space.crossover._build(value)
+        # Create a tool to select best individuals from a population
+        bpn = int(self.pop_size * self.elitism)
+        bcn = self.pop_size - bpn
+        value.register("best_p", tools.selBest, k=bpn)
+        value.register("best_c", tools.selBest, k=bcn)
 
         value.register(
             "individual_guess",
@@ -549,7 +564,7 @@ class Steady_State_GA(Metaheuristic):
         logger.debug("Selection...")
 
         new_x = []
-        selected = self.search_space.selection(self.pop, k=2)
+        selected = self.selection(self.pop, k=2)
 
         # Clone individuals from crossover
         children1 = self.toolbox.clone(selected[0])
@@ -559,7 +574,7 @@ class Steady_State_GA(Metaheuristic):
         logger.debug("Crossover...")
 
         # Apply crossover
-        self.search_space.crossover(children1[0], children2[0])
+        self.crossover(children1[0], children2[0])
         # Delete children fitness inherited from the parents
         del children1.fitness.values
         del children2.fitness.values
@@ -578,17 +593,17 @@ class Steady_State_GA(Metaheuristic):
         return solutions
 
     # Run GA
-    def forward(self, X, Y):
-        """forward(X, Y)
-        Runs one step of Genetic_algorithm.
+    def forward(
+        self,
+        X: Optional[list] = None,
+        Y: Optional[np.ndarray] = None,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ) -> Tuple[List[list], dict]:
+        """
+        Runs one step of GA.
 
-        Parameters
-        ----------
-        X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+        Secondary, or constraints are not necessary.
 
         Returns
         -------
@@ -597,33 +612,28 @@ class Steady_State_GA(Metaheuristic):
         info
             Additionnal information linked to :code:`points`
 
+
         """
         if not self.initialized:
-            logger.info("GA Starting")
-            self.pop = []
-            if X:
-                self.initialized = True
-                if not Y:
-                    return X, {"algorithm": "GA"}
-                else:
-                    # Map computed fitness to individual fitness value
-                    for ind, fit in zip(self.pop, Y):
-                        ind.fitness.values = (fit,)
-                    return self._do_selcrossmut(), {"algorithm": "SGA"}
-            else:
-                logger.info("Creation of the initial population...")
-
+            self.g = 0
+            self.initialized = True
+            # Start from a saved population
+            if X is None and Y is None:
                 # Build the population
-                new_pop = self.toolbox.population(n=self.pop_size)
+                logger.info("Creation of the initial population...")
+                pop = self.toolbox.population(n=self.pop_size)
 
                 logger.info("Evaluating the initial population...")
-                solutions = [p[0] for p in new_pop]
+                solutions = [p[0] for p in pop]
+                return solutions, {"algorithm": "GA", "generation": 0}
 
-                self.initialized = True
-
-                return solutions, {"algorithm": "GA"}
-
-        if (X and Y) and (len(X) > 0 and len(Y) > 0):
+        if X is None:
+            raise InputError(
+                "In SteadyStateGA,  X and Y cannot be of NoneType after initialization."
+            )
+        elif Y is None:
+            return X, {"algorithm": "GA", "generation": 0}
+        else:
             children = []
             # Map computed fitness to individual fitness value
             for ind, fit in zip(X, Y):
@@ -637,11 +647,11 @@ class Steady_State_GA(Metaheuristic):
                 min_pop = np.minimum(len(offspring), self.pop_size)
                 self.pop = tools.selBest(offspring, k=min_pop)
 
-        if len(self.pop) >= self.pop_size:
-            sol = self._do_selcrossmut()
-            return sol, {"algorithm": "GA"}
-        else:
-            return [self.search_space.random_point(1)], {"algorithm": "SGA"}
+            if len(self.pop) >= self.pop_size:
+                sol = self._do_selcrossmut()
+                return sol, {"algorithm": "GA"}
+            else:
+                return [self.search_space.random_point(1)], {"algorithm": "SSGA"}
 
     def __getstate__(self):
         state = self.__dict__.copy()
