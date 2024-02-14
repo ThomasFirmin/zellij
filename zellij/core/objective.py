@@ -1,14 +1,15 @@
-# @Author: Thomas Firmin <tfirmin>
-# @Date:   2022-11-08T16:57:09+01:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2022-11-09T14:17:02+01:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
+from typing import Union, List, Callable
 import os
 import numpy as np
+
+from zellij.core.errors import TargetError
 
 import logging
 
@@ -23,10 +24,8 @@ class Objective(ABC):
 
     Parameters
     ----------
-    target : int or str, default=0
-        Which outputs of the loss function should it target.
-        Default is 0, it will consider the value at index 0 in the outputs of
-        the loss function. If output is a dict, it can target one of its key.
+    target : str
+        Key of the :ref:`lf` :code:`outputs` to consider as the objective.
 
     Attributes
     ----------
@@ -34,22 +33,15 @@ class Objective(ABC):
 
     """
 
-    def __init__(self, target=0):
-        if isinstance(target, str):
-            self.target = [target]
-        elif isinstance(target, int):
-            self.target = [target]
-        elif isinstance(target, list) and (
-            all(isinstance(i, int) for i in target)
-            or all(isinstance(i, str) for i in target)
-        ):
-            self.target = target
-        else:
-            raise AssertionError(f"Unknown target type got, {target}")
-        self.index_built = False
+    @abstractmethod
+    def __init__(self, target: Union[str, List[str]]):
+        pass
 
     @abstractmethod
-    def __call__(self, outputs):
+    def _compute_obj(self, outputs: dict):
+        pass
+
+    def __call__(self, outputs: dict, num=0) -> dict:
         """__call__
 
         Add the objective value to the outputs.
@@ -58,6 +50,8 @@ class Objective(ABC):
         ----------
         outputs : int, float, list, dict
             Outputs of the loss function.
+        num : int, default=0
+            Objective id.
 
         Returns
         -------
@@ -65,87 +59,65 @@ class Objective(ABC):
             Outputs
 
         """
-        pass
 
-    @abstractmethod
-    def _select(self, X, Y, Q, *args, **kwargs):
-        """_select
-
-        Define how to select solution according to their associated objective
-        value.
-
-        Parameters
-        ----------
-        X : list[solutions]
-            List of solutions
-        Y : list[{float,int}]
-            List of loss values associated to X.
-        Q : int
-            Number of solution to select according to the objective.
-
-        Returns
-        -------
-        dict
-            Outputs
-
-        """
-        pass
-
-    def _cleaner(self, outputs):
-        """__call__
-
-        Parameters
-        ----------
-        outputs : int, float, list, dict
-            Outputs of the loss function.
-
-        Returns
-        -------
-        dict
-            Cleaned outputs
-
-        """
-        rd = {}
-        # Separate results
-        if (
-            isinstance(outputs, int)
-            or isinstance(outputs, float)
-            or isinstance(outputs, np.integer)
-            or isinstance(outputs, np.floating)
-        ):
-            rd["objective"] = outputs
-        elif isinstance(outputs, dict):
-            rd = outputs
-        elif isinstance(outputs, list):
-            rd = {f"r{i}": j for i, j in enumerate(outputs)}
-
-        return rd
-
-    def _build_index(self, outputs):
-        if not self.index_built:
-            for i, t in enumerate(self.target):
-                if isinstance(t, int):
-                    self.target[i] = list(outputs.keys())[t]
-            self.index_built = True
-
-    def reset(self):
-        self.index_built = False
+        outputs[f"objective{num}"] = self._compute_obj(outputs)
+        return outputs
 
 
-class Minimizer(Objective):
+class SingleObjective(Objective):
+    """SingleObjective
+
+    Objective made of a single target
+
+    Parameters
+    ----------
+    target : str
+        Key to consider as objective from the :code:`outputs` of :ref:`lf`.
+
+    Attribute
+    ---------
+    target
+
+    """
+
+    def __init__(self, target: str):
+        if isinstance(target, str):
+            self.target = target
+        else:
+            raise TargetError(f"Unknown target type got, {target}")
+
+
+class MultiObjective(Objective):
+    """MultiObjective
+
+    Objective made of multiple outputs from the :ref:`lf`.
+
+    Parameters
+    ----------
+    target : list[str]
+        List of keys to consider as objectives from the :code:`outputs` of :ref:`lf`.
+    """
+
+    def __init__(self, target: List[str]):
+        for t in target:
+            if not isinstance(t, str):
+                raise TargetError(f"Unknown target type got, {t} in {target}")
+
+        self.target = target
+
+
+class Minimizer(SingleObjective):
     """Minimizer
 
     Minimizer allows to minimize the given target.
     Do, :math:`f(y)=y`. With :math:`y` a given scores.
-    /!\ By default Zellij metaheuristics minimize the loss value.
-    So this object will just return the given scores.
+    By default Zellij metaheuristics minimize the loss value.
+    So this object simply returns the given scores.
 
     Parameters
     ----------
-    target : int or str, default=0
-        Which outputs of the loss function should it target.
-        Default is 0, it will consider the value at index 0 in the outputs of
-        the loss function. If output is a dict, it can target one of its key.
+    target : str
+        Key of the :ref:`lf` :code:`outputs` to consider as the objective.
 
     Attributes
     ----------
@@ -153,51 +125,28 @@ class Minimizer(Objective):
 
     """
 
-    def _select(self, X, Y, Q, *args, **kwargs):
-        """_select
-
-        Define how to select solution by minimizing the objective value.
-
-        Parameters
-        ----------
-        X : list[solutions]
-            List of solutions
-        Y : list[{float,int}]
-            List of loss values associated to X.
-        Q : int
-            Number of solution to select according to the objective.
-
-        Returns
-        -------
-        dict
-            Outputs
-
-        """
-        index = np.argsort(Y)
-        new_x = [X[i] for i in index[:Q]]
-        return new_x, Y[:Q]
-
-    def __call__(self, outputs):
-        clean = self._cleaner(outputs)
-        self._build_index(clean)
-        clean["objective"] = clean[self.target[0]]
-        return clean
+    def _compute_obj(self, outputs: dict) -> float:
+        try:
+            res = outputs[self.target]
+        except KeyError:
+            raise TargetError(
+                f"Target error in objective, no {self.target} in returned outputs."
+            )
+        return res
 
 
-class Maximizer(Objective):
+class Maximizer(SingleObjective):
     """Maximizer
 
     Maximizer allows to maximize the given target.
     Do, :math:`f(y)=-y`. With :math:`y` a given scores.
-    /!\ By default Zellij metaheuristics minimize the loss value.
-    So this object will compute the negative of the given scores.
+    By default Zellij metaheuristics minimize the loss value.
+    So this object will negate the given scores.
 
     Parameters
     ----------
     target : int or str, default=0
-        Which outputs of the loss function should it target.
-        Default is 0, it will consider the value at index 0 in the outputs of
-        the loss function. If output is a dict, it can target one of its key.
+        Key of the :ref:`lf` :code:`outputs` to consider as the objective.
 
     Attributes
     ----------
@@ -205,56 +154,30 @@ class Maximizer(Objective):
 
     """
 
-    def _select(self, X, Y, Q, *args, **kwargs):
-        """_select
-
-        Define how to select solution by maximizing the objective value.
-
-        Parameters
-        ----------
-        X : list[solutions]
-            List of solutions
-        Y : list[{float,int}]
-            List of loss values associated to X.
-        Q : int
-            Number of solution to select according to the objective.
-
-        Returns
-        -------
-        dict
-            Outputs
-
-        """
-        index = np.argsort(Y)
-        new_x = [X[-i] for i in index[-Q:]]
-        return new_x, Y[-Q:]
-
-    def __call__(self, outputs):
-        clean = self._cleaner(outputs)
-        self._build_index(clean)
-
-        clean["objective"] = -clean[self.target[0]]
-
-        return clean
+    def _compute_obj(self, outputs: dict) -> float:
+        try:
+            res = -outputs[self.target]
+        except KeyError:
+            raise TargetError(
+                f"Target error in objective, no {self.target} in returned outputs."
+            )
+        return res
 
 
-class Lambda(Objective):
+class Lambda(MultiObjective):
     """Lambda
 
     Lambda allows to transform the given target.
     Do, :math:`f(y)=function(y)`. With :math:`y` a given scores.
-    /!\ By default Zellij metaheuristics minimize the loss value.
+    By default Zellij metaheuristics minimize the loss value.
 
     Parameters
     ----------
     function : Callable
         Function with `len(target)` parameters which return an objective value.
-    selector : {"min","max"}
-        Minimize or maximize the results from `function`
-    target : {int,str,list[{int, str}]} default=0
-        Which outputs of the loss function should it target.
-        Default is 0, it will consider the value at index 0 in the outputs of
-        the loss function. If output is a dict, it can target one of its key.
+    target : list[str]
+        List of keys linked to the outputs of the :ref:`lf`.
+        Selected targets will be passed to :code:`function` with the same order as :code:`target` list.
 
     Attributes
     ----------
@@ -262,69 +185,25 @@ class Lambda(Objective):
 
     """
 
-    def __init__(self, function, selector="min", target=0):
+    def __init__(self, target: List[str], function: Callable):
         super().__init__(target)
 
         if function.__code__.co_argcount != len(self.target):
-            raise AssertionError(
-                logger.error(
-                    f"""
+            raise TargetError(
+                f"""
                     Number of parameters of `function` must be equal to
                     the length of `target`,
                     got {function.__code__.co_argcount} != {len(self.target)}
                     """
-                )
             )
 
         self.function = function
-        self.selector = selector
 
-    def _select(self, X, Y, Q, *args, **kwargs):
-        """_select
+    def _compute_obj(self, outputs: dict) -> float:
+        parameter = [outputs[t] for t in self.target]
+        res = self.function(*parameter)
+        return res
 
-        Define how to select solution by maximizing or minimizing
-        the objective value.
 
-        Parameters
-        ----------
-        X : list[solutions]
-            List of solutions
-        Y : list[{float,int}]
-            List of loss values associated to X.
-        Q : int
-            Number of solution to select according to the objective.
-
-        Returns
-        -------
-        dict
-            Outputs
-
-        """
-        if self.selector == "min":
-            index = np.argsort(Y)
-            new_x = [X[i] for i in index[:Q]]
-            return new_x, Y[:Q]
-        elif self.selector == "max":
-            index = np.argsort(Y)
-            new_x = [X[-i] for i in index[-Q:]]
-            return new_x, Y[-Q:]
-
-    def _build_index(self, outputs):
-        if not self.index_built:
-            if isinstance(self.target, list):
-                for i, t in enumerate(self.target):
-                    if isinstance(t, int):
-                        self.target[i] = list(outputs.keys())[self.target[i]]
-            self.index_built = True
-
-    def __call__(self, outputs):
-        clean = self._cleaner(outputs)
-        self._build_index(clean)
-        parameter = [clean[t] for t in self.target]
-        for t in self.target:
-            clean["objective"] = self.function(*parameter)
-
-        if self.selector == "max":
-            clean["objective"] = -clean["objective"]
-
-        return clean
+class DoNothing(Minimizer):
+    pass
