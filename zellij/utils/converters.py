@@ -1,18 +1,50 @@
-# @Author: Thomas Firmin <tfirmin>
-# @Date:   2022-05-06T12:07:38+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2022-11-08T14:26:53+01:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
+from __future__ import annotations
+from zellij.core.addons import VarConverter
+from zellij.core.variables import ArrayVar
 
-from zellij.core.addons import VarConverter, Converter
+from zellij.core.addons import (
+    ArrayAddon,
+    IntConverter,
+    FloatConverter,
+    CatConverter,
+    ArrayConverter,
+)
+from zellij.core.errors import InitializationError, DimensionalityError
+
 import numpy as np
 import logging
 
 logger = logging.getLogger("zellij.converters")
 logger.setLevel(logging.INFO)
+
+#########
+# TOOLS #
+#########
+
+
+class Binning(VarConverter):
+    def __init__(self, k: int):
+        super().__init__()
+        self.k = k
+
+    @property
+    def k(self) -> int:
+        return self._k
+
+    @k.setter
+    def k(self, value: int):
+        if isinstance(value, int) and value > 1:
+            self._k = value
+        else:
+            raise InitializationError(
+                f"k must be an int >1 for IntBinning, got {value}"
+            )
+
 
 ####################################
 # DO NOTHING
@@ -27,200 +59,11 @@ class DoNothing(VarConverter):
 
     """
 
-    def convert(self, value, *args, **kwargs):
+    def convert(self, value: object):
         return value
 
-    def reverse(self, value, *args, **kwargs):
+    def reverse(self, value: object):
         return value
-
-
-####################################
-# Array Converters
-####################################
-
-
-class ArrayConverter(VarConverter):
-    """ArrayConverter
-
-    :ref:`varadd` used when elements of an :code:`ArrayVar`
-    must be converted using variables's `converter` addons.
-
-    Parameters
-    ----------
-    variable : ArrayVar
-        Targeted ArrayVar.
-
-    Attributes
-    ----------
-    variable : ArrayVar
-        Targeted ArrayVar.
-
-    """
-
-    def __init__(self, variable=None):
-        super(ArrayConverter, self).__init__(variable)
-        if variable:
-            assert all(
-                hasattr(v, "converter") for v in self.target.variables
-            ), logger.error(
-                f"""
-                To use `ArrayMinmax`, variables in `ArrayVar` must have a `converter` method.
-                Use `converter` kwarg when defining a variable
-                """
-            )
-
-    def convert(self, value):
-        res = []
-
-        for variable, v in zip(self.target.variables, value):
-            res.append(variable.converter.convert(v))
-
-        return res
-
-    def reverse(self, value):
-        res = []
-
-        for variable, v in zip(self.target.variables, value):
-            res.append(variable.converter.reverse(v))
-
-        return res
-
-
-class ArrayBinaryBest(VarConverter):
-    """ArrayBinaryBest
-
-    Experimental
-
-    Parameters
-    ----------
-    variable : ArrayVar
-        Targeted ArrayVar.
-
-    Attributes
-    ----------
-    variable : ArrayVar
-        Targeted ArrayVar.
-
-    """
-
-    def __init__(self, loss, variable=None):
-        super(ArrayBinaryBest, self).__init__(variable)
-        if variable:
-            assert all(
-                hasattr(v, "converter") for v in self.target.variables
-            ), logger.error(
-                f"""
-                To use `ArrayMinmax`, variables in `ArrayVar` must have a `converter` method.
-                Use `converter` kwarg when defining a variable
-                """
-            )
-
-        self.loss = loss
-
-    def convert(self, value):
-        res = []
-
-        if self.loss.best_point:
-            for variable, v in zip(self.target.variables, value):
-                res.append(
-                    variable.converter.convert(
-                        v, replacement=self.loss.best_point[v._idx]
-                    )
-                )
-        else:
-            for variable, v in zip(self.target.variables, value):
-                res.append(variable.converter.convert(v, replacement=1))
-
-        return res
-
-    def reverse(self, value):
-        res = []
-
-        for variable, v in zip(self.target.variables, value):
-            res.append(variable.converter.reverse(v))
-
-        return res
-
-
-####################################
-# Float Converters
-####################################
-
-
-class FloatMinmax(VarConverter):
-    """FloatMinmax
-
-    Convert the value of a FloatVar, using
-    :math:`\\frac{x-lower}{upper-lower}=y`
-    .Reverse: :math:`y(upper-lower)+lower=x`
-
-    """
-
-    def convert(self, value):
-        return (value - self.target.lower) / (self.target.upper - self.target.lower)
-
-    def reverse(self, value):
-        return value * (self.target.upper - self.target.lower) + self.target.lower
-
-
-class FloatBinary(VarConverter):
-    """FloatBinary
-
-    Experimental
-
-    """
-
-    def convert(self, value):
-        return np.round(
-            (value - self.target.lower) / (self.target.upper - self.target.lower)
-        )
-
-    def reverse(self, value):
-        return value * (self.target.upper - self.target.lower) + self.target.lower
-
-
-class FloatBinaryStochastic(VarConverter):
-    """FloatBinaryStochastic
-    Experimental
-    """
-
-    def __init__(self, transfer, variable=None):
-        super().__init__(variable)
-        self.transfer = transfer
-
-    def convert(self, value, replacement=1):
-        p = self.transfer(value)
-        return 0 if np.random.random() > p else replacement
-
-    def reverse(self, value):
-        return value * (self.target.upper - self.target.lower) + self.target.lower
-
-
-class FloatBinning(VarConverter):
-    """FloatBinning
-
-    Convert a value from an FloatVar using binning between its
-    upper and lower bounds. Reversing a converted value will not return the
-    initial value. When binning some information can be lost. here the decimal
-    part of the float number.
-
-    """
-
-    def __init__(self, K, variable=None):
-        super(FloatBinning, self).__init__(variable)
-
-        assert (
-            isinstance(K, int) and K > 1
-        ), f"K must be an int >1 for FloatBinning, got {K}"
-        self.K = K + 1
-
-    def convert(self, value):
-        bins = np.linspace(self.target.lower, self.target.upper, self.K)
-        return np.digitize(value, bins) - 1
-
-    def reverse(self, value):
-        bins = np.linspace(self.target.lower, self.target.upper, self.K)
-        return bins[value]
 
 
 ####################################
@@ -228,44 +71,127 @@ class FloatBinning(VarConverter):
 ####################################
 
 
-class IntMinmax(VarConverter):
+class IntMinMax(IntConverter):
     """IntMinmax
 
     Convert the value of an IntVar, using :math:`\\frac{x-lower}{upper-lower}=y`
     .Reverse: :math:`y(upper-lower)+lower=x`
 
+    Examples
+    --------
+    >>> from zellij.core import IntVar
+    >>> from zellij.utils import IntMinMax
+
+    >>> a = IntVar("i1", 0, 255, converter=IntMinMax())
+    >>> p = a.random()
+    >>> intfloat = a.converter.convert(p)
+    >>> floatint = a.converter.reverse(intfloat)
+    >>> print(f"{p}->{intfloat:.1f}->{floatint}")
+    240->0.9->240
     """
 
-    def convert(self, value):
+    def convert(self, value: int) -> float:
         return (value - self.target.lower) / (self.target.upper - self.target.lower)
 
-    def reverse(self, value):
+    def reverse(self, value: float) -> int:
         return int(value * (self.target.upper - self.target.lower) + self.target.lower)
 
 
-class IntBinning(VarConverter):
+class IntBinning(Binning, IntConverter):
     """IntMinmax
 
     Convert a value from an IntVar using binning between its
     upper and lower bounds. Reversing a converted value will not return the
     initial value. When binning some information can be lost.
 
+    Examples
+    --------
+    >>> from zellij.core import IntVar
+    >>> from zellij.utils import IntBinning
+
+    >>> a = IntVar("i1", 0, 1000, converter=IntBinning(11))
+    >>> p = a.random()
+    >>> intfloat = a.converter.convert(p)
+    >>> floatint = a.converter.reverse(intfloat)
+    >>> print(f"{p}->{intfloat}->{floatint}")
+    847->8->800.0
     """
 
-    def __init__(self, K, variable=None):
-        super(IntBinning, self).__init__(variable)
+    def __init__(self, k: int):
+        super(IntBinning, self).__init__(k=k)
 
-        assert (
-            isinstance(K, int) and K > 1
-        ), f"K must be an int >1 for IntBinning, got {K}"
-        self.K = K
+    def convert(self, value: int) -> int:
+        bins = np.linspace(self.target.lower, self.target.upper, self.k)
+        return int(np.digitize(value, bins)) - 1
 
-    def convert(self, value):
-        bins = np.linspace(self.target.lower, self.target.upper, self.K)
-        return np.digitize(value, bins) - 1
+    def reverse(self, value: int) -> int:
+        bins = np.linspace(self.target.lower, self.target.upper, self.k)
+        return bins[value]
 
-    def reverse(self, value):
-        bins = np.linspace(self.target.lower, self.target.upper, self.K)
+
+####################################
+# Float Converters
+####################################
+
+
+class FloatMinMax(FloatConverter):
+    """FloatMinmax
+
+    Convert the value of a FloatVar, using
+    :math:`\\frac{x-lower}{upper-lower}=y`
+    .Reverse: :math:`y(upper-lower)+lower=x`
+
+    Examples
+    --------
+    >>> from zellij.core import FloatVar
+    >>> from zellij.utils import FloatMinMax
+
+    >>> a = FloatVar("f1", -255, 255, converter=FloatMinMax())
+    >>> p = a.random()
+    >>> floatnorm = a.converter.convert(p)
+    >>> normfloat = a.converter.reverse(floatnorm)
+    >>> print(f"{p:.2f}->{floatnorm:.2f}->{normfloat:.2f}")
+    231.61->0.95->231.61
+    """
+
+    def convert(self, value: float) -> float:
+        return (value - self.target.lower) / (self.target.upper - self.target.lower)
+
+    def reverse(self, value: float) -> float:
+        return value * (self.target.upper - self.target.lower) + self.target.lower
+
+
+class FloatBinning(Binning, FloatConverter):
+    """FloatBinning
+
+    Convert a value from an FloatVar using binning between its
+    upper and lower bounds. Reversing a converted value will not return the
+    initial value. When binning some information can be lost. here the decimal
+    part of the float number.
+
+    Examples
+    --------
+    >>> from zellij.core import FloatVar
+    >>> from zellij.utils import FloatBinning
+
+    >>> a = FloatVar("f1", 0, 1000, converter=FloatBinning(11))
+    >>> p = a.random()
+    >>> floatint = a.converter.convert(p)
+    >>> intfloat = a.converter.reverse(floatint)
+    >>> print(f"{p:.2f}->{floatnorm}->{intfloat:.2f}")
+    646.27->6->600.00
+
+    """
+
+    def __init__(self, k: int):
+        super(FloatBinning, self).__init__(k=k)
+
+    def convert(self, value: float) -> int:
+        bins = np.linspace(self.target.lower, self.target.upper, self.k)
+        return int(np.digitize(value, bins)) - 1
+
+    def reverse(self, value: int) -> float:
+        bins = np.linspace(self.target.lower, self.target.upper, self.k)
         return bins[value]
 
 
@@ -274,19 +200,30 @@ class IntBinning(VarConverter):
 ####################################
 
 
-class CatMinmax(VarConverter):
+class CatToFloat(CatConverter):
     """CatMinmax
 
     Convert the value of a CatVar, using the index of the value in the list
     of the features of CatVar. :math:`\\frac{index}{len(features)}=y`
     .Reverse: :math:`features[floor(y*(len(features)-1))]=x`.
 
+    Examples
+    --------
+    >>> from zellij.core import CatVar
+    >>> from zellij.utils import CatToFloat
+
+    >>> a = CatVar("c1", ["a", "b", "c"], converter=CatToFloat())
+    >>> p = a.random()
+    >>> catfloat = a.converter.convert(p)
+    >>> floatcat = a.converter.reverse(catfloat)
+    >>> print(f"{p}->{catfloat:.2f}->{floatcat}")
+    b->0.33->b
     """
 
-    def convert(self, value):
+    def convert(self, value: object) -> float:
         return self.target.features.index(value) / len(self.target.features)
 
-    def reverse(self, value):
+    def reverse(self, value: float) -> object:
         idx = int(value * len(self.target.features))
         if idx == len(self.target.features):
             idx -= 1
@@ -294,347 +231,96 @@ class CatMinmax(VarConverter):
         return self.target.features[idx]
 
 
-class CatBinning(VarConverter):
+class CatToInt(CatConverter):
     """CatMinmax
 
     Convert the value of a CatVar to its corresponding index in the
-    features list.
+    lsit of features.
 
+    Examples
+    --------
+    >>> from zellij.core import CatVar
+    >>> from zellij.utils import CatToInt
+
+    >>> a = CatVar("c1", ["a", "b", "c"], converter=CatToInt())
+    >>> p = a.random()
+    >>> catint = a.converter.convert(p)
+    >>> intcat = a.converter.reverse(catint)
+    >>> print(f"{p}->{catint}->{intcat}")
+    c->2->c
     """
 
-    def convert(self, value):
+    def convert(self, value: object) -> int:
         return self.target.features.index(value)
 
-    def reverse(self, value):
+    def reverse(self, value: int) -> object:
         return self.target.features[value]
 
 
 ####################################
-# Constant Converters
+# Array Converters
 ####################################
 
 
-class ConstantMinmax(VarConverter):
-    """ConstantMinmax
+class ArrayDefaultC(ArrayConverter):
+    """ArrayDefault
 
-    Convert the value of a Constant. :math:`y=1.0`
-    .Reverse: :math:`x=value`.
+    Default converter. Convert :ref:`var` one by one, by using their own converters.
 
+    Examples
+    --------
+    >>> from zellij.core import ArrayVar, FloatVar, IntVar, CatVar
+    >>> from zellij.utils import ArrayDefaultC, FloatMinMax, IntMinMax, CatToFloat
+
+    >>> a = ArrayVar(
+    ...     IntVar("i1", 0, 8, converter=IntMinMax()),
+    ...     FloatVar("f1", 10, 20, converter=FloatMinMax()),
+    ...     CatVar("c1", ["Hello", 87, 2.56], converter=CatToFloat()),
+    ...     converter=ArrayDefaultC(),
+    ... )
+
+    >>> p = a.random()
+    >>> tofloat = a.converter.convert(p)
+    >>> top = a.converter.reverse(tofloat)
+    >>> print(f"{p}->\n{tofloat}->\n{top}")
+    [8, 15.10240466469826, 'Hello']->
+    [1.0, 0.5102404664698261, 0.0]->
+    [8, 15.10240466469826, 'Hello']
     """
 
-    def convert(self, value):
-        return 1.0
+    @ArrayAddon.target.setter
+    def target(self, value: ArrayVar):
+        if not isinstance(value, ArrayVar):
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. ArrayVar expected."
+            )
+        elif any(v.converter is None for v in value.variables):
+            raise InitializationError(
+                f"If an ArrayVar has a converter, all variables within an ArrayVar must have a converter."
+            )
+        else:
+            self._target = value
 
-    def reverse(self, value):
-        return self.target.value
-
-
-class ConstantBinning(VarConverter):
-    """ConstantMinmax
-
-    Convert the value of a Constant. :math:`y=1`
-    Reverse: :math:`x=value`.
-
-    """
-
-    def convert(self, value):
-        return 1
-
-    def reverse(self, value):
-        return self.target.value
-
-
-####################################
-# Miscellaneous
-####################################
-
-
-class BlockMinmax(VarConverter):
-    """BlockMinmax
-
-    :ref:`varadd` used when elements of the Block must be converted to
-    continous.
-
-    Parameters
-    ----------
-    variable : Block
-        Targeted Block.
-
-    Attributes
-    ----------
-    variable : Block
-        Targeted Block.
-
-    """
-
-    def __init__(self, variable=None):
-        super(BlockMinmax, self).__init__(variable)
-
-        assert hasattr(self.target.value, "converter"), logger.error(
-            f"To use `BlockMinmax`, value in `Block` must have a `converter` method. Use `converter` kwarg when defining a variable"
-        )
-
-    def convert(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be equal to `Block` length,\
-             got {len(value)}(value)=={self.target.repeat}(Block)"
-        )
-
+    def convert(self, value: list) -> list:
         res = []
-        for v in value:
-            res.append(self.target.value.converter.convert(v))
-
-        return res
-
-    def reverse(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be equal to `Block` length,\
-             got {len(value)}(value)=={self.target.repeat}(Block)"
-        )
-
-        res = []
-        for v in value:
-            res.append(self.target.value.converter.reverse(v))
-
-        return res
-
-
-class DynamicBlockMinmax(VarConverter):
-    """DynamicBlockMinmax
-
-    :ref:`varadd` used when elements of the DynamicBlockMinmax must be
-    converted to continous.
-
-    Parameters
-    ----------
-    variable : DynamicBlockMinmax
-        Targeted DynamicBlockMinmax.
-
-    Attributes
-    ----------
-    variable : DynamicBlockMinmax
-        Targeted DynamicBlockMinmax.
-
-    """
-
-    def __init__(self, variable=None):
-        super(DynamicBlockMinmax, self).__init__(variable)
-
-        assert hasattr(self.target.value, "converter"), logger.error(
-            f"To use `DynamicBlockMinmax`, value in `DynamicBlock` must have a `converter` method. Use `converter` kwarg when defining a variable"
-        )
-
-    def convert(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be inferior or equal to `DynamicBlock`\
-            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
-        )
-
-        res = []
-        for v in value:
-            res.append(self.target.value.converter.convert(v))
-
-        return res
-
-    def reverse(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be inferior or equal to `DynamicBlock`\
-            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
-        )
-
-        res = []
-        for v in value:
-            res.append(self.target.value.converter.reverse(v))
-
-        return res
-
-
-class BlockBinning(VarConverter):
-    """BlockBinning
-
-    :ref:`varadd` used when elements of the Block must be converted to
-    discrete.
-
-    Parameters
-    ----------
-    variable : Block
-        Targeted Block.
-
-    Attributes
-    ----------
-    variable : Block
-        Targeted Block.
-
-    """
-
-    def __init__(self, variable=None):
-        super(BlockBinning, self).__init__(variable)
-
-        assert hasattr(self.target.value, "converter"), logger.error(
-            f"To use `BlockBinning`, value in `Block` must have a `converter` method. Use `converter` kwarg when defining a variable"
-        )
-
-    def convert(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be equal to `Block` length,\
-             got {len(value)}(value)=={self.target.repeat}(Block)"
-        )
-
-        res = []
-        for v in value:
-            res.append(self.target.value.converter.convert(v, K))
-
-        return res
-
-    def reverse(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be equal to `Block` length,\
-             got {len(value)}(value)=={self.target.repeat}(Block)"
-        )
-
-        res = []
-        for v in value:
-            res.append(self.target.value.converter.reverse(v, K))
-
-        return res
-
-
-class DynamicBlockBinning(VarConverter):
-    """DynamicBlockMinmax
-
-    :ref:`varadd` used when elements of the DynamicBlockMinmax must be
-    converted to discrete.
-
-    Parameters
-    ----------
-    variable : DynamicBlockMinmax
-        Targeted DynamicBlockMinmax.
-
-    Attributes
-    ----------
-    variable : DynamicBlockMinmax
-        Targeted DynamicBlockMinmax.
-
-    """
-
-    def __init__(self, variable=None):
-        super(DynamicBlockBinning, self).__init__(variable)
-
-        assert hasattr(self.target.value, "converter"), logger.error(
-            f"To use `DynamicBlockBinning`, value in `DynamicBlock` must have a `converter` method. Use `converter` kwarg when defining a variable"
-        )
-
-    def convert(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be inferior or equal to `DynamicBlock`\
-            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
-        )
-
-        res = []
-        for v in value:
-            res.append(self.target.value.converter.convert(v, K))
-
-        return res
-
-    def reverse(self, value):
-        assert len(value) == self.target.repeat, logger.error(
-            f"Length of value must be inferior or equal to `DynamicBlock`\
-            length, got {len(value)}(value)<={self.target.repeat}(DynamicBlock)"
-        )
-
-        res = []
-        for v in value:
-            res.append(self.value.target.converter.reverse(v, K))
-
-        return res
-
-
-####################################
-# SEARCH SPACE CONVERTER
-####################################
-
-
-class Basic(Converter):
-    """Basic
-
-    Basic converter for :ref:`sp`.
-
-    Parameters
-    ----------
-    search_space : :ref:`sp`
-        Targeted :ref:`sp`.
-
-    Attributes
-    ----------
-    target : :ref:`sp`
-        Targeted :ref:`sp`.
-
-    """
-
-    def __init__(self, search_space=None):
-        super(Basic, self).__init__(search_space)
-        if search_space:
-            assert hasattr(self.target.variables, "converter"), logger.error(
-                f"To use `converter`, variables in Searchspace must have a `converter` method. Use `converter` kwarg when defining a variable"
+        if len(self.target) == len(value):
+            for var, v in zip(self.target.variables, value):
+                res.append(var.converter.convert(v))  # type: ignore
+        else:
+            raise DimensionalityError(
+                f"Array of variables does not have the same length as given value. Got {len(self.target)}={len(value)}."
             )
 
-    # Convert a point to continuous
-    def convert(self, points):
-        """convert(self, points)
+        return res
 
-        Convert given points using variables' `converter` addon.
-
-        Parameters
-        ----------
-
-        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
-            List of points to convert
-
-        Returns
-        -------
-
-        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
-            List of converted points. Points are list of float if converted to continuous.
-
-        """
-
-        # Mixed to continuous
-        if isinstance(points[0], (list, np.ndarray)):
-            res = []
-            for point in points:
-                res.append(self.target.variables.converter.convert(point))
-
-            return res
+    def reverse(self, value: list) -> list:
+        res = []
+        if len(self.target) == len(value):
+            for var, v in zip(self.target.variables, value):
+                res.append(var.converter.reverse(v))  # type: ignore
         else:
-            return self.target.variables.converter.convert(points)
+            raise DimensionalityError(
+                f"Array of variables does not have the same length as given value. Got {len(self.target)}={len(value)}."
+            )
 
-    # Convert a continuous point to a mixed point
-    def reverse(self, points):
-        """reverse(self, points)
-
-        Reverse the convertion of given converted points.
-        Use `reverse` method from variables' `converte` addon.
-
-        Parameters
-        ----------
-
-        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
-            List of points to convert
-
-        Returns
-        -------
-
-        points : {list[list[{int, float, str}, {int, float, str}...], ...], list[list[float, float...], ...]}
-            List of converted points. Points are list of float if converted to continuous.
-
-        """
-
-        # Mixed to continuous
-        if isinstance(points[0], (list, np.ndarray)):
-            res = []
-            for point in points:
-                res.append(self.target.variables.converter.reverse(point))
-
-            return res
-        else:
-            return self.target.variables.converter.reverse(points)
+        return res
