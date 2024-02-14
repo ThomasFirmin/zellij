@@ -1,10 +1,7 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-01-20T12:35:50+01:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
 import numpy as np
 from abc import ABC, abstractmethod
@@ -12,7 +9,9 @@ from abc import ABC, abstractmethod
 
 def himmelblau(x):
     x_ar = np.array(x)
-    return (x_ar[0] ** 2 + x_ar[1] - 11) ** 2 + (x_ar[0] + x_ar[1] ** 2 - 7) ** 2
+    return {
+        "obj": (x_ar[0] ** 2 + x_ar[1] - 11) ** 2 + (x_ar[0] + x_ar[1] ** 2 - 7) ** 2
+    }
 
 
 class Benchmark(ABC):
@@ -110,7 +109,7 @@ class Sphere(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum(np.square(z)) + self.bias
+        return {"obj": np.sum(np.square(z)) + self.bias}
 
 
 class Schwefel_2_21(Benchmark):
@@ -162,7 +161,10 @@ class Rosenbrock(Benchmark):
         z = self.transform(y) + 1
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum((z[:-1] - 1) ** 2 + 100 * (z[:-1] ** 2 - z[1:]) ** 2) + self.bias
+        return {
+            "obj": np.sum((z[:-1] - 1) ** 2 + 100 * (z[:-1] ** 2 - z[1:]) ** 2)
+            + self.bias
+        }
 
 
 class Rastrigin(Benchmark):
@@ -186,7 +188,7 @@ class Rastrigin(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum(z**2 - 10 * np.cos(2 * np.pi * z) + 10) + self.bias
+        return {"obj": np.sum(z**2 - 10 * np.cos(2 * np.pi * z) + 10) + self.bias}
 
 
 class Griewank(Benchmark):
@@ -210,12 +212,14 @@ class Griewank(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return (
-            np.sum(z**2 / 4000)
-            - np.prod(np.cos(z / np.sqrt(np.arange(1, len(y) + 1))))
-            + 1
-            + self.bias
-        )
+        return {
+            "obj": (
+                np.sum(z**2 / 4000)
+                - np.prod(np.cos(z / np.sqrt(np.arange(1, len(y) + 1))))
+                + 1
+                + self.bias
+            )
+        }
 
 
 class Ackley(Benchmark):
@@ -239,13 +243,15 @@ class Ackley(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return (
-            -20 * np.exp(-0.2 * np.sqrt(np.mean(z**2)))
-            - np.exp(np.mean(np.cos(2 * np.pi * z)))
-            + 20
-            + np.exp(1.0)
-            + self.bias
-        )
+        return {
+            "obj": (
+                -20 * np.exp(-0.2 * np.sqrt(np.mean(z**2)))
+                - np.exp(np.mean(np.cos(2 * np.pi * z)))
+                + 20
+                + np.exp(1.0)
+                + self.bias
+            )
+        }
 
 
 class Schwefel_2_22(Benchmark):
@@ -270,7 +276,7 @@ class Schwefel_2_22(Benchmark):
         if self.shuffle is not None:
             z = z[self.shuffle]
         z = np.abs(z)
-        return np.sum(z) + np.prod(z) + self.bias
+        return {"obj": np.sum(z) + np.prod(z) + self.bias}
 
 
 class Schwefel_1_2(Benchmark):
@@ -293,11 +299,11 @@ class Schwefel_1_2(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        sum = 0
+        ssum = 0
         for i in range(len(z)):
-            sum += np.sum(z[:i]) ** 2
+            ssum += np.sum(z[:i]) ** 2
 
-        return sum + self.bias
+        return {"obj": ssum + self.bias}
 
 
 class F10(Benchmark):
@@ -320,13 +326,15 @@ class F10(Benchmark):
         F = (z[:-1] ** 2 + z[1:] ** 2) ** 0.25 * np.sin(
             50 * (z[:-1] ** 2 + z[1:] ** 2) ** 0.1
         ) ** 2 + 1
-        return (
-            np.sum(F)
-            + (z[-1] ** 2 + z[0] ** 2) ** 0.25
-            * np.sin(50 * (z[-1] ** 2 + z[0] ** 2) ** 0.1) ** 2
-            + 1
-            + self.bias
-        )
+        return {
+            "obj": (
+                np.sum(F)
+                + (z[-1] ** 2 + z[0] ** 2) ** 0.25
+                * np.sin(50 * (z[-1] ** 2 + z[0] ** 2) ** 0.1) ** 2
+                + 1
+                + self.bias
+            )
+        }
 
 
 class Bohachevsky(Benchmark):
@@ -359,7 +367,7 @@ class Bohachevsky(Benchmark):
             + self.bias
         )
 
-        return res
+        return {"obj": res}
 
 
 class Schaffer(Benchmark):
@@ -379,12 +387,16 @@ class Schaffer(Benchmark):
 
     def __call__(self, y):
         z = self.transform(y)
+
         if self.shuffle is not None:
             z = z[self.shuffle]
-        F = (z[:-1] ** 2 + z[1:] ** 2) ** 0.25 * np.sin(
-            50 * (z[:-1] ** 2 + z[1:] ** 2) ** 0.1
-        ) ** 2 + 1
-        return np.sum(F) + self.bias
+
+        xpy = z[:-1] ** 2 + z[1:] ** 2
+        xpy_last = z[-1] ** 2 + z[0] ** 2
+        F = xpy**0.25 * (np.sin(50 * (xpy**0.1) + 1) ** 2)
+        last = xpy_last**0.25 * (np.sin(50 * (xpy_last**0.1) + 1) ** 2)
+
+        return {"obj": np.sum(F) + last + self.bias}
 
 
 class Styblinsky_tang(Benchmark):
@@ -406,7 +418,7 @@ class Styblinsky_tang(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum(z**4 - 16 * z**2 + 5 * z) / len(z) + self.bias
+        return {"obj": np.sum(z**4 - 16 * z**2 + 5 * z) / len(z) + self.bias}
 
 
 class Alpine(Benchmark):
@@ -430,7 +442,7 @@ class Alpine(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum(np.absolute(z * np.sin(z) + 0.1 * z)) + self.bias
+        return {"obj": np.sum(np.absolute(z * np.sin(z) + 0.1 * z)) + self.bias}
 
 
 # CEC2020
@@ -452,7 +464,8 @@ class Cigar(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return z[0] ** 2 + (10**6) * np.sum(z[1:] ** 2) + self.bias
+        res = z[0] ** 2 + (10**6) * np.sum(np.power(z[1:], 2)) + self.bias
+        return {"obj": res}
 
 
 class Happycat(Benchmark):
@@ -477,12 +490,14 @@ class Happycat(Benchmark):
         if self.shuffle is not None:
             z = z[self.shuffle]
         znorm = np.sum(z**2)
-        return (
-            ((znorm - len(z)) ** 2) ** self.alpha
-            + (0.5 * znorm + np.sum(z)) / len(z)
-            + 0.5
-            + self.bias
-        )
+        return {
+            "obj": (
+                ((znorm - len(z)) ** 2) ** self.alpha
+                + (0.5 * znorm + np.sum(z)) / len(z)
+                + 0.5
+                + self.bias
+            )
+        }
 
 
 class Levy(Benchmark):
@@ -503,12 +518,14 @@ class Levy(Benchmark):
         if self.shuffle is not None:
             z = z[self.shuffle]
         z = 1 + (z - 1) / 4
-        return (
-            np.sin(np.pi * y[0]) ** 2
-            + np.sum((y[:-1] - 1) ** 2 * (1 + 10 * np.sin(np.pi * y[:-1] + 1) ** 2))
-            + (y[-1] - 1) ** 2 * (1 + np.sin(2 * np.pi * y[-1]) ** 2)
-            + self.bias
-        )
+        return {
+            "obj": (
+                np.sin(np.pi * y[0]) ** 2
+                + np.sum((y[:-1] - 1) ** 2 * (1 + 10 * np.sin(np.pi * y[:-1] + 1) ** 2))
+                + (y[-1] - 1) ** 2 * (1 + np.sin(2 * np.pi * y[-1]) ** 2)
+                + self.bias
+            )
+        }
 
 
 class Brown(Benchmark):
@@ -530,11 +547,13 @@ class Brown(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum(
-            (z[:-1] ** 2) ** (z[1:] ** 2 + 1)
-            + (z[1:] ** 2) ** (z[:-1] ** 2 + 1)
-            + self.bias
-        )
+        return {
+            "obj": np.sum(
+                (z[:-1] ** 2) ** (z[1:] ** 2 + 1)
+                + (z[1:] ** 2) ** (z[:-1] ** 2 + 1)
+                + self.bias
+            )
+        }
 
 
 class High_conditioned_elliptic(Benchmark):
@@ -556,9 +575,11 @@ class High_conditioned_elliptic(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return np.sum(
-            (10**6) ** (np.arange(0, len(z)) / (len(z) - 1)) * z**2 + self.bias
-        )
+        return {
+            "obj": np.sum(
+                (10**6) ** (np.arange(0, len(z)) / (len(z) - 1)) * z**2 + self.bias
+            )
+        }
 
 
 class HGBat(Benchmark):
@@ -582,12 +603,14 @@ class HGBat(Benchmark):
             z = z[self.shuffle]
         znorm = np.sum(z**2)
         zsum = np.sum(z)
-        return (
-            np.abs(znorm**2 - zsum**2) ** self.alpha
-            + (0.5 * znorm + zsum) / len(z)
-            + 0.5
-            + self.bias
-        )
+        return {
+            "obj": (
+                np.abs(znorm**2 - zsum**2) ** self.alpha
+                + (0.5 * znorm + zsum) / len(z)
+                + 0.5
+                + self.bias
+            )
+        }
 
 
 class Discus(Benchmark):
@@ -609,7 +632,7 @@ class Discus(Benchmark):
         z = self.transform(y)
         if self.shuffle is not None:
             z = z[self.shuffle]
-        return 10**6 * z[0] ** 2 + np.sum(z[1:] ** 2) + self.bias
+        return {"obj": 10**6 * z[0] ** 2 + np.sum(z[1:] ** 2) + self.bias}
 
 
 class Lunacek(Benchmark):
@@ -635,16 +658,18 @@ class Lunacek(Benchmark):
         s = 1.0 - 1.0 / (2.0 * np.sqrt(len(z) + 20.0) - 8.2)
         mu0 = 2.5
         mu1 = -np.sqrt((mu0**2 - d) / s)
-        return (
-            np.min(
-                [
-                    np.sum((z - mu0) ** 2),
-                    d * len(z) + s * np.sum((z - mu1) ** 2),
-                ]
+        return {
+            "obj": (
+                np.min(
+                    [
+                        np.sum((z - mu0) ** 2),
+                        d * len(z) + s * np.sum((z - mu1) ** 2),
+                    ]
+                )
+                + 10 * np.sum(1 - np.cos(2 * np.pi * (z - mu0)))
+                + self.bias
             )
-            + 10 * np.sum(1 - np.cos(2 * np.pi * (z - mu0)))
-            + self.bias
-        )
+        }
 
 
 # CEC2020
@@ -677,16 +702,18 @@ class Lunacek_bi_rastrigin(Benchmark):
         z = 2 * z * np.sign(self.shift[: len(z)]) + mu0
         z = self._rotate_point(z)
 
-        return (
-            np.min(
-                [
-                    np.sum((z - mu0) ** 2),
-                    d * len(z) + s * np.sum((z - mu1) ** 2),
-                ]
+        return {
+            "obj": (
+                np.min(
+                    [
+                        np.sum((z - mu0) ** 2),
+                        d * len(z) + s * np.sum((z - mu1) ** 2),
+                    ]
+                )
+                + 10 * np.sum(1 - np.cos(2 * np.pi * (z - mu0)))
+                + self.bias
             )
-            + 10 * np.sum(1 - np.cos(2 * np.pi * (z - mu0)))
-            + self.bias
-        )
+        }
 
 
 # CEC2020
@@ -728,7 +755,7 @@ class Modified_schwefel(Benchmark):
             (z[mask3] + 500) ** 2
         ) / (10000 * len(z))
 
-        return 418.9829 * len(z) - np.sum(g) + self.bias
+        return {"obj": 418.9829 * len(z) - np.sum(g) + self.bias}
 
 
 class Expanded_schaffer(Benchmark):
@@ -752,11 +779,9 @@ class Expanded_schaffer(Benchmark):
             z = z[self.shuffle]
         xpy = z[:-1] ** 2 + z[1:] ** 2
         xpy_last = z[-1] ** 2 + z[0] ** 2
-        F = 0.5 + (np.sin(np.sqrt(xpy) - 0.5) ** 2) / (1 + 0.001 * xpy) ** 2
-        last = (
-            0.5 + (np.sin(np.sqrt(xpy_last) - 0.5) ** 2) / (1 + 0.001 * xpy_last) ** 2
-        )
-        return np.sum(F) + last + self.bias
+        F = xpy**0.25 * (np.sin(50 * (xpy**0.1) + 1) ** 2)
+        last = xpy_last**0.25 * (np.sin(50 * (xpy_last**0.1) + 1) ** 2)
+        return {"obj": np.sum(F) + last + self.bias}
 
 
 # CEC2020
@@ -787,13 +812,15 @@ class Expanded_rosenbrock_griewangk(Benchmark):
         lasttmp1 = z[-1] ** 2 - z[0]
         lasttmp2 = z[-1] - 1.0
         lasttemp = 100 * lasttmp1**2 + lasttmp2**2
-        return (
-            np.sum(temp**2 / 4000 - np.cos(temp) + 1.0)
-            + lasttemp**2 / 4000
-            - np.cos(lasttemp)
-            + 1.0
-            + self.bias
-        )
+        return {
+            "obj": (
+                np.sum(temp**2 / 4000 - np.cos(temp) + 1.0)
+                + lasttemp**2 / 4000
+                - np.cos(lasttemp)
+                + 1.0
+                + self.bias
+            )
+        }
 
 
 class Weierstrass(Benchmark):
@@ -825,7 +852,7 @@ class Weierstrass(Benchmark):
             self.ak[:, np.newaxis] * np.cos(np.outer(2 * np.pi * self.bk, (z + 0.5)))
         )
         sum2 = len(z) * np.sum(self.ak * np.cos(2 * np.pi * self.bk * 0.5))
-        return sum1 - sum2 + self.bias
+        return {"obj": sum1 - sum2 + self.bias}
 
 
 ##############
@@ -885,7 +912,7 @@ class H1(Benchmark):
             z2 = np.array([z2])
         if not isinstance(z3, np.ndarray):
             z3 = np.array([z3])
-        return self.g1(z1) + self.g2(z2) + self.g3(z3) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.g3(z3) + self.bias}
 
 
 # hf06 case 16 realnum 16
@@ -947,7 +974,9 @@ class H2(Benchmark):
         if not isinstance(z4, np.ndarray):
             z4 = np.array([z4])
 
-        return self.g1(z1) + self.g2(z2) + self.g3(z3) + self.g4(z4) + self.bias
+        return {
+            "obj": self.g1(z1) + self.g2(z2) + self.g3(z3) + self.g4(z4) + self.bias
+        }
 
 
 # hf05 case 15 realnum 6
@@ -1020,14 +1049,16 @@ class H3(Benchmark):
         if not isinstance(z5, np.ndarray):
             z5 = np.array([z5])
 
-        return (
-            self.g1(z1)
-            + self.g2(z2)
-            + self.g3(z3)
-            + self.g4(z4)
-            + self.g5(z5)
-            + self.bias
-        )
+        return {
+            "obj": (
+                self.g1(z1)
+                + self.g2(z2)
+                + self.g3(z3)
+                + self.g4(z4)
+                + self.g5(z5)
+                + self.bias
+            )
+        }
 
 
 # cf02 case 22 realnum 22
@@ -1094,12 +1125,14 @@ class C1(Benchmark):
         else:
             w1, w2, w3 = 1, 1, 1
 
-        return (
-            w1 * (1 * self.g1(z))
-            + w2 * (10 * self.g2(z) + 100)
-            + w3 * (1 * self.g3(z) + 200)
-            + self.bias
-        )
+        return {
+            "obj": (
+                w1 * (1 * self.g1(z))
+                + w2 * (10 * self.g2(z) + 100)
+                + w3 * (1 * self.g3(z) + 200)
+                + self.bias
+            )
+        }
 
 
 # cf04 case 24 realnum 24
@@ -1174,13 +1207,15 @@ class C2(Benchmark):
         else:
             w1, w2, w3, w4 = 1, 1, 1, 1
 
-        return (
-            w1 * (10 * self.g1(z))
-            + w2 * (1e-6 * self.g2(z) + 100)
-            + w3 * (10 * self.g3(z) + 200)
-            + w4 * (1 * self.g4(z) + 300)
-            + self.bias
-        )
+        return {
+            "obj": (
+                w1 * (10 * self.g1(z))
+                + w2 * (1e-6 * self.g2(z) + 100)
+                + w3 * (10 * self.g3(z) + 200)
+                + w4 * (1 * self.g4(z) + 300)
+                + self.bias
+            )
+        }
 
 
 # cf05 case 25 realnum 25
@@ -1259,16 +1294,18 @@ class C3(Benchmark):
         if sw != 0:
             w1, w2, w3, w4, w5 = w1 / sw, w2 / sw, w3 / sw, w4 / sw, w5 / sw
         else:
-            w1, w2, w3, w4 = 1, 1, 1, 1, 1
+            w1, w2, w3, w4, w5 = 1, 1, 1, 1, 1
 
-        return (
-            w1 * (10 * self.g1(z))
-            + w2 * (1 * self.g2(z) + 100)
-            + w3 * (10 * self.g3(z) + 200)
-            + w4 * (1e-6 * self.g4(z) + 300)
-            + w5 * (1 * self.g5(z) + 400)
-            + self.bias
-        )
+        return {
+            "obj": (
+                w1 * (10 * self.g1(z))
+                + w2 * (1 * self.g2(z) + 100)
+                + w3 * (10 * self.g3(z) + 200)
+                + w4 * (1e-6 * self.g4(z) + 300)
+                + w5 * (1 * self.g5(z) + 400)
+                + self.bias
+            )
+        }
 
 
 ##############
@@ -1323,7 +1360,7 @@ class CF9F1_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
 
 
 class CF9F3_25(Benchmark):
@@ -1373,7 +1410,7 @@ class CF9F3_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
 
 
 class CF9F4_25(Benchmark):
@@ -1423,7 +1460,7 @@ class CF9F4_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
 
 
 class CF10F7_25(Benchmark):
@@ -1473,7 +1510,7 @@ class CF10F7_25(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
 
 
 class CF9F1_75(Benchmark):
@@ -1523,7 +1560,7 @@ class CF9F1_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
 
 
 class CF9F3_75(Benchmark):
@@ -1573,7 +1610,7 @@ class CF9F3_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
 
 
 class CF9F4_75(Benchmark):
@@ -1623,7 +1660,7 @@ class CF9F4_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
 
 
 class CF10F7_75(Benchmark):
@@ -1673,4 +1710,4 @@ class CF10F7_75(Benchmark):
             z = z[self.shuffle]
         idx1 = np.ceil(self.p * len(z)).astype(int)
         z1, z2 = z[0:idx1], z[idx1:]
-        return self.g1(z1) + self.g2(z2) + self.bias
+        return {"obj": self.g1(z1) + self.g2(z2) + self.bias}
