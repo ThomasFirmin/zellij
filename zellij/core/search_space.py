@@ -1,21 +1,40 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-04-26T15:33:50+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
+from __future__ import annotations
+from abc import abstractmethod
+from zellij.core.errors import InitializationError, InputError
+from zellij.core.variables import (
+    ArrayVar,
+    FloatVar,
+    IntVar,
+    PermutationVar,
+    IterableVar,
+)
+from zellij.utils.distances import Euclidean, Mixed, Manhattan
 
+from typing import (
+    Optional,
+    Tuple,
+    List,
+    Sequence,
+    Union,
+    TypeVar,
+    TYPE_CHECKING,
+)
 
-from zellij.core.variables import Variable, ArrayVar, FloatVar, IntVar
-from zellij.core.loss_func import LossFunc
-from zellij.utils.distances import Distance, Mixed, Euclidean
-from zellij.core.addons import SearchspaceAddon, Converter
+if TYPE_CHECKING:
+    from zellij.strategies.tools.measurements import Measurement
+    from zellij.core.addons import Distance
+
+    FR = TypeVar("FR", bound="Fractal")
+    MFR = TypeVar("MFR", bound="MixedFractal")
+
 import numpy as np
-import copy
 import os
 import pickle
-from abc import ABC, abstractmethod
+from abc import ABCMeta
 
 
 import logging
@@ -23,57 +42,45 @@ import logging
 logger = logging.getLogger("zellij.space")
 
 
-class Searchspace(ABC):
+class MetaSearchspace(ABCMeta):
+    def __call__(cls, *args, **kwargs):
+        instance = super().__call__(*args, **kwargs)
+        instance._check_addons(instance.variables)
+        return instance
+
+
+class Searchspace(metaclass=MetaSearchspace):
     """Searchspace
 
     Searchspace is an essential class for Zellij. Define your search space with this object.
 
     Attributes
     ----------
-
-    variables : Variable
+    variables : IterableVar
         Determines the decision space. See `MixedSearchspace`, `ContinuousSearchspace`,
         `DiscreteSearchspace` for more info.
-
-    loss : LossFunc
-        Callable of type `LossFunc`. See :ref:`lf` for more information.
-        `loss` will be used by the :ref:`sp` object and by optimization
 
     See Also
     --------
     LossFunc : Parent class for a loss function.
     """
 
-    def __init__(self, variables, loss, **kwargs):
-        """__init__(variables, loss, **kwargs)
+    def __init__(self, variables: IterableVar):
+        """__init__
 
         Parameters
         ----------
-
-        variables : ArrayVar
+        variables : IterableVar
             Determines the decision space. See :code:`MixedSearchspace`, :code:`ContinuousSearchspace`,
             :code:`DiscreteSearchspace` for more info.
-
-        loss : LossFunc
-            Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
-            :code:`loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
         """
-
-        assert isinstance(loss, LossFunc), logger.error(
-            f"`loss` must be a `LossFunc`, got {loss}"
-        )
+        #############
+        # VARIABLES #
+        #############
+        # if true solutions must be converted before being past to loss func.
+        self._do_convert = False
+        self._do_neighborhood = False
+        self.size = len(variables)
 
         ##############
         # PARAMETERS #
@@ -81,174 +88,92 @@ class Searchspace(ABC):
 
         self.variables = variables
 
-        self.loss = loss
-        self.kwargs = kwargs
-
-        #############
-        # VARIABLES #
-        #############
-        # if true solutions must be converted before being past to loss func.
-        self._convert_sol = False
-
-        self.size = len(self.variables)
-
-        self._all_addons = kwargs
-
-        self._add_addons(**kwargs)
-
     @property
-    def loss(self):
-        return self._loss
+    def variables(self) -> IterableVar:
+        return self._variables
 
-    @loss.setter
-    def loss(self, value):
-        self._loss = value
-
-    def _add_addons(self, **kwargs):
-        for k in kwargs:
-            assert isinstance(kwargs[k], SearchspaceAddon), logger.error(
-                f"Kwargs must be of type `SearchspaceAddon`, got {k}:{kwargs[k]}"
+    @variables.setter
+    def variables(self, value: IterableVar):
+        if isinstance(value, IterableVar):
+            self._variables = value
+        else:
+            raise InitializationError(
+                f"In Searchspace, variables must be defined within an ArrayVar. Got {type(value)}"
             )
 
-            if kwargs[k]:
-                setattr(self, k, copy.copy(kwargs[k]))
-                addon = getattr(self, k)
-                addon.target = self
-            else:
-                setattr(self, k, kwargs[k])
-                addon = getattr(self, k)
-                addon.target = self
-
-            if isinstance(kwargs[k], Converter):
-                self._convert_sol = True
-
-    # Return 1 or size=n random attribute from the search space, can exclude one attribute
-    def random_attribute(self, size=1, replace=True, exclude=None):
-        """random_attribute(size=1,replace=True, exclude=None)
-
-        Draw random features from the search space.
-
-        Parameters
-        ----------
-        size : int, default=1
-            Select randomly <size> features.
-        replace : boolean, default=True
-            Select randomly <size> features with replacement if True.
-            See numpy.random.choice
-        exclude : Variable or list[Variable] or type or list[type] or int or list[int], default=None
-            Exclude one or several `Variable` to be drawn.
-            Can also exclude types.For example one can exclude all Constant type.
-            Can also exclude variables according to their index or value.
-
-        Returns
-        -------
-
-        out : numpy.array(dtype=int)
-            Array of index, corresponding to the selected Variable in `variables`.
-
-        Examples
-        --------
-        >>> rand_att = sp.random_attribute(3)
-        >>> print(rand_att)
-        array([FloatVar(float_1, [2;12]), CatVar(cat_1, ['Hello', 87, 2.56]),
-         FloatVar(float_1, [2;12])], dtype=object)
-        """
-
-        if exclude:
-            index = []
-            if isinstance(exclude, int):
-                index = [exclude]
-            elif isinstance(exclude, Variable):
-                index = [exclude._idx]  # type: ignore
-            elif isinstance(exclude, type):
-                index = []
-                for elem in self.variables.variables:
-                    if isinstance(elem, exclude):
-                        index.append(elem._idx)
-            elif isinstance(exclude, list) or isinstance(exclude, tuple):
-                if all(isinstance(elem, int) for elem in exclude):
-                    index = exclude
-                elif all(isinstance(elem, Variable) for elem in exclude):
-                    index = []
-                    for elem in exclude:
-                        index.append(elem._idx)
-                elif all(isinstance(elem, type) for elem in exclude):
-                    index = []
-                    for elem in self.variables.variables:
-                        if isinstance(elem, tuple(exclude)):
-                            index.append(elem._idx)
-
-            p = np.full(self.size, 1 / (self.size - len(index)))
-            p[index] = 0
+    def _check_addons(self, value):
+        if value.converter:
+            self._do_convert = True
         else:
-            p = np.full(self.size, 1 / self.size)
-
-        return np.random.choice(
-            self.variables.variables, size=size, replace=replace, p=p
-        )
+            self._do_convert = False
+        if value.neighborhood:
+            self._do_neighborhood = True
+        else:
+            self._do_neighborhood = False
 
     # Return a random point of the search space
-    def random_point(self, size=1):
-        """random_point(size=1)
+    def random_point(self, size: Optional[int] = None) -> list:
+        """random_point
 
         Return a random point from the search space
 
         Parameters
         ----------
-
-        size : int, default=1
-            Draw <size> points.
+        size : int, optional
+            Draw <size> points. If None returns a single point.
 
         Returns
         -------
-
-        points : list[list[{int, float, str}]]
+        points : {list, list[list]
             List of <point>.
-
-        Examples
-        --------
-
-        >>> rand_pts = sp.random_point(3)
-        >>> print(f"Random points: {rand_pts}")
-        Random points: [[-3.830114043118622, 9, 'sigmoid'],
-        ...             [3.065902630698311, 3, 'sigmoid'],
-        ...             [-0.6839762230289024, 10, 'relu']]
-
         """
 
         return self.variables.random(size)
 
-    def subspace(self, lower, upper, **kwargs):
-        """subspace(self, lower, upper)
+    def convert(self, X: List[list]) -> List[list]:
+        if isinstance(X[0], list):
+            if self.variables.converter:
+                res = []
+                for x in X:
+                    res.append(self.variables.converter.convert(x))
+                return res
+            else:
+                raise InitializationError(
+                    f"In {type(self).__name__} `convert` was called while no converter is set."
+                )
+        else:
+            raise InputError(
+                f"In {type(self).__name__} `convert` X must be a list of solutions, list of list. Got {X}."
+            )
 
-        Build a sub space according to the actual Searchspace using two vectors containing lower and upper bounds of the subspace.
-        Can change type to Constant if necessary
+    def reverse(self, X: list) -> list:
+        if isinstance(X, list):
+            if self.variables.converter:
+                res = []
+                for x in X:
+                    res.append(self.variables.converter.reverse(x))
+                return res
+            else:
+                raise InitializationError(
+                    f"In {type(self).__name__} `reverse` was called while no converter is set."
+                )
+        else:
+            raise InputError(
+                f"In {type(self).__name__} `reverse` X must be a list of solutions, list of list. Got {X}."
+            )
 
-        Parameters
-        ----------
+    def neighborhood(self, X: List[list], size: Optional[int] = None) -> List[list]:
+        if self.variables.neighborhood:
+            res = []
+            for x in X:
+                res.extend(self.variables.neighborhood(x, size=size))
+            return res
+        else:
+            raise InitializationError(
+                f"In {type(self).__name__} `neighborhood` was called while no converter is set."
+            )
 
-        lower : list
-            Lower bounds of the subspace. See `Variable` for more info.
-        upper : boolean, default=False
-            Upper bounds of the subspace. See `Variable` for more info.
-
-        Returns
-        -------
-
-        out : Searchspace
-            Return a subspace of the actual Searchspace.
-
-        Examples
-        --------
-
-        """
-
-        sub = self.variables.subset(lower, upper)
-        sp = type(self)(sub, self.loss, **kwargs, **self.kwargs)
-
-        return sp
-
-    def save(self, path):
+    def save(self, path: str):
         pickle.dump(self, open(os.path.join(path, "searchspace.p"), "wb"))
 
     def __getstate__(self):
@@ -258,12 +183,11 @@ class Searchspace(ABC):
     def __setstate__(self, state):
         self.__dict__.update(state)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.variables)
 
 
 class MixedSearchspace(Searchspace):
-
     """MixedSearchspace
 
     :code:`MixedSearchspace` is a search space made for HyperParameter Optimization (HPO).
@@ -271,27 +195,18 @@ class MixedSearchspace(Searchspace):
 
     Attributes
     ----------
-
-    variables : ArrayVar
+    variables : IterableVar
         Determines the bounds of the search space.
-        For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
+        For `ContinuousSearchspace` the `variables` must be an `IterableVar`
         of `FloatVar`, `IntVar`, `CatVar`.
-        The :ref:`sp` will then manipulate this array.
-
-    loss : LossFunc
-        Callable of type `LossFunc`. See :ref:`lf` for more information.
-        `loss` will be used by the :ref:`sp` object and by optimization
-
+    distance : Distance, optional
+        Distance object defining the distance between two point within this :ref:`sp`.
+        By default :code:`Mixed()`.
 
     Methods
     -------
-    random_attribute(self,size=1,replace=True, exclude=None)
-        Draw random features from the search space.
-        Return the selected `Variable`
-
     random_point(self,size=1)
         Return random points from the search space
-
     subspace(self,lower,upper)
         Build a sub space according to the actual Searchspace using two vectors
         containing lower and upper bounds of the subspace.
@@ -303,80 +218,43 @@ class MixedSearchspace(Searchspace):
     Examples
     --------
     >>> from zellij.core.variables import ArrayVar, IntVar, FloatVar, CatVar
-    >>> from zellij.utils.distances import Mixed
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.utils.benchmark import himmelblau
-    >>> from zellij.core.search_space import MixedSearchspace
-    >>> a = ArrayVar(IntVar("int_1", 0,8),
-    >>>              IntVar("int_2", 4,45),
-    >>>              FloatVar("float_1", 2,12),
-    >>>              CatVar("cat_1", ["Hello", 87, 2.56]))
-    >>> lf = Loss()(himmelblau)
-    >>> sp = MixedSearchspace(a,lf, distance=Mixed())
-    >>> p1,p2 = sp.random_point(), sp.random_point()
-    >>> print(p1)
-    [5, 34, 4.8808143412719485, 87]
-    >>> print(p2)
-    [3, 42, 2.8196595134477738, 'Hello']
-
+    >>> from zellij.core import MixedSearchspace
+    >>> a = ArrayVar(
+    ...             IntVar("i1", 0, 8),
+    ...             IntVar("i2", 30, 40),
+    ...             FloatVar("f1", 10, 20),
+    ...             CatVar("c1", ["Hello", 87, 2.56]),
+    ...         )
+    >>> sp = MixedSearchspace(a)
+    >>> p = sp.random_point()
+    >>> print(p)
+    [7, 32, 19.70695001272685, 2.56]
+    >>> p = sp.random_point(2)
+    >>> print(p)
+    [[7, 37, 18.734133066154932, 87],
+    [3, 35, 12.003121963930703, 2.56]]
+    >>> sp.distance(p[0],p[1])
+    0.5411583306216192
     """
 
     # Initialize the search space
-    def __init__(self, variables, loss, **kwargs):
-        """__init__(variables, loss, **kwargs)
+    def __init__(self, variables: IterableVar, distance: Optional[Distance] = None):
+        """__init__
 
         Parameters
         ----------
-
-        variables : ArrayVar
+        variables : IterableVar
             Determines the bounds of the search space.
-            For :code:`ContinuousSearchspace` the :code:`variables` must be an :code:`ArrayVar`
-            of :code:`FloatVar`, :code:`IntVar`, :code:`CatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
-            :code:`loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * er : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
-
-
         """
 
         ##############
         # ASSERTIONS #
         ##############
-
-        assert isinstance(variables, ArrayVar), logger.error(
-            f"`variables` must be be an `ArrayVar`, got {variables}"
-        )
-
-        self.distance = kwargs.pop("distance", Mixed())
-        super(MixedSearchspace, self).__init__(variables, loss, **kwargs)
-        assert isinstance(self.distance, Distance), logger.error(
-            f"Kwargs `distance` must be of type `Distance`, got {self.distance}"
-        )
-        self.distance.target = self
-
-    @Searchspace.loss.setter
-    def loss(self, value):
-        self._loss = value
-        if self._loss and not self.loss.labels:
-            self.loss.labels = [v.label for v in self.variables]
+        super(MixedSearchspace, self).__init__(variables)
+        self.distance = distance
 
 
 class ContinuousSearchspace(Searchspace):
-
     """ContinuousSearchspace
 
     :code:`ContinuousSearchspace` is a search space made for continuous optimization.
@@ -385,25 +263,17 @@ class ContinuousSearchspace(Searchspace):
 
     Attributes
     ----------
-
     variables : ArrayVar
         Determines the bounds of the search space.
         For :code:`ContinuousSearchspace` the :code:`variables` must be an :code:`ArrayVar`
         of :code:`FloatVar`.
-        The :ref:`sp` will then manipulate this array.
-
-    loss : LossFunc
-        Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
-        :code:`loss` will be used by the :ref:`sp` object and by optimization
-
+    distance : Distance, optional
+        Distance object defining the distance between two point within this :ref:`sp`.
+        By default :code:`Euclidean()`.
 
     Methods
     -------
-    random_attribute(self,size=1,replace=True, exclude=None)
-        Draw random features from the search space.
-        Return the selected `Variable`
-
-    random_point(self,size=1)
+    random_point(self,size=None)
         Return random points from the search space
 
     subspace(self,lower,upper)
@@ -417,100 +287,142 @@ class ContinuousSearchspace(Searchspace):
     Examples
     --------
     >>> from zellij.core.variables import ArrayVar, FloatVar
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.utils.benchmark import himmelblau
-    >>> from zellij.core.search_space import ContinuousSearchspace
-    >>> lf = Loss()(himmelblau)
-    >>> a = ArrayVar(FloatVar("float_1", 0,1),
-    ...              FloatVar("float_2", 0,1))
-    >>> sp = ContinuousSearchspace(a,lf)
-    >>> p1,p2 = sp.random_point(), sp.random_point()
-    >>> print(p1)
-    [0.8922761649920034, 0.12709277668616326]
-    >>> print(p2)
-    [0.7730279148456985, 0.14715728189857524]
+    >>> from zellij.core import ContinuousSearchspace
+    >>> a = ArrayVar(FloatVar("f1", 0, 10),FloatVar("f2", -10, 0))
+    >>> sp = ContinuousSearchspace(a)
+    >>> p = sp.random_point()
+    >>> print(p)
+    [7.8040745696654845, -4.360651502175973]
+    >>> p = sp.random_point(2)
+    >>> print(p)
+    [[2.409486588746743, -0.19724026255489946],
+    [2.962067847388803, -5.178636429752261]]
+    >>> sp.distance(p[0],p[1])
+    5.011951099319607
 
     """
 
     # Initialize the search space
-    def __init__(self, variables, loss, **kwargs):
-        """__init__(variables, loss, **kwargs)
+    def __init__(self, variables: ArrayVar, distance: Optional[Distance] = None):
+        """__init__
 
         Parameters
         ----------
-
         variables : ArrayVar
             Determines the bounds of the search space.
-            For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
-
+        distance : Distance, optional
+            Distance object defining the distance between two point within this :ref:`sp`.
         """
-        super(ContinuousSearchspace, self).__init__(variables, loss, **kwargs)
+        super(ContinuousSearchspace, self).__init__(variables)
+        self.distance = distance
 
-        ##############
-        # ASSERTIONS #
-        ##############
+    @Searchspace.variables.setter
+    def variables(self, value: ArrayVar):
+        if isinstance(value, ArrayVar):
+            cont_condition = all(isinstance(v, FloatVar) for v in value)
+            conv_condition = (
+                all(v.converter is not None for v in value) and value.converter
+            )
 
-        cont_condition = all(isinstance(v, FloatVar) for v in variables)
-        conv_condition = all(hasattr(v, "converter") for v in variables)
+            if cont_condition or conv_condition:
+                self._variables = value
+                self.lower = np.zeros(len(value), dtype=float)
+                self.upper = np.ones(len(value), dtype=float)
 
-        assert isinstance(variables, ArrayVar) and (
-            cont_condition or conv_condition
-        ), logger.error(
-            f"`variables` must be be an `ArrayVar` of `FloatVar`, got {variables}"
-        )
+                if value.converter and conv_condition:
+                    self._do_convert = True
+                else:
+                    self._do_convert = False
+                    for idx, v in enumerate(value):
+                        self.lower[idx] = v.lower  # type: ignore
+                        self.upper[idx] = v.upper  # type: ignore
 
-        self.lower = np.zeros(self.size)
-        self.upper = np.ones(self.size)
-
-        if cont_condition and not conv_condition:
-            for idx, v in enumerate(variables):
-                self.lower[idx] = v.lower
-                self.upper[idx] = v.upper
-            self._convert_sol = False
+                if self._variables.neighborhood:
+                    self._do_neighborhood = True
+                else:
+                    self._do_neighborhood = False
+            else:
+                raise InitializationError(
+                    f"In {type(self).__name__}, variables must be FloatVar defined within an ArrayVar, or have a converter. Got {type(value)}"
+                )
         else:
-            self._convert_sol = True
+            raise InitializationError(
+                f"In {type(self).__name__}, variables must be FloatVar defined within an ArrayVar, or have a converter. Got {type(value)}"
+            )
 
-        self.distance = kwargs.pop("distance", Euclidean(self))
-        assert isinstance(self.distance, Distance), logger.error(
-            f"Kwargs `distance` must be of type `Distance`, got {self.distance}"
-        )
-        self.distance.target = self
+    @property
+    def distance(self) -> Distance:
+        return self._distance
+
+    @distance.setter
+    def distance(self, value: Optional[Distance]):
+        if value:
+            self._distance = value
+        else:
+            self._distance = Euclidean()
+        self._distance.target = self
 
     # Return a random point of the search space
-    def random_point(self, size=1):
-        if self._convert_sol:
-            points = self.converter.convert(super().random_point(size=size))  # type: ignore
+    def random_point(self, size: Optional[int] = None) -> Union[list, List[list]]:
+        if size:
+            points = super().random_point(size=size)
+            if self._do_convert:
+                points = self.convert(points)
         else:
             points = super().random_point(size=size)
+            if self._do_convert:
+                points = self.convert([points])[0]
         return points
 
-    @Searchspace.loss.setter
-    def loss(self, value):
-        self._loss = value
-        if self._loss and not self.loss.labels:
-            self.loss.labels = [v.label for v in self.variables]
+
+class UnitSearchspace(ContinuousSearchspace):
+    @Searchspace.variables.setter
+    def variables(self, value: ArrayVar):
+        if isinstance(value, ArrayVar):
+            # Converter condition
+            conv_condition = (
+                all(v.converter is not None for v in value) and value.converter
+            )
+
+            # Unit cube condition
+            unit_cond = True
+            cv = 0  # current value
+            while cv < self.size and unit_cond:
+                v = value[cv]
+
+                if isinstance(v, FloatVar):
+                    if v.lower != 0 or v.upper != 1:
+                        unit_cond = False
+                else:
+                    unit_cond = False
+
+                cv += 1
+
+            if unit_cond or conv_condition:
+                self._variables = value
+                self.lower = np.zeros(self.size)
+                self.upper = np.ones(self.size)
+
+                if conv_condition:
+                    self._do_convert = True
+                else:
+                    self._do_convert = False
+
+                if value.neighborhood:
+                    self._neighborhood = True
+                else:
+                    self._neighborhood = False
+            else:
+                raise InitializationError(
+                    f"In {type(self).__name__}, variables must be FloatVar within [0,1] defined within an ArrayVar, or have a converter."
+                )
+        else:
+            raise InitializationError(
+                f"In {type(self).__name__}, variables must be FloatVar within [0,1] defined within an ArrayVar, or have a converter."
+            )
 
 
 class DiscreteSearchspace(Searchspace):
-
     """DiscreteSearchspace
 
     :code:`DiscreteSearchspace` is a search space made for continuous optimization.
@@ -518,27 +430,16 @@ class DiscreteSearchspace(Searchspace):
 
     Attributes
     ----------
-
     variables : ArrayVar
         Determines the bounds of the search space.
-        For :code:`DiscreteSearchspace` the :code:`variables` must be an :code:`ArrayVar`
-        of :code:`IntVar`.
-        The :ref:`sp` will then manipulate this array.
-
-    loss : LossFunc
-        Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
-        :code:`loss` will be used by the :ref:`sp` object and by optimization
-
+    distance : Distance, optional
+        Distance object defining the distance between two point within this :ref:`sp`.
+        By default :code:`Manhattan()`.
 
     Methods
     -------
-    random_attribute(self,size=1,replace=True, exclude=None)
-        Draw random features from the search space.
-        Return the selected `Variable`
-
     random_point(self,size=1)
         Return random points from the search space
-
     subspace(self,lower,upper)
         Build a sub space according to the actual Searchspace using two vectors
         containing lower and upper bounds of the subspace.
@@ -550,92 +451,100 @@ class DiscreteSearchspace(Searchspace):
     Examples
     --------
     >>> from zellij.core.variables import ArrayVar, IntVar
-    >>> from zellij.core.loss_func import Loss
-    >>> from zellij.utils.benchmark import himmelblau
-    >>> from zellij.core.search_space import DiscreteSearchspace
-    >>> a = ArrayVar(IntVar("int_1", 0,8),
-    >>>              IntVar("int_2", 4,45))
-    >>> lf = Loss()(himmelblau)
-    >>> sp = DiscreteSearchspace(a,lf)
-    >>> p1,p2 = sp.random_point(), sp.random_point()
-    >>> print(p1)
-    [5, 34]
-    >>> print(p2)
-    [3, 42]
+    >>> from zellij.core import DiscreteSearchspace
+    >>> a = ArrayVar(IntVar("i1", 0, 10),IntVar("i2", -10, 0))
+    >>> sp = DiscreteSearchspace(a)
+    >>> p = sp.random_point()
+    >>> print(p)
+    [3, -2]
+    >>> p = sp.random_point(2)
+    >>> print(p)
+    [[1, -4], [7, -7]]
+    >>> sp.distance(p[0],p[1])
+    6
 
     """
 
     # Initialize the search space
-    def __init__(self, variables, loss, **kwargs):
-        """__init__(variables, loss, **kwargs)
+    def __init__(self, variables: ArrayVar, distance: Optional[Distance] = None):
+        """__init__
 
         Parameters
         ----------
-
         variables : ArrayVar
             Determines the bounds of the search space.
             For :code:`DiscreteSearchspace` the :code:`variables` must be an :code:`ArrayVar`
             of :code:`IntVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type :code:`LossFunc`. See :ref:`lf` for more information.
-            :code:`loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
-
         """
-        super(DiscreteSearchspace, self).__init__(variables, loss, **kwargs)
+        super(DiscreteSearchspace, self).__init__(variables)
+        self.distance = distance
 
-        ##############
-        # ASSERTIONS #
-        ##############
+    @Searchspace.variables.setter
+    def variables(self, value: ArrayVar):
+        if isinstance(value, ArrayVar):
+            cont_condition = all(isinstance(v, IntVar) for v in value)
+            conv_condition = all(v.converter is not None for v in value)
 
-        cont_condition = all(isinstance(v, IntVar) for v in variables)
-        conv_condition = all(hasattr(v, "converter") for v in variables)
+            if cont_condition or conv_condition:
+                self._variables = value
+                self.lower = np.zeros(len(value), dtype=int)
+                self.upper = np.ones(len(value), dtype=int)
 
-        assert isinstance(variables, ArrayVar) and (
-            cont_condition or conv_condition
-        ), logger.error(
-            f"`variables` must be be an `ArrayVar` of `IntVar`, got {variables}"
-        )
+                if self._variables.converter and conv_condition:
+                    self._do_convert = True
+                else:
+                    self._do_convert = False
+                    for idx, v in enumerate(value):
+                        self.lower[idx] = v.lower  # type: ignore
+                        self.upper[idx] = v.upper  # type: ignore
 
-        self.lower = np.zeros(self.size)
-        self.upper = np.ones(self.size)
-
-        if cont_condition and not conv_condition:
-            for idx, v in enumerate(variables):
-                self.lower[idx] = v.lower
-                self.upper[idx] = v.upper
-            self._convert_sol = False
+                if self._variables.neighborhood:
+                    self._do_neighborhood = True
+                else:
+                    self._do_neighborhood = False
+            else:
+                raise InitializationError(
+                    f"In {type(self).__name__}, variables must be IntVar defined within an ArrayVar, or have a converter. Got {type(value)}"
+                )
         else:
-            self._convert_sol = True
+            raise InitializationError(
+                f"In {type(self).__name__}, variables must be IntVar defined within an ArrayVar, or have a converter. Got {type(value)}"
+            )
 
-        self.distance = kwargs.pop("distance", Euclidean(self))
-        assert isinstance(self.distance, Distance), logger.error(
-            f"Kwargs `distance` must be of type `Distance`, got {self.distance}"
-        )
-        self.distance.target = self
+    @property
+    def distance(self) -> Distance:
+        return self._distance
 
-    @Searchspace.loss.setter
-    def loss(self, value):
-        self._loss = value
-        if self._loss and not self.loss.labels:
-            self.loss.labels = [v.label for v in self.variables]
+    @distance.setter
+    def distance(self, value: Optional[Distance]):
+        if value:
+            self._distance = value
+        else:
+            self._distance = Manhattan()
+        self._distance.target = self
+
+    # Return a random point of the search space
+    def random_point(self, size: Optional[int] = None) -> Union[list, List[list]]:
+        if size:
+            points = super().random_point(size=size)
+            if self._do_convert:
+                points = self.convert(points)
+        else:
+            points = super().random_point(size=size)
+            if self._do_convert:
+                points = self.convert([points])[0]
+        return points
 
 
-class BaseFractal(Searchspace):
-    """Fractal
+class MetaFrac(MetaSearchspace):
+    def __call__(cls, *args, **kwargs):
+        instance = super().__call__(*args, **kwargs)
+        instance._update_measure()
+        return instance
+
+
+class BaseFractal(Searchspace, metaclass=MetaFrac):
+    """BaseFractal
 
     BaseFractal is an abstract describing what an fractal object is.
     This class is used to build a new kind of search space.
@@ -648,27 +557,18 @@ class BaseFractal(Searchspace):
     ----------
     level : int
         Current level of the fractal in the partition tree. See Tree_search.
-
     father : int
         Fractal id of the parent of the fractal.
-
     f_id : int
         ID of the fractal at the current level.
-
     c_id : int
         ID of the child among the children of the parent.
-
     score : float
         Score of the fractal. By default the score of the fractal is equal
         to the score of its parent (inheritance), so it can be locally
         used and modified by the :ref:`scoring`.
-
     solutions : list[list[float]]
         List of solutions computed within the fractal
-
-    variables : list[float]
-        List of objective variables.
-
     measure : float, default=NaN
         Measure of the fractal, obtained by a :code:`Measurement`.
 
@@ -683,72 +583,37 @@ class BaseFractal(Searchspace):
 
     def __init__(
         self,
-        variables,
-        loss,
-        measure=None,
-        **kwargs,
+        variables: IterableVar,
+        measurement: Optional[Measurement] = None,
     ):
-        """__init__(variables, loss, measure=None, **kwargs)
+        """__init__
 
         Parameters
         ----------
-
-        variables : ArrayVar
+        variables : IterableVar
             Determines the bounds of the search space.
-            For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        measure : Measurement, default=None
+        measurement : Measurement, optional
             Defines the measure of a fractal.
-
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
-
         """
-        super(BaseFractal, self).__init__(variables, loss, **kwargs)
+        super(BaseFractal, self).__init__(variables)
+        self._compute_measure = measurement
 
-        self._compute_measure = measure
+        #############
+        # VARIABLES #
+        #############
+
         self.measure = float("nan")
 
         self.level = 0
         self.father = -1  # father id, -1 = no father
         self.f_id = 0  # fractal id at a given level
         self.c_id = 0  # Children id
-
         self.score = float("inf")
 
         self.solutions = []
-        self.losses = []
-
-    @Searchspace.loss.setter
-    def loss(self, value):
-        self._loss = value
-        if self._loss and not self.loss.labels:
-            self.loss.labels = [v.label for v in self.variables]
-
-    def __init_subclass__(cls, *args, **kwargs):
-        super().__init_subclass__(*args, **kwargs)
-
-        def init_measurement(self, *args, init=cls.__init__, **kwargs):
-            init(self, *args, **kwargs)
-            if cls is type(self):
-                self._update_measure()
-
-        cls.__init__ = init_measurement
+        self.losses = np.array([], dtype=float)
+        self.secondary_loss = None
+        self.constraint_val = None
 
     def _update_measure(self):
         if self._compute_measure:
@@ -756,7 +621,13 @@ class BaseFractal(Searchspace):
         else:
             self.measure = float("nan")
 
-    def add_solutions(self, X, Y):
+    def add_solutions(
+        self,
+        X: list,
+        Y: np.ndarray,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ):
         """add_solutions
 
         Add computed solutions to the fractal.
@@ -769,47 +640,42 @@ class BaseFractal(Searchspace):
                 List of loss values associated to X.
         """
         self.solutions.extend(X)
-        self.losses.extend(Y)
+        self.losses = np.append(self.losses, Y)
+        if secondary:
+            if self.secondary_loss:
+                self.secondary_loss = np.vstack((self.secondary_loss, secondary))
+            else:
+                self.secondary_loss = secondary
+
+        if constraint:
+            if self.constraint_val:
+                self.constraint_val = np.vstack((self.constraint_val, constraint))
+            else:
+                self.constraint_val = secondary
 
     def get_id(self):
         return (self.level, self.father, self.c_id)
 
-    def _compute_f_id(self, k):
+    def _compute_f_id(self, k: int) -> Tuple[int, int]:
+        """_compute_f_id
+        Compute range of IDs according to partition size k
+        """
         base = self.f_id * k
         return base, base + k
 
-    def create_children(self, k, *args, **kwargs):
-        """create_children(self)
+    @abstractmethod
+    def create_children(self) -> Sequence[BaseFractal]:
+        pass
 
-        Defines the partition function.
-        Determines how children of the current space should be created.
-
-        The child will inherit the parent's score.
-
-        """
-
-        children = [
-            type(self)(
-                variables=self.variables,
-                loss=self.loss,
-                measure=self._compute_measure,
-                *args,
-                **kwargs,
-            )
-            for _ in range(k)
-        ]
-        low_id, up_id = self._compute_f_id(k)
-        for c_id, f_id in enumerate(range(low_id, up_id)):
-            children[c_id].level = self.level + 1
-            children[c_id].father = self.f_id
-            children[c_id].c_id = c_id
-            children[c_id].f_id = f_id
-            children[c_id].score = self.score
-            children[c_id]._update_measure()
-
-        return children
-
-    def _modify(self, level, father, f_id, c_id, score, measure):
+    def _modify(
+        self,
+        level: int,
+        father: int,
+        f_id: int,
+        c_id: int,
+        score: float,
+        measure: float,
+    ):
         """_modify
 
         Modify the fractal according to given info. used for sending fractals in
@@ -825,7 +691,7 @@ class BaseFractal(Searchspace):
         self.solutions = []
         self.losses = []
 
-    def _essential_info(self):
+    def _essential_info(self) -> dict:
         return {
             "level": self.level,
             "father": self.father,
@@ -835,7 +701,7 @@ class BaseFractal(Searchspace):
             "measure": self.measure,
         }
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         """_essential_info
         Essential information to create the fractal. Used in _modify
         """
@@ -860,7 +726,7 @@ class BaseFractal(Searchspace):
         return self.score != other.score
 
 
-class Fractal(BaseFractal):
+class Fractal(BaseFractal, UnitSearchspace):
     """Fractal
 
     Fractal is an abstract class used in DBA.
@@ -878,33 +744,24 @@ class Fractal(BaseFractal):
     ----------
     level : int
         Current level of the fractal in the partition tree. See Tree_search.
-
     father : int
         Fractal id of the parent of the fractal.
-
     f_id : int
         ID of the fractal at the current level.
-
     c_id : int
         ID of the child among the children of the parent.
-
     score : float
         Score of the fractal. By default the score of the fractal is equal
         to the score of its parent (inheritance), so it can be locally
         used and modified by the :ref:`scoring`.
-
     solutions : list[list[float]]
         List of solutions computed within the fractal
-
     variables : list[float]
         List of objective variables.
-
     lower : list[0.0,...,0.0]
         Lower bounds of the unit hypercube.
-
     upper : list[1.0,...,1.0]
         Upper bounds of the unit hypercube.
-
     measure : float, default=NaN
         Measure of the fractal, obtained by a :code:`Measurement`.
 
@@ -919,80 +776,28 @@ class Fractal(BaseFractal):
 
     def __init__(
         self,
-        variables,
-        loss,
-        measure=None,
-        **kwargs,
+        variables: ArrayVar,
+        measurement: Optional[Measurement] = None,
+        distance: Optional[Distance] = None,
     ):
-        """__init__(variables, loss, measure=None, **kwargs)
+        """__init__
 
         Parameters
         ----------
-
         variables : ArrayVar
             Determines the bounds of the search space.
-            For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        measure : Measurement, default=None
+        distance : Distance, optional
+            Distance object defining the distance between two point within this :ref:`sp`.
+            By default :code:`Euclidean()`.
+        measurement : Measurement, optional
             Defines the measure of a fractal.
 
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
-
         """
-
-        # remove distance from kwargs as it is a default addon.
-        distance = kwargs.pop("distance", Euclidean())
-
-        super(Fractal, self).__init__(variables, loss, **kwargs)
-
-        assert self._is_valid_fractal(), logger.error(
-            "`variables` must be be an `ArrayVar` of `FloatVar`,"
-            f"or all `Var` must have a `converter` addon, got {variables}"
-        )
-
-        assert isinstance(distance, Distance), logger.error(
-            f"Kwargs `distance` must be of type `Distance`, got {distance}"
-        )
+        self._do_convert = False
+        super(Fractal, self).__init__(variables=variables, measurement=measurement)
         self.distance = distance
-        self.distance.target = self
 
-        self.lower = np.zeros(self.size)
-        self.upper = np.ones(self.size)
-
-    def _is_valid_fractal(self):
-        conv_condition = all(
-            hasattr(v, "converter") for v in self.variables
-        ) and hasattr(self.variables, "converter")
-        unit_cond = True
-
-        cv = 0  # current value
-        while cv < self.size and unit_cond:
-            v = self.variables[cv]
-            if isinstance(v, FloatVar):
-                if v.lower != 0 or v.upper != 1:
-                    unit_cond = False
-            else:
-                unit_cond = False
-
-        return isinstance(self.variables, ArrayVar) and (unit_cond or conv_condition)
-
-    def create_children(self, k, *args, **kwargs):
+    def create_children(self: FR, k: int, *args, **kwargs) -> Sequence[FR]:
         """create_children(self)
 
         Defines the partition function.
@@ -1000,13 +805,16 @@ class Fractal(BaseFractal):
 
         The child will inherit the parent's score.
 
+        Attributes
+        ----------
+        k : int
+            Partition size
         """
 
         children = [
             type(self)(
-                variables=self.variables,
-                loss=self.loss,
-                measure=self._compute_measure,
+                variables=self.variables,  # type: ignore
+                measurement=self._compute_measure,
                 *args,
                 **kwargs,
             )
@@ -1020,6 +828,109 @@ class Fractal(BaseFractal):
             children[c_id].f_id = f_id
             children[c_id].score = self.score
             children[c_id]._update_measure()
-            children[c_id].distance = self.distance
+
+        return children
+
+    @property
+    def distance(self) -> Distance:
+        return self._distance
+
+    @distance.setter
+    def distance(self, value: Optional[Distance]):
+        if value:
+            self._distance = value
+        else:
+            self._distance = Euclidean()
+        self._distance.target = self
+
+
+class MixedFractal(BaseFractal, MixedSearchspace):
+    """MixedFractal
+
+    MixedFractal is an abstract where variables can be of Mixed types.
+
+    MixedFractals can be compared between eachothers, using:
+    :code:`__lt__`, :code:`__le__`, :code:`__eq__`,
+    :code:`__ge__`, :code:`__gt__`, :code:`__ne__` operators.
+
+    Attributes
+    ----------
+    level : int
+        Current level of the fractal in the partition tree. See Tree_search.
+    father : int
+        Fractal id of the parent of the fractal.
+    f_id : int
+        ID of the fractal at the current level.
+    c_id : int
+        ID of the child among the children of the parent.
+    score : float
+        Score of the fractal. By default the score of the fractal is equal
+        to the score of its parent (inheritance), so it can be locally
+        used and modified by the :ref:`scoring`.
+    solutions : list[list[float]]
+        List of solutions computed within the fractal
+    measure : float, default=NaN
+        Measure of the fractal, obtained by a :code:`Measurement`.
+
+    See Also
+    --------
+    :ref:`lf` : Defines what a loss function is
+    Tree_search : Defines how to explore and exploit a fractal partition tree.
+    :ref:`sp` : Initial search space used to build fractal.
+    Hypercube : Inherited Fractal type
+    Hypersphere : Inherited Fractal type
+    """
+
+    def __init__(
+        self, variables: IterableVar, measurement: Optional[Measurement] = None
+    ):
+        """__init__
+
+        Parameters
+        ----------
+        variables : IterableVar
+            Determines the bounds of the search space.
+        distance : Distance, optional
+            Distance object defining the distance between two point within this :ref:`sp`.
+            By default :code:`Euclidean()`.
+        measurement : Measurement, optional
+            Defines the measure of a fractal.
+
+        """
+        self._do_convert = False
+        super(MixedFractal, self).__init__(variables=variables, measurement=measurement)
+
+    def create_children(self: MFR, k: int, *args, **kwargs) -> Sequence[MFR]:
+        """create_children(self)
+
+        Defines the partition function.
+        Determines how children of the current space should be created.
+
+        The child will inherit the parent's score.
+
+        Attributes
+        ----------
+        k : int
+            Partition size
+        """
+
+        children = [
+            type(self)(
+                variables=self.variables,
+                measurement=self._compute_measure,
+                *args,
+                **kwargs,
+            )
+            for _ in range(k)
+        ]
+
+        low_id, up_id = self._compute_f_id(k)
+        for c_id, f_id in enumerate(range(low_id, up_id)):
+            children[c_id].level = self.level + 1
+            children[c_id].father = self.f_id
+            children[c_id].c_id = c_id
+            children[c_id].f_id = f_id
+            children[c_id].score = self.score
+            children[c_id]._update_measure()
 
         return children
