@@ -1,15 +1,16 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-01-19T19:21:57+01:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
+from __future__ import annotations
+from zellij.core.errors import InitializationError
+from zellij.core.metaheuristic import ContinuousMetaheuristic
+from zellij.strategies.tools import Hypersphere
+
+from typing import List, Tuple, Optional
 
 import numpy as np
-from zellij.core.metaheuristic import ContinuousMetaheuristic
-from zellij.core.search_space import Fractal, ContinuousSearchspace
 
 import logging
 
@@ -18,7 +19,6 @@ logger = logging.getLogger("zellij.PHS")
 
 # Promising Hypersphere Search
 class PHS(ContinuousMetaheuristic):
-
     """PHS
 
     Promising Hypersphere Search  is an exploration algorithm comming from the original FDA paper.
@@ -26,8 +26,8 @@ class PHS(ContinuousMetaheuristic):
 
     Attributes
     ----------
-    search_space : Searchspace
-        :ref:`sp` object containing decision variables and the loss function.
+    search_space : Hypersphere
+        A Hypersphere.
     inflation : float, default=1.75
         Inflation rate of the :code:`Hypersphere`
     verbose : boolean, default=True
@@ -35,26 +35,52 @@ class PHS(ContinuousMetaheuristic):
 
     Methods
     -------
-
     forward(X, Y)
         Runs one step of PHS.
-
 
     See Also
     --------
     Metaheuristic : Parent class defining what a Metaheuristic is.
     LossFunc : Describes what a loss function is in Zellij
     Searchspace : Describes what a loss function is in Zellij
+
+    Examples
+    --------
+    >>> from zellij.core.variables import ArrayVar, FloatVar
+    >>> from zellij.strategies.tools import Hypersphere
+    >>> from zellij.utils import ArrayDefaultC, FloatMinMax
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.fractals import PHS
+
+    >>> @Loss(objective=Minimizer("obj"))
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     return {"obj": res}
+
+    >>> a = ArrayVar(
+    ...     FloatVar("f1", -5, 5, converter=FloatMinMax()),
+    ...     FloatVar("i2", -5, 5, converter=FloatMinMax()),
+    ...     converter=ArrayDefaultC(),
+    ... )
+    >>> sp = Hypersphere(a)
+    >>> opt = PHS(sp, inflation=1)
+    >>> stop = Calls(himmelblau, 3)
+    >>> exp = Experiment(opt, himmelblau, stop)
+    >>> exp.run()
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([-3.5355339059327373, -3.5355339059327373])=8.002525316941673
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 3
     """
 
-    def __init__(self, search_space, inflation=1.75, verbose=True):
-        """__init__(search_space,verbose=True)
-
-        Initialize PHS class
+    def __init__(
+        self, search_space: Hypersphere, inflation: float = 1.75, verbose: bool = True
+    ):
+        """__init__
 
         Parameters
         ----------
-        search_space : Searchspace
+        search_space : Hypersphere
             :ref:`sp` object containing decision variables and the loss function.
         inflation : float, default=1.75
             Inflation rate of the :code:`Hypersphere`
@@ -64,48 +90,38 @@ class PHS(ContinuousMetaheuristic):
         """
 
         self.inflation = inflation
-        self.computed = False
         super().__init__(search_space, verbose)
+        self.computed = False
 
     @ContinuousMetaheuristic.search_space.setter
-    def search_space(self, value):
-        if value:
-            if (
-                isinstance(value, ContinuousSearchspace)
-                or isinstance(value, Fractal)
-                or hasattr(value, "converter")
-            ):
-                self._search_space = value
-            else:
-                raise ValueError(
-                    f"Search space must be continuous, a fractal or have a `converter` addon, got {value}"
-                )
-
-            if not (hasattr(value, "lower") and hasattr(value, "upper")):
-                raise AttributeError(
-                    "Search space must have lower and upper bounds attributes, got {value}."
-                )
-
-            self.radius = (
-                np.tile(
-                    self.inflation * self.search_space.radius,
-                    (2, 1),
-                )
-                / np.sqrt(self.search_space.size)
+    def search_space(self, value: Hypersphere):
+        if value and isinstance(value, Hypersphere):
+            self._search_space = value
+            self.center = value.center
+            self.radius = self.inflation * value.radius / np.sqrt(value.size)
+        else:
+            raise InitializationError(
+                f"Search space must be a Hyperpshere, got {type(value)}."
             )
-            self.radius[1] = -self.radius[1]
 
-    def forward(self, X, Y, constraint=None):
-        """forward(X, Y)
+    # RUN PHS
+    def forward(
+        self,
+        X: list,
+        Y: np.ndarray,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ) -> Tuple[List[list], dict]:
+        """
         Runs one step of PHS.
+        PHS does not use secondary and constraint.
 
         Parameters
         ----------
         X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+            List of points.
+        Y : numpy.ndarray[float]
+            List of loss values.
 
         Returns
         -------
@@ -116,17 +132,16 @@ class PHS(ContinuousMetaheuristic):
 
         """
 
-        points = np.tile(self.search_space.center, (3, 1))
+        if self.computed:
+            return [], {"algorithm": "EndPHS"}
+        else:
+            points = np.tile(self.center, (3, 1))
+            points[1] -= self.radius
+            points[2] += self.radius
+            points[1:] = np.clip(points[1:], 0.0, 1.0)
 
-        # logging
-        logger.info("Starting")
-
-        points[1:] += self.radius
-        points[1:] = np.clip(points[1:], 0.0, 1.0)
-
-        self.computed = True
-
-        return points, {"algorithm": "PHS"}
+            self.computed = True
+            return points.tolist(), {"algorithm": "PHS"}
 
     def reset(self):
         super().reset()

@@ -1,19 +1,20 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-05-23T12:43:39+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
+from __future__ import annotations
+from zellij.core.errors import InitializationError
+from zellij.core.search_space import Fractal, MixedFractal
 
-import numpy as np
-import abc
+from typing import Optional, Callable, Union, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from zellij.core.variables import ArrayVar, PermutationVar
+    from zellij.strategies.tools.measurements import Measurement
+
 from itertools import product
-from abc import ABC, abstractmethod
-
-from zellij.core.search_space import Fractal
-from zellij.strategies.tools.measurements import SigmaInf
+import numpy as np
 
 import logging
 
@@ -34,14 +35,38 @@ class Hypercube(Fractal):
     SearchSpace : Initial search space used to build fractal.
     Fractal : Parent class. Basic object to define what a fractal is.
     Hypersphere : Another hypervolume, with different properties
+
+    Examples
+    --------
+    >>> from zellij.core.variables import ArrayVar, FloatVar
+    >>> from zellij.strategies.tools import Hypercube
+
+    >>> a = ArrayVar(FloatVar("f1", 0, 1), FloatVar("i2", 0, 1))
+    >>> sp = Hypercube(a)
+    >>> print(sp, sp.lower, sp.upper)
+    Hypercube(0,-1,0) [0. 0.] [1. 1.]
+    >>> print(sp.get_id())
+    (0, -1, 0)
+    >>> p = sp.random_point()
+    >>> print(p)
+    [0.24742878610332475, 0.24380936977381884]
+    >>> p = sp.random_point(2)
+    >>> d = sp.distance(p[0], p[1])
+    >>> print(f"{d:.2f}")
+    0.73
+    >>> children = sp.create_children()
+    >>> for c in children:
+    ...     print(f"id:{c.get_id()}:[{c.lower},{c.upper}]")
+    id:(1, 0, 0):[[0. 0.],[0.5 0.5]]
+    id:(1, 0, 1):[[0.  0.5],[0.5 1. ]]
+    id:(1, 0, 2):[[0.5 0. ],[1.  0.5]]
+    id:(1, 0, 3):[[0.5 0.5],[1. 1.]]
     """
 
     def __init__(
         self,
-        variables,
-        loss,
-        measure=None,
-        **kwargs,
+        variables: ArrayVar,
+        measurement: Optional[Measurement] = None,
     ):
         """__init__
 
@@ -50,33 +75,11 @@ class Hypercube(Fractal):
         variables : ArrayVar
             Determines the bounds of the search space.
             For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        measure : Measurement, default=None
+            of `FloatVar` and all must have converter.
+        measurement : Measurement, optional
             Defines the measure of a fractal.
-
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
         """
-
-        super(Hypercube, self).__init__(variables, loss, measure, **kwargs)
-
-        self.lower = np.zeros(self.size)
-        self.upper = np.ones(self.size)
+        super(Hypercube, self).__init__(variables, measurement)
 
     def create_children(self):
         """create_children(self)
@@ -84,7 +87,7 @@ class Hypercube(Fractal):
         Partition function.
         """
 
-        children = super().create_children(2**self.size, **self._all_addons)
+        children = super().create_children(2**self.size)
 
         center = (self.lower + self.upper) / 2
         vertices = np.array(list(product(*zip(self.lower, self.upper))))
@@ -122,43 +125,63 @@ class Hypersphere(Fractal):
     SearchSpace : Initial search space used to build fractal.
     Fractal : Parent class. Basic object to define what a fractal is.
     Hypercube : Another hypervolume, with different properties
+
+    Examples
+    --------
+    >>> a = ArrayVar(FloatVar("f1", 0, 1), FloatVar("i2", 0, 1))
+    >>> sp = Hypersphere(a)
+    >>> print(sp, sp.center, sp.radius)
+    Hypersphere(0,-1,0) [0.5 0.5] 0.5
+    >>> print(sp.get_id())
+    (0, -1, 0)
+    >>> p = sp.random_point()
+    >>> print(p)
+    [0.5598151051101674, 0.5136607275129557]
+    >>> p = sp.random_point(2)
+    >>> d = sp.distance(p[0], p[1])
+    >>> print(f"{d:.2f}")
+    0.59
+    >>> children = sp.create_children()
+    >>> for c in children:
+    ...     print(f"id:{c.get_id()}:[{c.center},{c.radius:.2f}]")
+    id:(1, 0, 0):[[0.79289322 0.5       ],0.21]
+    id:(1, 0, 1):[[0.5        0.79289322],0.21]
+    id:(1, 0, 2):[[0.20710678 0.5       ],0.21]
+    id:(1, 0, 3):[[0.5        0.20710678],0.21]
+
     """
 
-    def __init__(self, variables, loss, measure=None, **kwargs):
-        """__init__(self,variables,loss,father="root",level=0,id=0,children=[],score=None,**kwargs)
+    def __init__(self, variables, measurement: Optional[Measurement] = None):
+        """__init__
 
         Parameters
         ----------
         variables : ArrayVar
             Determines the bounds of the search space.
             For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        measure : Measurement, default=None
+            of `FloatVar` and all must have converter.
+        measurement : Measurement, optional
             Defines the measure of a fractal.
 
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
         """
 
-        super(Hypersphere, self).__init__(variables, loss, measure, **kwargs)
-
+        super(Hypersphere, self).__init__(variables, measurement)
         self.center = np.full(self.size, 0.5)
         self.radius = 0.5
+
+    # Return a random point of the search space
+    def random_point(self, size: Optional[int] = None) -> Union[list, List[list]]:
+        if size:
+            points = np.random.normal(size=(size, self.size))
+            norm = np.linalg.norm(points, axis=1)[:, None]
+            radii = np.random.random((size, 1)) ** (1 / self.size)
+            points = self.radius * (radii * points / norm) + self.center
+        else:
+            points = np.random.normal(size=self.size)
+            norm = np.linalg.norm(points)
+            radii = np.random.random() ** (1 / self.size)
+            points = self.radius * (radii * points / norm) + self.center
+        return points.tolist()
 
     def create_children(self):
         """create_children(self)
@@ -185,7 +208,17 @@ class Hypersphere(Fractal):
 
         return children
 
-    def _modify(self, center, radius, level, father, f_id, c_id, score, measure):
+    def _modify(
+        self,
+        center: np.ndarray,
+        radius: float,
+        level: int,
+        father: int,
+        f_id: int,
+        c_id: int,
+        score: float,
+        measure: float,
+    ):
         super()._modify(level, father, f_id, c_id, score, measure)
         self.center, self.radius = center, radius
 
@@ -203,20 +236,15 @@ class Section(Fractal):
 
     Attributes
     ----------
-
     section : int
         Defines in how many equal sections the space should be partitioned.
-
     lower : list[float]
         Lower bounds of the section
-
     upper : list[float]
         Upper bounds of the section
-
     is_middle : boolean
         When section is an odd number.
         If the section is at the middle of the partition, then True.
-
 
     See Also
     --------
@@ -225,61 +253,73 @@ class Section(Fractal):
     SearchSpace : Initial search space used to build fractal.
     Fractal : Parent class. Basic object to define what a fractal is.
     Hypercube : Another hypervolume, with different properties
+
+    Examples
+    --------
+    >>> from zellij.core.variables import ArrayVar, FloatVar
+    >>> from zellij.strategies.tools import Section
+
+    >>> a = ArrayVar(FloatVar("f1", 0, 1), FloatVar("i2", 0, 1))
+    >>> sp = Section(a, section=3)
+    >>> print(sp, sp.lower, sp.upper, sp.section)
+    Section(0,-1,0) [0. 0.] [1. 1.] 3
+    >>> print(sp.get_id())
+    (0, -1, 0)
+    >>> p = sp.random_point()
+    >>> print(p)
+    [0.3977808911066778, 0.9684061309949581]
+    >>> p = sp.random_point(2)
+    >>> d = sp.distance(p[0], p[1])
+    >>> print(f"{d:.2f}")
+    0.41
+    >>> children = sp.create_children()
+    >>> for c in children:
+    ...     print(f"id:{c.get_id()}:[{c.lower},{c.upper}]")
+    id:(1, 0, 0):[[0. 0.],[0.33333333 1.        ]]
+    id:(1, 0, 1):[[0.33333333 0.        ],[0.66666667 1.        ]]
+    id:(1, 0, 2):[[0.66666667 0.        ],[1. 1.]]
     """
 
     def __init__(
         self,
-        variables,
-        loss,
-        measure=None,
-        section=2,
-        **kwargs,
+        variables: ArrayVar,
+        measurement: Optional[Measurement] = None,
+        section: int = 2,
     ):
-        """__init__(self,variables,loss,father="root",level=0,id=0,children=[],score=None,**kwargs)
+        """__init__
 
         Parameters
         ----------
         variables : ArrayVar
             Determines the bounds of the search space.
             For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        measure : Measurement, default=None
+            of `FloatVar` and all must have converter.
+        measurement : Measurement, optional
             Defines the measure of a fractal.
-
         section : int, default=2
             Defines in how many equal sections the space should be decompose.
 
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
-
         """
 
-        super(Section, self).__init__(variables, loss, measure, **kwargs)
-
-        assert section > 1, logger.error(
-            f"{section}-Section is not possible, section must be > 1"
-        )
-
+        super(Section, self).__init__(variables, measurement)
         self.lower = np.zeros(self.size)
         self.upper = np.ones(self.size)
         self.section = section
 
         self.is_middle = False
+
+    @property
+    def section(self) -> int:
+        return self._section
+
+    @section.setter
+    def section(self, value: int):
+        if value <= 1:
+            raise InitializationError(
+                f"{value}-Section is not possible, section must be > 1"
+            )
+        else:
+            self._section = value
 
     def create_children(self):
         """create_children()
@@ -341,15 +381,10 @@ class Direct(Fractal):
 
     Attributes
     ----------
-    sigma : Direct_size
-        Sigma function. Determines a measurement of the size of a subspace.
-
     longest : list[int]
         Index of the dimensions with the longest side of the space.
-
     width : float
         Value of the longest side of the space.
-
     center : list[float]
         Center of the space.
 
@@ -362,31 +397,21 @@ class Direct(Fractal):
     Hypercube : Another hypervolume, with different properties
     """
 
-    def __init__(self, variables, loss, measure=SigmaInf, **kwargs):
-        """__init__(values, loss, max_calls, scoring=Min(), force_convert=False, sigma=SigmaInf(), **kwargs,)
+    def __init__(self, variables: ArrayVar, measurement: Optional[Measurement] = None):
+        """__init__
 
         Parameters
         ----------
-        values : Variables
-            Defines the decision variables. See :ref:`var`.
-        loss : LossFunc
-            Defines the loss function. See :ref:`lf`.
-        heuristic : Heuristic, default=Min()
-            Function that defines how promising a space is according to sampled
-            points. It is similar to the acquisition function in BO.
-        force_convert : bool, default=False
-            Force the convertion of all :ref:`var`, even continuous ones.
-            It allows for example, to consider the unit hypercube, instead of
-            the defined space.
-        sigma : Direct_size, default, Sigma2()
-            Sigma function. Determines a measurement of the size of a subspace.
+        variables : ArrayVar
+            Determines the bounds of the search space.
+            For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
+            of `FloatVar` and all must have converter.
+        measurement : Measurement, optional
+            Defines the measure of a fractal.
 
         """
 
-        super(Direct, self).__init__(variables, loss, measure, **kwargs)
-
-        self.lower = np.zeros(self.size)
-        self.upper = np.ones(self.size)
+        super(Direct, self).__init__(variables, measurement)
         self.width = 1.0
         self.set_i = list(range(0, self.size))
 
@@ -396,6 +421,7 @@ class Direct(Fractal):
         self.width = up_m_lo[longest]
         self.set_i = np.where(up_m_lo == up_m_lo[longest])[0]
         self._update_measure()
+
         self.level = int(-np.log(self.width) / np.log(3))
 
     def create_children(self):
@@ -405,7 +431,7 @@ class Direct(Fractal):
 
         """
         section_length = self.width / 3
-        if section_length > 1e-15:
+        if section_length > 1e-13:
             if self.level == 0:
                 scores = np.reshape(self.losses[1:], (-1, 2))
                 self.score = self.losses[0]
@@ -470,16 +496,16 @@ class Direct(Fractal):
 
     def _modify(
         self,
-        upper,
-        lower,
-        width,
-        set_i,
-        level,
-        father,
-        f_id,
-        c_id,
-        score,
-        measure,
+        upper: np.ndarray,
+        lower: np.ndarray,
+        width: float,
+        set_i: list,
+        level: int,
+        father: int,
+        f_id: int,
+        c_id: int,
+        score: float,
+        measure: float,
     ):
         super()._modify(level, father, f_id, c_id, score, measure)
         self.upper, self.lower = upper, lower
@@ -499,7 +525,7 @@ class Direct(Fractal):
         return infos
 
 
-class LatinHypercube(Fractal):
+class LatinHypercube(Hypercube):
     """LatinHypercube
 
     Subspaces are built according to a Latin Hypercube Sampling.
@@ -516,14 +542,11 @@ class LatinHypercube(Fractal):
 
     def __init__(
         self,
-        variables,
-        loss,
-        measure=None,
-        ndist=1,
-        grid_size=2,
-        orthogonal=False,
-        symmetric=True,
-        **kwargs,
+        variables: ArrayVar,
+        measurement: Optional[Measurement] = None,
+        ndist: int = 1,
+        grid_size: int = 2,
+        orthogonal: bool = False,
     ):
         """__init__
 
@@ -532,64 +555,56 @@ class LatinHypercube(Fractal):
         variables : ArrayVar
             Determines the bounds of the search space.
             For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar`.
-            The :ref:`sp` will then manipulate this array.
-
-        loss : LossFunc
-            Callable of type `LossFunc`. See :ref:`lf` for more information.
-            `loss` will be used by the :ref:`sp` object and by optimization
-            algorithms.
-
-        grid_size : int, default=2
+            of `FloatVar` and all must have converter.
+        grid_size : {int, callable}, default=1
             Size of the grid for LHS. :code:`self.size * grid_size` hypercubes will
             be sampled. Given value must be :code:`grid_size > 1`.
-
-        ndist : int default=1
+            Can be a callable of the form Callable[[int], int].
+            A callable taking an int (level) and returning an int (grid).
+        ndist : {int, callable}, default=1
             Number of sampled distributions.
-
+            Can be a callable of the form Callable[[int], int].
+            A callable taking an int (level) and returning an int (number of distribution).
         orthogonal : boolean, default=False
             If True, performs an orthoganal LHS.
-
         symmetric : boolean, default=True
             Apply a symmetrization on the LatinHypercube distribution.
-
-        measure : Measurement, default=None
+        measurement : Measurement, optional
             Defines the measure of a fractal.
-
-        **kwargs : dict
-            Kwargs are the different addons one want to add to a `Variable`.
-            Common addons are:
-            * converter : Converter
-                * Will be called when converting a solution to another space is needed.
-            * neighbor : Neighborhood
-                * Will be called when a neighborhood is needed.
-            * distance: Distance, default, Mixed
-                * Will be called when computing a distance is needed
-            * And other operators linked to the optimization algorithms (crossover, mutation,...)
         """
 
-        super(LatinHypercube, self).__init__(variables, loss, measure, **kwargs)
+        super(LatinHypercube, self).__init__(variables, measurement)
 
-        if isinstance(grid_size, int):
-            assert grid_size > 1, f"grid_size must be >1, got {grid_size}"
-            self.grid_size = lambda level: grid_size
-        else:
-            self.grid_size = grid_size
-
-        if isinstance(ndist, int):
-            assert ndist > 0, f"ndist must be >0, got {ndist}"
-            self.ndist = lambda level: ndist
-        else:
-            self.ndist = ndist
+        self.grid_size = grid_size
+        self.ndist = ndist
 
         self.orthogonal = orthogonal
-        self.symmetric = symmetric
 
-        self.lower = np.zeros(self.size)
-        self.upper = np.ones(self.size)
+    @property
+    def grid_size(self) -> Callable:
+        return self._grid_size
 
-    def _compute_bounds(self):
-        pass
+    @grid_size.setter
+    def grid_size(self, value: Union[int, Callable]):
+        if callable(value):
+            self._grid_size = value
+        elif value <= 1:
+            raise InitializationError(f"grid_size must be >1, got {value}")
+        else:
+            self._grid_size = lambda level: value
+
+    @property
+    def ndist(self) -> Callable:
+        return self._ndist
+
+    @ndist.setter
+    def ndist(self, value: Union[int, Callable]):
+        if callable(value):
+            self._ndist = value
+        elif value < 1:
+            raise InitializationError(f"ndist must be >0, got {value}")
+        else:
+            self._ndist = lambda level: value
 
     def create_children(self):
         """create_children(self)
@@ -602,17 +617,12 @@ class LatinHypercube(Fractal):
         ndist = self.ndist(self.level)
         grid_size = self.grid_size(self.level)
 
-        if self.symmetric:
-            sym_factor = 2
-        else:
-            sym_factor = 1
-
-        children = super().create_children(
-            sym_factor * ndist * grid_size,
+        children = Fractal.create_children(
+            self,
+            ndist * grid_size,
             orthogonal=self.orthogonal,
             grid_size=self.grid_size,
             ndist=self.ndist,
-            **self._all_addons,
         )
 
         for nd in range(ndist):
@@ -622,7 +632,7 @@ class LatinHypercube(Fractal):
             r = (self.upper - self.lower) / grid_size
 
             for k in range(self.size):
-                A[k] = np.array(list(range(grid_size)), dtype=int)
+                A[k] = np.arange(0, grid_size, dtype=int)
                 np.random.shuffle(A[k])
 
             A = A.T
@@ -635,39 +645,152 @@ class LatinHypercube(Fractal):
                     )
 
             Bd = np.zeros((grid_size, self.size))
-
-            if self.symmetric:
-                SBd = np.copy(Bd)
-                for k in range(grid_size):
-                    for i in range(self.size):
-                        Bd[k, i] = R[A[k, i], i]
-                        SBd[k, i] = self.upper[i] + self.lower[i] - Bd[k, i] - r[i]
-            else:
-                for k in range(grid_size):
-                    for i in range(self.size):
-                        Bd[k, i] = R[A[k, i], i]
-
-            cidx = sym_factor * grid_size * nd  # which children to select
-            end_idx = cidx + grid_size
-            for child, l in zip(children[cidx:end_idx], Bd):
+            sidx = nd * grid_size
+            eidx = sidx + grid_size
+            for k in range(grid_size):
+                for i in range(self.size):
+                    Bd[k, i] = R[A[k, i], i]
+            for child, l in zip(children[sidx:eidx], Bd):
                 child.lower = l
                 child.upper = l + r
                 child._update_measure()
 
-            if self.symmetric:
-                end_idx2 = end_idx * grid_size
-                for child, l in zip(children[end_idx:end_idx2], SBd):
-                    child.lower = l
-                    child.upper = l + r
-                    child._update_measure()
-
         return children
 
-    def _modify(self, upper, lower, level, father, f_id, c_id, score, measure):
-        super()._modify(level, father, f_id, c_id, score, measure)
+    def _modify(
+        self,
+        upper: np.ndarray,
+        lower: np.ndarray,
+        level: int,
+        father: int,
+        f_id: int,
+        c_id: int,
+        score: float,
+        measure: float,
+    ):
+        Fractal._modify(self, level, father, f_id, c_id, score, measure)
         self.upper, self.lower = upper, lower
 
     def _essential_info(self):
         infos = super()._essential_info()
         infos.update({"upper": self.upper, "lower": self.lower})
+        return infos
+
+
+class PermFractal(MixedFractal):
+
+    """PermFractal
+
+    Concrete Fractal for permutations
+
+    See Also
+    --------
+    LossFunc : Defines what a loss function is
+    Tree_search : Defines how to explore and exploit a fractal partition tree.
+    SearchSpace : Initial search space used to build fractal.
+    Fractal : Parent class. Basic object to define what a fractal is.
+    Hypercube : Another hypervolume, with different properties
+
+    Examples
+    --------
+    >>> from zellij.core.variables import ArrayVar, FloatVar
+    >>> from zellij.strategies.tools import Section
+
+    >>> a = ArrayVar(FloatVar("f1", 0, 1), FloatVar("i2", 0, 1))
+    >>> sp = Section(a, section=3)
+    >>> print(sp, sp.lower, sp.upper, sp.section)
+    Section(0,-1,0) [0. 0.] [1. 1.] 3
+    >>> print(sp.get_id())
+    (0, -1, 0)
+    >>> p = sp.random_point()
+    >>> print(p)
+    [0.3977808911066778, 0.9684061309949581]
+    >>> p = sp.random_point(2)
+    >>> d = sp.distance(p[0], p[1])
+    >>> print(f"{d:.2f}")
+    0.41
+    >>> children = sp.create_children()
+    >>> for c in children:
+    ...     print(f"id:{c.get_id()}:[{c.lower},{c.upper}]")
+    id:(1, 0, 0):[[0. 0.],[0.33333333 1.        ]]
+    id:(1, 0, 1):[[0.33333333 0.        ],[0.66666667 1.        ]]
+    id:(1, 0, 2):[[0.66666667 0.        ],[1. 1.]]
+    """
+
+    def __init__(
+        self,
+        variables: PermutationVar,
+        measurement: Optional[Measurement] = None,
+    ):
+        """__init__
+
+        Parameters
+        ----------
+        variables : PermutationVar
+            Determines the bounds of the search space.
+        measurement : Measurement, optional
+            Defines the measure of a fractal.
+        """
+
+        super().__init__(variables, measurement)
+        self.base = np.arange(self.variables.n, dtype=int)
+        self.fixed_idx = 1
+
+    @property
+    def variables(self) -> PermutationVar:
+        return self._variables
+
+    @variables.setter
+    def variables(self, value: PermutationVar):
+        if value:
+            self._variables = value
+        else:
+            raise InitializationError(
+                f"In PermFractal, variables must be defined within an PermutationVar. Got {type(value)}"
+            )
+
+    def create_children(self):
+        """create_children()
+
+        Partition function.
+        """
+
+        fixed_idx = self.fixed_idx
+        k = len(self.variables) - fixed_idx
+        new_fixed_idx = fixed_idx + 1
+
+        if k > 0:
+            children = super().create_children(k)
+            for idx, child in enumerate(children):
+                child.base = self.base.copy()
+                child.base[fixed_idx:] = np.roll(child.base[fixed_idx:], -idx)
+                child.fixed_idx = new_fixed_idx
+                child.score = self.score
+
+            return children
+        else:
+            logger.warning(
+                f"In PermFractal, cannot create children. Maximum depth reached. The theoretical depth = {self.variables.n})."
+            )
+            return []
+
+    def random_point(self, size: Optional[int] = None) -> Union[list, List[list]]:
+        if size:
+            res = np.tile(self.base, (size, 1))
+            for v in res:
+                v[self.fixed_idx :] = np.random.permutation(v[self.fixed_idx :])
+            return res.tolist()
+        else:
+            return np.random.permutation(self.base[self.fixed_idx :]).tolist()
+
+    def _modify(self, fixed_v, level, father, f_id, c_id, score, measure):
+        super()._modify(level, father, f_id, c_id, score, measure)
+        self.base = np.arange(self.variables.n)
+        self.base[: len(fixed_v)] = self.base[fixed_v]
+        self.base[fixed_v] = np.arange(len(fixed_v))
+        self.fixed_idx = len(fixed_v)
+
+    def _essential_info(self):
+        infos = super()._essential_info()
+        infos.update({"fixed_v": self.base[: self.fixed_idx]})
         return infos
