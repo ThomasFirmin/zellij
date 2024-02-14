@@ -1,49 +1,51 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-05-23T14:51:22+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
 
-from zellij.core.metaheuristic import ContinuousMetaheuristic
+from __future__ import annotations
+from zellij.core.errors import InputError
+from zellij.core.metaheuristic import UnitMetaheuristic
+
+from typing import Tuple, List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from zellij.core.search_space import UnitSearchspace
 
 import torch
 import numpy as np
-from botorch.models import SingleTaskGP
+
+import gpytorch
+
 from gpytorch.mlls.sum_marginal_log_likelihood import ExactMarginalLogLikelihood
 from gpytorch.likelihoods import GaussianLikelihood
+
+from botorch.utils import standardize
+from botorch.models import SingleTaskGP
 from botorch.optim import optimize_acqf
 from botorch.acquisition.analytic import ExpectedImprovement
-
 from botorch import fit_gpytorch_model
-
 from botorch.exceptions import ModelFittingError
 
 from torch.quasirandom import SobolEngine
-import gpytorch
 
 import logging
 
 logger = logging.getLogger("zellij.BO")
 
 
-class Bayesian_optimization(ContinuousMetaheuristic):
-    """Bayesian_optimization
+class BayesianOptimization(UnitMetaheuristic):
+    """BayesianOptimization
 
     Bayesian optimization (BO) is a surrogate based optimization method which
-    interpolates the actual loss function with a surrogate model, here it is a
-    gaussian process. By sampling into this surrogate,
-    BO determines promising points, which are worth to evaluate with the actual
-    loss function. Once done, the gaussian process is updated using results
-    obtained by evaluating these promising solutions with the loss function.
-
+    interpolates the actual loss function with a surrogate model, here a
+    gaussian process.
     It is based on `BoTorch <https://botorch.org/>`_ and `GPyTorch <https://gpytorch.ai/>`__.
 
     Attributes
     ----------
-    search_space : Searchspace
+    search_space : UnitSearchspace
         Search space object containing bounds of the search space
     verbose : bool
         If False, there will be no print.
@@ -72,41 +74,51 @@ class Bayesian_optimization(ContinuousMetaheuristic):
 
     Examples
     --------
-    >>> from zellij.core import Loss, Threshold, Experiment
-    >>> from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar
-    >>> from zellij.utils.benchmarks import himmelblau
-    >>> from zellij.strategies import Bayesian_optimization
-    >>> import botorch
-    >>> import gpytorch
-    ...
-    >>> lf = Loss()(himmelblau)
-    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
-    >>> stop = Threshold(lf, 'calls', 100)
-    >>> bo = Bayesian_optimization(sp,
-    ...       acquisition=botorch.acquisition.monte_carlo.qExpectedImprovement,
-    ...       q=5)
-    >>> exp = Experiment(bo, stop)
+    >>> from zellij.core import UnitSearchspace, ArrayVar, FloatVar
+    >>> from zellij.utils import FloatMinMax, ArrayDefaultC
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.continuous import BayesianOptimization
+
+
+    >>> @Loss(objective=Minimizer("obj"))
+    ... def himmelblau(x):
+    ...    res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...    return {"obj": res}
+
+
+    >>> a = ArrayVar(
+    ...     FloatVar("f1", -5, 5, converter=FloatMinMax()),
+    ...     FloatVar("i2", -5, 5, converter=FloatMinMax()),
+    ...     converter= ArrayDefaultC(),
+    ... )
+    >>> sp = UnitSearchspace(a)
+    >>> opt = BayesianOptimization(sp)
+    >>> stop = Calls(himmelblau, 100)
+    >>> exp = Experiment(opt, himmelblau, stop)
     >>> exp.run()
-    >>> print(f"Best solution:f({lf.best_point})={lf.best_score}")
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([-2.8044706937942547, 3.1283592102618414])=0.0003616033800198142
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 100
     """
 
     def __init__(
         self,
-        search_space,
-        verbose=True,
+        search_space: UnitSearchspace,
+        verbose: bool = True,
         surrogate=SingleTaskGP,
         mll=ExactMarginalLogLikelihood,
         likelihood=GaussianLikelihood,
         acquisition=ExpectedImprovement,
-        initial_size=10,
-        gpu=False,
+        initial_size: int = 10,
+        gpu: bool = False,
         **kwargs,
     ):
-        """Short summary.
+        """__init__
 
         Parameters
         ----------
-        search_space : Searchspace
+        search_space : ContinuousSearchspace
             Search space object containing bounds of the search space
         verbose : bool
             If False, there will be no print.
@@ -126,11 +138,12 @@ class Bayesian_optimization(ContinuousMetaheuristic):
             Size of the initial set of solution to draw randomly.
         gpu: bool, default=True
             Use GPU if available
-        **kwargs
+        kwargs
             Key word arguments linked to the surrogate and the acquisition function.
+
         """
 
-        super().__init__(search_space, verbose)
+        super().__init__(search_space=search_space, verbose=verbose)
 
         ##############
         # PARAMETERS #
@@ -151,7 +164,7 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         # Prior points
         self.train_x = torch.empty((0, self.search_space.size))
         self.train_obj = torch.empty((0, 1))
-        self.state_dict = None
+        self.state_dict = {}
 
         # Determine if BO is initialized or not
         self.initialized = False
@@ -160,16 +173,20 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         self.iterations = 0
 
         if gpu:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if torch.cuda.is_available():
+                self.device = torch.device("cuda")
+            else:
+                self.device = torch.device("cpu")
+                logger.warning(f"A GPU is not available for BayesianOptimization.")
         else:
-            self.device = "cpu"
+            self.device = torch.device("cpu")
 
         self.dtype = torch.double
 
         self.sobol = SobolEngine(dimension=self.search_space.size, scramble=True)
         self._build_kwargs()
 
-    def _generate_initial_data(self, n):
+    def _generate_initial_data(self, n: int) -> torch.Tensor:
         X_init = self.sobol.draw(n=n).to(dtype=self.dtype, device=self.device)
         lower = torch.tensor(
             self.search_space.lower, device=self.device, dtype=self.dtype
@@ -180,7 +197,12 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         X_init = X_init * (upper - lower) + lower
         return X_init
 
-    def _initialize_model(self, train_x, train_obj, state_dict=None):
+    def _initialize_model(
+        self,
+        train_x: torch.Tensor,
+        train_obj: torch.Tensor,
+        state_dict: Optional[dict] = None,
+    ):
         train_x.to(self.device, dtype=self.dtype)
         train_obj.to(self.device, dtype=self.dtype)
 
@@ -201,14 +223,16 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         )
 
         # load state dict if it is passed
-        if state_dict is not None:
+        if state_dict:
             model.load_state_dict(state_dict)
 
         model.to(self.device)
 
         return mll, model
 
-    def _optimize_acqf_and_get_observation(self, acq_func, restarts=10, raw=512):
+    def _optimize_acqf_and_get_observation(
+        self, acq_func, restarts: int = 10, raw: int = 512
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """Optimizes the acquisition function, and returns a new candidate
         and a noisy observation."""
 
@@ -233,29 +257,47 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         return candidates.detach(), acqf_value
 
     def _build_kwargs(self):
+        # Surrogate kwargs
         self.model_kwargs = {
             key: value
             for key, value in self.kwargs.items()
             if key in self.surrogate.__init__.__code__.co_varnames
         }
+
+        for m in self.model_kwargs.values():
+            if isinstance(m, torch.nn.Module):
+                m.to(self.device)
+
+        # Likelihood kwargs
         self.likelihood_kwargs = {
             key: value
             for key, value in self.kwargs.items()
             if key in self.likelihood.__init__.__code__.co_varnames
         }
+        for m in self.likelihood_kwargs.values():
+            if isinstance(m, torch.nn.Module):
+                m.to(self.device)
+
+        # MLL kwargs
         self.mll_kwargs = {
             key: value
             for key, value in self.kwargs.items()
             if key in self.mll.__init__.__code__.co_varnames
         }
+        for m in self.mll_kwargs.values():
+            if isinstance(m, torch.nn.Module):
+                m.to(self.device)
+
         self.acqf_kwargs = {
             key: value
             for key, value in self.kwargs.items()
             if key in self.acquisition.__init__.__code__.co_varnames
         }
-        print(
-            self.model_kwargs, self.likelihood_kwargs, self.mll_kwargs, self.acqf_kwargs
-        )
+        for m in self.acqf_kwargs.values():
+            if isinstance(m, torch.nn.Module):
+                m.to(self.device)
+
+        logger.debug(self.model_kwargs, self.likelihood_kwargs, self.mll_kwargs)
 
     def reset(self):
         """reset()
@@ -265,29 +307,33 @@ class Bayesian_optimization(ContinuousMetaheuristic):
         """
         self.initialized = False
         self.train_x = torch.empty((0, self.search_space.size))
-        self.train_y = torch.empty((0, 1))
-        self.state_dict = None
+        self.train_obj = torch.empty((0, 1))
+        self.state_dict = {}
 
-    def forward(self, X, Y, constraint=None):
+    def forward(
+        self,
+        X: Optional[list],
+        Y: Optional[np.ndarray],
+        secondary: Optional[np.ndarray],
+        constraint: Optional[np.ndarray],
+    ) -> Tuple[List[list], dict]:
         """forward
 
-        Runs one step of BO.
+        Abstract method describing one step of the :ref:`meta`.
 
         Parameters
         ----------
         X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+            List of points.
+        Y : numpy.ndarray[float]
+            List of loss values.
 
         Returns
         -------
         points
             Return a list of new points to be computed with the :ref:`lf`.
         info
-            Additionnal information linked to :code:`points`
-
+            Dictionnary of additionnal information linked to :code:`points`.
         """
 
         if not self.initialized:
@@ -296,69 +342,79 @@ class Bayesian_optimization(ContinuousMetaheuristic):
             # call helper functions to generate initial training data and initialize model
             train_x = self._generate_initial_data(n=self.initial_size)
             self.initialized = True
-            return train_x.cpu().numpy(), {"acquisition": 0, "algorithm": "InitBO"}
+            return train_x.cpu().numpy().tolist(), {
+                "acquisition": 0,
+                "algorithm": "InitBO",
+            }
+        elif X is None or Y is None:
+            raise InputError(
+                "After initialization Bayesian optimization must receive non-empty X and Y in forward."
+            )
         else:
-            if (X is not None and Y is not None) and (len(X) > 0 and len(Y) > 0):
-                self.iteration += 1
+            self.iteration += 1
 
-                mask = np.isfinite(Y)
-                X = np.array(X)
-                Y = -np.array(Y)  # negate Y, BoTorch -> max, Zellij -> min
+            npx = np.array(X)
+            npy = np.array(Y)
+            mask = np.isfinite(npy)
 
-                mx = X[mask]
-                my = Y[mask]
+            mx = npx[mask]
+            my = npy[mask]
 
-                if len(my) > 0:
-                    new_x = torch.tensor(mx, dtype=self.dtype)
-                    new_obj = torch.tensor(my, dtype=self.dtype).unsqueeze(-1)
+            if len(my) > 0:
+                new_x = torch.tensor(mx, dtype=self.dtype)
+                new_obj = torch.tensor(my, dtype=self.dtype).unsqueeze(-1)
 
-                    # update training points
-                    self.train_x = torch.cat([self.train_x, new_x])
-                    self.train_obj = torch.cat([self.train_obj, new_obj])
+                # update training points
+                self.train_x = torch.cat([self.train_x, new_x])
+                self.train_obj = torch.cat([self.train_obj, new_obj])
 
-                    # reinitialize the models so they are ready for fitting on next iteration
-                    # use the current state dict to speed up fitting
-                    mll, model = self._initialize_model(
-                        self.train_x,
-                        self.train_obj,
-                        self.state_dict,
-                    )
+                train_obj_std = -standardize(self.train_obj)
 
-                    self.state_dict = model.state_dict()
+                # reinitialize the models so they are ready for fitting on next iteration
+                # use the current state dict to speed up fitting
+                mll, model = self._initialize_model(
+                    self.train_x,
+                    train_obj_std,
+                    self.state_dict,
+                )
 
-                    try:
-                        with gpytorch.settings.max_cholesky_size(float("inf")):
-                            # run N_BATCH rounds of BayesOpt after the initial random batch
-                            # fit the models
-                            fit_gpytorch_model(mll)
+                self.state_dict = model.state_dict()
 
-                            # Add potentially usefull kwargs for acqf kwargs
-                            self.acqf_kwargs[
-                                "best_f"
-                            ] = self.search_space.loss.best_score
+                try:
+                    with gpytorch.settings.max_cholesky_size(300):
+                        # run N_BATCH rounds of BayesOpt after the initial random batch
+                        # fit the models
+                        fit_gpytorch_model(mll)
+
+                        # Add potentially usefull kwargs for acqf kwargs
+                        self.acqf_kwargs["best_f"] = torch.max(train_obj_std)
+                        if (
+                            "X_baseline"
+                            in self.acquisition.__init__.__code__.co_varnames
+                        ):
                             self.acqf_kwargs["X_baseline"] = (self.train_x,)
 
-                            # Build acqf kwargs
-                            acqf = self.acquisition(model=model, **self.acqf_kwargs)
+                        # Build acqf kwargs
+                        acqf = self.acquisition(model=model, **self.acqf_kwargs)
 
-                            # optimize and get new observation
-                            new_x, acqf_value = self._optimize_acqf_and_get_observation(
-                                acqf
-                            )
+                        # optimize and get new observation
+                        new_x, acqf_value = self._optimize_acqf_and_get_observation(
+                            acqf
+                        )
 
-                            return new_x.cpu().numpy(), {
-                                "acquisition": acqf_value.cpu().item(),
-                                "algorithm": "BO",
-                            }
-                    except ModelFittingError:
-                        new_x = self._generate_initial_data(1)
-                        return new_x.cpu().numpy(), {
-                            "acquisition": 0,
-                            "algorithm": "ResampleBO",
+                        return new_x.cpu().numpy().tolist(), {
+                            "acquisition": acqf_value.cpu().item(),
+                            "algorithm": "BO",
                         }
-                else:
+                except ModelFittingError:
                     new_x = self._generate_initial_data(1)
-                    return new_x.cpu().numpy(), {
+                    return new_x.cpu().numpy().tolist(), {
                         "acquisition": 0,
-                        "algorithm": "ResampleBO",
+                        "algorithm": "ModelFittingError",
                     }
+            else:
+                new_x = self._generate_initial_data(1)
+                return new_x.cpu().numpy().tolist(), {
+                    "acquisition": 0,
+                    "algorithm": "ResampleBO",
+                }
