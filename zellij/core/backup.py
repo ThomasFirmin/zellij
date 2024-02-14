@@ -1,3 +1,8 @@
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
+
 import threading
 import time
 import os
@@ -13,7 +18,8 @@ class AutoSave(object):
         self.is_running = False
         self.next_call = time.time()
 
-        self.start()
+        if self.experiment.backup_interval:
+            self.start()
 
     def _run(self):
         self.is_running = False
@@ -28,14 +34,14 @@ class AutoSave(object):
             self.is_running = True
 
     def stop(self):
-        self._timer.cancel()  # type: ignore
-        self.is_running = False
+        if self.experiment.backup_interval:
+            self._timer.cancel()  # type: ignore
+            self.is_running = False
 
 
 def load_backup(path, loss):
-    """load_backup
-
-    Load a previously save backup.
+    """
+    Load a saved backup.
 
     Parameters
     ----------
