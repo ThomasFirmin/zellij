@@ -1,122 +1,102 @@
-# @Author: Thomas Firmin <tfirmin>
-# @Date:   2022-05-06T12:07:22+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2022-10-03T22:54:24+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
 
-from zellij.core.addons import VarNeighborhood, Neighborhood
-from zellij.core.variables import (
-    FloatVar,
-    IntVar,
-    CatVar,
-    Constant,
-    ArrayVar,
+from zellij.core.errors import InitializationError, DimensionalityError
+from zellij.core.addons import (
+    IntNeighborhood,
+    FloatNeighborhood,
+    CatNeighborhood,
+    ArrayNeighborhood,
+    PermutationNeighborhood,
 )
+
+from typing import Optional, Union, List
+
 import numpy as np
-import copy
 
 import logging
 
 logger = logging.getLogger("zellij.neighborhoods")
 
 
-class ArrayInterval(VarNeighborhood):
-    """ArrayInterval
+class IntInterval(IntNeighborhood):
+    """IntInterval
 
-    :ref:`spadd`, used to determine the neighbor of an ArrayVar.
-    neighbor kwarg must be implemented for all :ref:`var` of the ArrayVar.
+    :ref:`varadd`, used to determine the neighbor of an :code:`IntVar`.
+    Draw a random point in :math:`x \pm neighborhood`.
 
     Parameters
     ----------
-    variable : ArrayVar, default=None
-        Targeted :ref:`var`.
-    neighborhood : list, default=None
-        Not yet implemented
+    neighborhood : int, default=None
+        :math:`x \pm neighborhood`
 
     Attributes
     ----------
     neighborhood
 
+    Examples
+    --------
+    >>> from zellij.core import IntVar
+    >>> from zellij.utils import IntInterval
+
+    >>> a = IntVar("i1", 0, 1000, neighborhood=IntInterval(10))
+    >>> p = a.random()
+    >>> n = a.neighborhood(p)
+    >>> print(f"{p} is close to {n}")
+    582 is close to 580
     """
 
-    def __init__(self, variable=None, neighborhood=None):
-        super(ArrayInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
+    @property
+    def neighborhood(self) -> int:
+        return self._neighborhood
 
-    def __call__(self, value, size=1):
-        attribute = np.random.choice(self.target.variables, size=size)
-        res = []
-
-        for v in attribute:
-            inter = copy.deepcopy(value)
-            inter[v._idx] = v.neighbor(value[v._idx])
-            res.append(inter)
-
-        return res
-
-    @VarNeighborhood.neighborhood.setter
-    def neighborhood(self, neighborhood=None):
-        if neighborhood:
-            for var, neig in zip(self.target.variables, neighborhood):
-                var.neighborhood = neig
-
-        self._neighborhood = None
-
-    @VarNeighborhood.target.setter
-    def target(self, variable):
-        assert isinstance(variable, ArrayVar) or variable == None, logger.error(
-            f"Target object must be an `ArrayVar` for {self.__class__.__name__},\
-             got {variable}"
-        )
-
-        self._target = variable
-
-        if variable != None:
-            assert all(
-                hasattr(v, "neighbor") for v in self.target.variables
-            ), logger.error(
-                f"To use `ArrayInterval`, variables in `ArrayVar` must have a `neighbor` method. Use `neighbor` kwarg when defining a variable"
+    @neighborhood.setter
+    def neighborhood(self, neighborhood: int):
+        if isinstance(neighborhood, int) and neighborhood > 0:
+            self._neighborhood = neighborhood
+        else:
+            raise InitializationError(
+                f"`neighborhood` must be a positive int, got {neighborhood}"
             )
 
+    def __call__(self, value: int, size: Optional[int] = None) -> Union[int, List[int]]:
+        """__call__
 
-class BlockInterval(VarNeighborhood):
-    """BlockInterval
+        Parameters
+        ----------
+        value : object
+            Feature of :code:`CatVar`
+        size : Optional[int], optional
+            If size is None, then returns a single value. Else, returns a list of values.
 
-    :ref:`spadd`, used to determine the neighbor of an BlockInterval.
-    neighbor kwarg must be implemented for all :ref:`var` of the BlockInterval.
+        Returns
+        -------
+        v : {int, list[int]}
+            Return a single feature or list of feature.
+        """
 
-    Not yet implemented...
+        upper = np.min([value + self.neighborhood + 1, self.target.upper])
+        lower = np.max([value - self.neighborhood, self.target.lower])
+        if size:
+            res = [0] * size
+            for i in range(size):
+                v = np.random.randint(lower, upper)
+                while v == value:
+                    v = np.random.randint(lower, upper)
+                res[i] = v
+            return res
+        else:
+            v = np.random.randint(lower, upper)
+            while v == value:
+                v = np.random.randint(lower, upper)
 
-    """
-
-    def __call__(self, value, size=1):
-        raise NotImplementedError(
-            f"{self.__class__.__name__}\
-        neighborhood is not yet implemented"
-        )
-
-
-class DynamicBlockInterval(VarNeighborhood):
-    """BlockInterval
-
-    :ref:`spadd`, used to determine the neighbor of an BlockInterval.
-    neighbor kwarg must be implemented for all :ref:`var` of the BlockInterval.
-
-    Not yet implemented...
-
-    """
-
-    def __call__(self, value, size=1):
-        raise NotImplementedError(
-            f"{self.__class__.__name__}\
-        neighborhood is not yet implemented"
-        )
+            return int(v)
 
 
-class FloatInterval(VarNeighborhood):
+class FloatInterval(FloatNeighborhood):
     """FloatInterval
 
     :ref:`varadd`, used to determine the neighbor of a FloatVar.
@@ -124,139 +104,129 @@ class FloatInterval(VarNeighborhood):
 
     Parameters
     ----------
-    variable : FloatVar, default=None
-        Targeted :ref:`var`.
-    neighborhood : float, default=None
+    neighborhood : float
         :math:`x \pm neighborhood`
 
     Attributes
     ----------
     neighborhood
 
+    Examples
+    --------
+    >>> from zellij.core import FloatVar
+    >>> from zellij.utils import FloatInterval
+
+    >>> a = FloatVar("f1", 0, 1000, neighborhood=FloatInterval(10))
+    >>> p = a.random()
+    >>> n = a.neighborhood(p)
+    >>> print(f"{p:.2f} is close to {n:.2f}")
+    133.47 is close to 141.24
+
     """
 
-    def __call__(self, value, size=1):
+    @property
+    def neighborhood(self) -> Union[float, int]:
+        return self._neighborhood
+
+    @neighborhood.setter
+    def neighborhood(self, neighborhood: Union[float, int]):
+        if isinstance(neighborhood, (int, float)) and neighborhood > 0:
+            self._neighborhood = neighborhood
+        else:
+            raise InitializationError(
+                f"`neighborhood` must be a positive float or int, got {neighborhood}"
+            )
+
+    def __call__(
+        self, value: Union[float, int], size: Optional[int] = None
+    ) -> Union[float, List[float]]:
+        """__call__
+
+        Parameters
+        ----------
+        value : object
+            Feature of :code:`CatVar`
+        size : Optional[int], optional
+            If size is None, then returns a single value. Else, returns a list of values.
+
+        Returns
+        -------
+        v : {float, list[float]}
+            Return a single feature or list of feature.
+        """
         upper = np.min([value + self.neighborhood, self.target.upper])
         lower = np.max([value - self.neighborhood, self.target.lower])
 
-        if size > 1:
-            res = []
-            for _ in range(size):
+        if size:
+            res = [0.0] * size
+            for i in range(size):
                 v = np.random.uniform(lower, upper)
                 while v == value:
                     v = np.random.uniform(lower, upper)
-                res.append(float(v))
+                res[i] = float(v)
             return res
         else:
             v = np.random.uniform(lower, upper)
             while v == value:
                 v = np.random.uniform(lower, upper)
 
-            return v
-
-    @VarNeighborhood.neighborhood.setter
-    def neighborhood(self, neighborhood):
-        assert isinstance(neighborhood, int) or isinstance(
-            neighborhood, float
-        ), logger.error(
-            f"`neighborhood` must be a float or an int, for `FloatInterval`,\
-            got{neighborhood}"
-        )
-
-        self._neighborhood = neighborhood
-
-    @VarNeighborhood.target.setter
-    def target(self, variable):
-        assert isinstance(variable, FloatVar) or variable == None, logger.error(
-            f"Target object must be a `FloatVar` for {self.__class__.__name__},\
-             got {variable}"
-        )
-        self._target = variable
+            return float(v)
 
 
-class IntInterval(VarNeighborhood):
-    """IntInterval
-
-    :ref:`varadd`, used to determine the neighbor of an IntVar.
-    Draw a random point in :math:`x \pm neighborhood`.
-
-    Parameters
-    ----------
-    variable : IntVar, default=None
-        Targeted :ref:`var`.
-    neighborhood : int, default=None
-        :math:`x \pm neighborhood`
-
-    Attributes
-    ----------
-    neighborhood
-
-    """
-
-    def __call__(self, value, size=1):
-        upper = np.min([value + self.neighborhood + 1, self.target.upper])
-        lower = np.max([value - self.neighborhood, self.target.lower])
-
-        if size > 1:
-            res = []
-            for _ in range(size):
-                v = np.random.randint(lower, upper)
-                while v == value:
-                    v = np.random.randint(lower, upper)
-                res.append(int(v))
-            return res
-        else:
-            v = np.random.randint(lower, upper)
-            while v == value:
-                v = np.random.randint(lower, upper)
-
-            return v
-
-    @VarNeighborhood.neighborhood.setter
-    def neighborhood(self, neighborhood):
-        assert isinstance(neighborhood, int) or isinstance(
-            neighborhood, float
-        ), logger.error(
-            f"`neighborhood` must be an int, for `IntInterval`,\
-            got{neighborhood}"
-        )
-
-        self._neighborhood = neighborhood
-
-    @VarNeighborhood.target.setter
-    def target(self, variable):
-        assert isinstance(variable, IntVar) or variable == None, logger.error(
-            f"Target object must be a `IntInterval` for {self.__class__.__name__},\
-             got {variable}"
-        )
-        self._target = variable
-
-
-class CatInterval(VarNeighborhood):
-    """CatInterval
+class CatRandom(CatNeighborhood):
+    """CatRandom
 
     :ref:`varadd`, used to determine the neighbor of a CatVar.
     Draw a random feature in CatVar.
 
     Parameters
     ----------
-    variable : FlaotVar, default=None
-        Targeted :ref:`var`.
-    neighborhood : int, default=None
+    neighborhood : int, optional
         Undefined, for CatVar it draws a random feature.
 
     Attributes
     ----------
     neighborhood
 
+    Examples
+    --------
+    >>> from zellij.core import CatVar
+    >>> from zellij.utils import CatRandom
+
+    >>> a = CatVar("c1", ["a","b","c","d"], neighborhood=CatRandom())
+    >>> p = a.random()
+    >>> n = a.neighborhood(p)
+    >>> print(f"{p} is close to {n}")
+    a is close to d
+
     """
 
-    def __init__(self, variable=None, neighborhood=None):
-        super(CatInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
+    @property
+    def neighborhood(self):
+        return self._neighborhood
 
-    def __call__(self, value, size=1):
-        if size > 1:
+    @neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        self._neighborhood = neighborhood
+
+    def __call__(
+        self, value, size: Optional[int] = None
+    ) -> Union[object, List[object]]:
+        """__call__
+
+        Parameters
+        ----------
+        value : object
+            Feature of :code:`CatVar`
+        size : Optional[int], optional
+            If size is None, then returns a single value. Else, returns a list of values.
+
+        Returns
+        -------
+        v : {object, list[object]}
+            Return a single feature or list of feature.
+        """
+        if size:
             res = []
             for _ in range(size):
                 v = self.target.random()
@@ -270,143 +240,156 @@ class CatInterval(VarNeighborhood):
                 v = self.target.random()
             return v
 
-    @VarNeighborhood.neighborhood.setter
-    def neighborhood(self, neighborhood=None):
-        if neighborhood != None:
-            logger.warning(
-                f"`neighborhood`= {neighborhood} is useless for \
-            {self.__class__.__name__}, it will be replaced by None"
-            )
 
-        self._neighborhood = None
+class ArrayDefaultN(ArrayNeighborhood):
+    """ArrayDefaultN
 
-    @VarNeighborhood.target.setter
-    def target(self, variable):
-        assert isinstance(variable, CatVar) or variable == None, logger.error(
-            f"Target object must be a `CatInterval` for {self.__class__.__name__},\
-             got {variable}"
-        )
-        self._target = variable
-
-
-class ConstantInterval(VarNeighborhood):
-    """ConstantInterval
-
-    :ref:`varadd`, used to determine the neighbor of a Constant.
-    Do nothing. Return the constant.
+    :ref:`varadd`, used to determine the neighbor of a ArrayVar.
+    Draw a random feature in ArrayVar.
 
     Parameters
     ----------
-    variable : Constant, default=None
-        Targeted :ref:`var`.
-    neighborhood : int, default=None
-        Not implemented.
+    neighborhood : int, optional
+        Undefined, for ArrayVar.
 
     Attributes
     ----------
     neighborhood
 
-    """
+    Examples
+    --------
+    >>> from zellij.core import ArrayVar, FloatVar, IntVar, CatVar
+    >>> from zellij.utils import ArrayDefaultN, FloatInterval, IntInterval, CatRandom
 
-    def __init__(self, variable=None, neighborhood=None):
-        super(ConstantInterval, self).__init__(variable)
-        self.neighborhood = neighborhood
+    >>> a = ArrayVar(
+    ...     IntVar("i1", 0, 100, neighborhood=IntInterval(10)),
+    ...     FloatVar("f1", -100, 0, neighborhood=FloatInterval(10)),
+    ...     CatVar("c1", ["Hello", 87, 2.56], neighborhood=CatRandom()),
+    ...     neighborhood=ArrayDefaultN(),
+    ... )
 
-    def __call__(self, value, size=1):
-        logger.warning("Calling `neighbor` of a constant is useless")
-        if size > 1:
-            return [self.target.value for _ in range(size)]
-        else:
-            return self.target.value
-
-    @VarNeighborhood.neighborhood.setter
-    def neighborhood(self, neighborhood=None):
-        if neighborhood != None:
-            logger.warning(
-                f"`neighborhood`= {neighborhood} is useless for \
-            {self.__class__.__name__}, it will be replaced by None"
-            )
-
-        self._neighborhood = None
-
-    @VarNeighborhood.target.setter
-    def target(self, variable):
-        assert isinstance(variable, Constant) or variable == None, logger.error(
-            f"Target object must be a `ConstantInterval` for {self.__class__.__name__}\
-            , got {variable}"
-        )
-        self._target = variable
-
-
-class Intervals(Neighborhood):
-    """Intervals
-
-    :ref:`spadd`, used to determine the neighbor of a given point.
-    All :ref:`var` of the :ref:`sp` must have the `neighbor` addon implemented.
-
-    Parameters
-    ----------
-    variable : :ref:`sp`, default=None
-        Targeted :ref:`sp`.
-    neighborhood : list, default=None
-        If a list of the shape of the variables from the :ref:`sp`.
-        Modify the neighborhood attribute of all :ref:`varadd` of type
-        VarNeighborhood, for each :ref:`var`.
-
-
-    Attributes
-    ----------
-    neighborhood
+    >>> p = a.random()
+    >>> n = a.neighborhood(p)
+    >>> print(f"{p}\nis close to\n{n}")
+    [86, -38.23310264757463, 2.56]
+    is close to
+    [96, -42.305187546793135, 87]
 
     """
 
-    def __init__(self, search_space=None, neighborhood=None):
-        super(Intervals, self).__init__(search_space, neighborhood)
+    @property
+    def neighborhood(self):
+        return self._neighborhood
 
-    @Neighborhood.neighborhood.setter
+    @neighborhood.setter
     def neighborhood(self, neighborhood):
-        if neighborhood:
-            for var, neig in zip(self.target.variables, neighborhood):
-                var.neighbor.neighborhood = neig
+        self._neighborhood = neighborhood
 
-        self._neighborhood = None
-
-    @Neighborhood.target.setter
-    def target(self, object):
-        self._target = object
-        if object:
-            assert hasattr(self.target.variables, "neighbor"), logger.error(
-                f"To use `Intervals`, variables in Searchspace must have a `neighbor` method. Use `neighbor` kwarg when defining a variable"
-            )
-
-    def __call__(self, point, size=1):
-        """__call__(point, size=1)
-
-        Draw a neighbor of a solution, according to the :ref:`var` neighbor
-        function.
+    def __call__(
+        self, value: list, size: Optional[int] = None
+    ) -> Union[list, List[list]]:
+        """__call__
 
         Parameters
         ----------
-
-        point : list
-            Initial point.
-        size : int, default=1
-            Draw <size> neighbors of <point>.
+        value : List
+            List made of values from :code:`variables` from :code:`ArrayVar`.
+        size : Optional[int], optional
+            If size is None, then returns a single value. Else, returns a list of values.
 
         Returns
         -------
-
-        out : list
-            List of neighbors of <point>.
-
+        v : {object, list[object]}
+            Return a single feature or list of feature.
         """
-        attribute = self.target.random_attribute(size=size, exclude=Constant)
+        if len(value) == len(self.target):
+            res = []
+            if size:
+                for _ in range(size):
+                    inter = []
+                    for var, v in zip(self.target.variables, value):
+                        inter.append(var.neighborhood(v))  # type: ignore
+                    res.append(inter)
+            else:
+                for var, v in zip(self.target.variables, value):
+                    res.append(var.neighborhood(v))  # type: ignore
+            return res
+        else:
+            raise DimensionalityError(
+                f"In ArrayDefaultN, a value does not have the same length as the dimensionality of the target."
+            )
 
-        points = []
 
-        for att in attribute:
-            inter = copy.deepcopy(point)
-            inter[att._idx] = att.neighbor(point[att._idx])
-            points.append(inter)
+class PermutationRandom(PermutationNeighborhood):
+    """PermutationRandom
 
-        return points
+    :ref:`varadd`, used to determine the neighbor of a PermutationVar.
+    Draw a random neighbor in PermutationVar.
+    |!| Does not ensure that two succesive neighbors are different.
+
+    Parameters
+    ----------
+    neighborhood : int, optional
+        Undefined, for PermutationRandom it draws a random feature.
+
+    Attributes
+    ----------
+    neighborhood
+
+    Examples
+    --------
+    >>> from zellij.core import CatVar
+    >>> from zellij.utils import CatRandom
+
+    >>> a = CatVar("c1", ["a","b","c","d"], neighborhood=CatRandom())
+    >>> p = a.random()
+    >>> n = a.neighborhood(p)
+    >>> print(f"{p} is close to {n}")
+    a is close to d
+
+    """
+
+    @property
+    def neighborhood(self):
+        return self._neighborhood
+
+    @neighborhood.setter
+    def neighborhood(self, neighborhood=None):
+        self._neighborhood = neighborhood
+
+    def __call__(
+        self, value, size: Optional[int] = None
+    ) -> Union[object, List[object]]:
+        """__call__
+
+        Parameters
+        ----------
+        value : list[int]
+            A permutation. A list of integer, list[int].
+        size : Optional[int], optional
+            If size is None, then returns a single value. Else, returns a list of values.
+
+        Returns
+        -------
+        v : {object, list[object]}
+            Return a single feature or list of feature.
+        """
+
+        if size:
+            elem = np.arange(size)[:, None]
+            res = np.tile(value, (size, 1))
+            idx = np.array(
+                [
+                    np.random.choice(len(value), size=2, replace=False)
+                    for _ in range(size)
+                ]
+            )
+            idxT = idx.copy()[:, [1, 0]]
+            res[elem, idx] = res[elem, idxT]
+            return res.tolist()
+        else:
+            res = np.array(value[:])
+            idx = np.random.choice(len(value), size=(1, 2), replace=False)
+            idxT = idx.copy()[:, [1, 0]]
+            res[idx] = res[idxT]
+            return res.tolist()
