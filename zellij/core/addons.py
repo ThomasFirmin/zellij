@@ -1,16 +1,33 @@
-# @Author: Thomas Firmin <tfirmin>
-# @Date:   2022-05-05T16:18:04+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2022-10-03T23:04:17+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
-
+from __future__ import annotations
 from abc import ABC, abstractmethod
+
+from zellij.core.errors import InitializationError
+from typing import Optional, List, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from zellij.core.variables import (
+        Variable,
+        IntVar,
+        FloatVar,
+        CatVar,
+        ArrayVar,
+        PermutationVar,
+    )
+    from zellij.core.search_space import Searchspace
+
+
 import logging
 
 logger = logging.getLogger("zellij.addons")
+
+####################
+# ABSTRACT GENERAL #
+####################
 
 
 class Addon(ABC):
@@ -21,342 +38,449 @@ class Addon(ABC):
     :code:`target` object. See :ref:`varadd` for addon targeting :ref:`var` or
     :ref:`spadd` targeting :ref:`sp`.
 
-    Parameters
-    ----------
-    target : Object, default=None
-        Object targeted by the addons
-
     Attributes
     ----------
     target : Object, default=None
-        Object targeted by the addons
+        Object targeted by the addons.
 
     """
 
-    def __init__(self, object=None):
-        self.target = object
+    def __init__(self):
+        self._target = None
 
     @property
-    def target(self):
-        return self._target
+    def target(self) -> object:
+        if self._target:
+            return self._target
+        else:
+            raise InitializationError("The target is not initialized.")
 
     @target.setter
-    def target(self, object):
-        self._target = object
-
-
-class VarAddon(Addon):
-    """VarAddon
-
-    :ref:`addons` where the target must be of type :ref:`var`.
-
-    Parameters
-    ----------
-    target : :ref:`var`, default=None
-        Object targeted by the addons
-
-    Attributes
-    ----------
-    target : :ref:`var`, default=None
-        Object targeted by the addons
-
-    """
-
-    def __init__(self, variable=None):
-        super(VarAddon, self).__init__(variable)
-
-    @property
-    def target(self):
-        return self._target
-
-    @target.setter
-    def target(self, variable):
-        from zellij.core.variables import Variable
-
-        if variable:
-            assert isinstance(variable, Variable), logger.error(
-                f"Object must be a `Variable` for {self.__class__.__name__}, got {variable}"
-            )
-
-        self._target = variable
+    def target(self, value: object):
+        self._target = value
 
 
 class SearchspaceAddon(Addon):
-    """SearchspaceAddon
-
+    """
     :ref:`addons` where the target must be of type :ref:`sp`.
-
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
 
     Attributes
     ----------
     target : :ref:`sp`, default=None
-        Object targeted by the addons
+        :ref:`sp` targeted by the addons
 
     """
 
-    def __init__(self, search_space=None):
-        super(SearchspaceAddon, self).__init__(search_space)
+    def __init__(self):
+        super(SearchspaceAddon, self).__init__()
 
     @property
-    def target(self):
+    def target(self) -> Searchspace:
+        if self._target:
+            return self._target
+        else:
+            raise InitializationError("The target is not initialized.")
+
+    @target.setter
+    def target(self, value: Searchspace):
+        if value:
+            self._target = value
+        else:
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. Searchspace expected."
+            )
+
+
+class VarAddon(Addon):
+    """
+    :ref:`addons` where the target must be of type :ref:`var`.
+
+    Attributes
+    ----------
+    target : :ref:`var`, default=None
+        :ref:`var` targeted by the addons
+
+    """
+
+    def __init__(self):
+        super(VarAddon, self).__init__()
+
+    @property
+    def target(self) -> Variable:
+        if self._target:
+            return self._target
+        else:
+            raise InitializationError("The target is not initialized.")
+
+    @target.setter
+    def target(self, value: Variable):
+        if value:
+            self._target = value
+        else:
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. Variable expected."
+            )
+
+
+#########################
+# ABSTRACT VAR SPECIFIC #
+#########################
+
+
+class IntAddon(VarAddon):
+    @property
+    def target(self) -> IntVar:
+        if self._target:
+            return self._target
+        else:
+            raise InitializationError("The target is not initialized.")
+
+    @target.setter
+    def target(self, value: IntVar):
+        if value:
+            self._target = value
+        else:
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. IntVar expected."
+            )
+
+
+class FloatAddon(VarAddon):
+    @property
+    def target(self) -> FloatVar:
+        if self._target:
+            return self._target
+        else:
+            raise InitializationError("The target is not initialized.")
+
+    @target.setter
+    def target(self, value: FloatVar):
+        if value:
+            self._target = value
+        else:
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. FloatVar expected."
+            )
+
+
+class CatAddon(VarAddon):
+    @property
+    def target(self) -> CatVar:
+        if self._target is None:
+            raise InitializationError("The target is not initialized.")
         return self._target
 
     @target.setter
-    def target(self, search_space):
-        from zellij.core.search_space import Searchspace
-
-        if search_space:
-            assert isinstance(search_space, Searchspace), logger.error(
-                f"Object must be a `Searchspace` for {self.__class__.__name__},\
-                 got {search_space}"
+    def target(self, value: CatVar):
+        if value:
+            self._target = value
+        else:
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. CatVar expected."
             )
 
-        self._target = search_space
 
-
-class Neighborhood(SearchspaceAddon):
-    """Neighborhood
-
-    :ref:`addons` where the target must be of type :ref:`sp`.
-    Describes what a neighborhood is for a :ref:`sp`.
-
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    Attributes
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    """
-
-    def __init__(self, neighborhood, search_space=None):
-        super(Neighborhood, self).__init__(search_space)
-        self.neighborhood = neighborhood  # type: ignore
-
+class ArrayAddon(VarAddon):
     @property
-    def neighborhood(self):
-        return self._neighborhood  # type: ignore
+    def target(self) -> ArrayVar:
+        if self._target:
+            return self._target
+        else:
+            raise InitializationError("The target is not initialized.")
 
-    @abstractmethod
-    def __call__(self, point, size=1):
-        pass
+    @target.setter
+    def target(self, value: ArrayVar):
+        if value:
+            self._target = value
+        else:
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. ArrayVar expected."
+            )
+
+
+class PermutationAddon(VarAddon):
+    @property
+    def target(self) -> PermutationVar:
+        if self._target:
+            return self._target
+        else:
+            raise InitializationError("The target is not initialized.")
+
+    @target.setter
+    def target(self, value: PermutationVar):
+        if value:
+            self._target = value
+        else:
+            raise InitializationError(
+                f"The target value cannot be {type(value)}. ArrayVar expected."
+            )
+
+
+################
+# Neighborhood #
+################
 
 
 class VarNeighborhood(VarAddon):
-    """VarNeighborhood
-
+    """
     :ref:`addons` where the target must be of type :ref:`var`.
     Describes what a neighborhood is for a :ref:`var`.
 
-    Parameters
-    ----------
-    target : :ref:`var`, default=None
-        Object targeted by the addons
-
     Attributes
     ----------
-    target : :ref:`var`, default=None
-        Object targeted by the addons
+    neighborhood : object, optional
+        Defines what is the neighborhood of the targetted variable.
 
     """
 
-    def __init__(self, neighborhood, variable=None):
-        super(VarAddon, self).__init__(variable)
-        self.neighborhood = neighborhood  # type: ignore
+    def __init__(self, neighborhood: Optional[object] = None):
+        super(VarAddon, self).__init__()
+        self.neighborhood = neighborhood
 
     @property
+    @abstractmethod
     def neighborhood(self):
-        return self._neighborhood  # type: ignore
+        pass
+
+    @neighborhood.setter
+    @abstractmethod
+    def neighborhood(self, value):
+        pass
 
     @abstractmethod
-    def __call__(self, point, size=1):
+    def __call__(
+        self, point: object, size: Optional[int] = None
+    ) -> Union[List, List[list]]:
         pass
 
 
-class Converter(SearchspaceAddon):
-    """Converter
-
-    :ref:`addons` where the target must be of type :ref:`sp`.
-    Describes what a converter is for a :ref:`sp`.
-    Converter allows to convert the type of a :ref:`sp` to another one.
-    All :ref:`var` must have a converter :ref:`varadd` implemented.
-
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    Attributes
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
+class IntNeighborhood(VarNeighborhood, IntAddon):
+    """
+    Describes what a converter is for a :ref:`IntVar`.
     """
 
-    def __init__(self, search_space=None):
-        super(Converter, self).__init__(search_space)
+    def __init__(self, neighborhood: Optional[object] = None):
+        super().__init__(neighborhood)
 
-    @abstractmethod
-    def convert(self):
-        pass
 
-    @abstractmethod
-    def reverse(self):
-        pass
+class FloatNeighborhood(VarNeighborhood, FloatAddon):
+    """
+    Describes what a converter is for a :ref:`FloatVar`.
+    """
+
+    def __init__(self, neighborhood: Optional[object] = None):
+        super().__init__(neighborhood)
+
+
+class CatNeighborhood(VarNeighborhood, CatAddon):
+    """
+    Describes what a converter is for a :ref:`CatVar`.
+    """
+
+    def __init__(self, neighborhood: Optional[object] = None):
+        super().__init__(neighborhood)
+
+
+class ArrayNeighborhood(VarNeighborhood, ArrayAddon):
+    """
+    Describes what a converter is for a :ref:`ArrayVar`.
+    """
+
+    def __init__(self, neighborhood: Optional[object] = None):
+        super().__init__(neighborhood)
+
+
+class PermutationNeighborhood(VarNeighborhood, PermutationAddon):
+    """
+    Describes what a converter is for a :ref:`PermutationVar`.
+    """
+
+    def __init__(self, neighborhood: Optional[object] = None):
+        super().__init__(neighborhood)
+
+
+##############
+# CONVERTERS #
+##############
 
 
 class VarConverter(VarAddon):
-    """VarConverter
-
-    :ref:`addons` where the target must be of type :ref:`var`.
+    """
     Describes what a converter is for a :ref:`var`.
-    Converter allows to convert the type of a :ref:`var` to another one.
-
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    Attributes
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
+    Converter allows to convert values from a :ref:`var` to another type.
     """
 
-    def __init__(self, variable=None):
-        super(VarConverter, self).__init__(variable)
-
     @abstractmethod
-    def convert(self):
+    def convert(self, value: object) -> object:
         pass
 
     @abstractmethod
-    def reverse(self):
+    def reverse(self, value: object) -> object:
         pass
 
 
-class Operator(SearchspaceAddon):
-    """Operator
+class IntConverter(VarConverter, IntAddon):
+    """
+    Describes what a converter is for a :ref:`IntVar`.
+    """
 
-    Abstract class describing what an operator is for a :ref:`sp`.
+    def __init__(self):
+        super().__init__()
+
+
+class FloatConverter(VarConverter, FloatAddon):
+    """
+    Describes what a converter is for a :ref:`FloatVar`.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+
+class CatConverter(VarConverter, CatAddon):
+    """
+    Describes what a converter is for a :ref:`CatVar`.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+
+class ArrayConverter(VarConverter, ArrayAddon):
+    """
+    Describes what a converter is for a :ref:`ArrayVar`.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+
+class PermutationConverter(VarConverter, PermutationAddon):
+    """
+    Describes what a converter is for a :ref:`PermutationVar`.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+
+#############
+# DISTANCES #
+#############
+
+
+class Distance(SearchspaceAddon):
+    """
+    Abstract class describing what an Distance is for a :ref:`sp`.
     :ref:`addons` where the target must be of type :ref:`sp`.
 
     Parameters
     ----------
+    weights : list[float], default=None
+        List of floats giving weights for each feature of the :ref:`sp`
+    Attributes
+    ----------
     target : :ref:`sp`, default=None
-        Object targeted by the addons
+        :ref:`sp` targeted by the addons
+
+    """
+
+    def __init__(
+        self,
+        weights: Optional[List[float]] = None,
+    ):
+        super(Distance, self).__init__()
+        self.weights = weights
+
+    @abstractmethod
+    def __call__(self, point_a, point_b) -> float:
+        pass
+
+
+############
+# OPERATOR #
+############
+
+
+class Operator(SearchspaceAddon):
+    """
+    Abstract class describing what an operator is for a :ref:`sp`.
+    :ref:`addons` where the target must be of type :ref:`sp`.
 
     Attributes
     ----------
     target : :ref:`sp`, default=None
-        Object targeted by the addons
+        :ref:`sp` targeted by the addons
 
     """
 
-    def __init__(self, search_space=None):
-        super(Operator, self).__init__(search_space)
+    def __init__(self):
+        super(Operator, self).__init__()
+
+    @abstractmethod
+    def _build(self, toolbox):
+        pass
 
     @abstractmethod
     def __call__(self):
         pass
 
 
-class Mutator(SearchspaceAddon):
-    """Mutator
-
-    Abstract class describing what an Mutator is for a :ref:`sp`.
+class Mutation(Operator):
+    """
+    Abstract class describing what an Mutation is for a :ref:`sp`.
     :ref:`addons` where the target must be of type :ref:`sp`.
-
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
 
     Attributes
     ----------
     target : :ref:`sp`, default=None
-        Object targeted by the addons
+        :ref:`sp` targeted by the addons
 
     """
 
-    def __init__(self, search_space=None):
-        super(Mutator, self).__init__(search_space)
+    def __init__(self):
+        super(Mutation, self).__init__()
+
+    @abstractmethod
+    def __call__(self, individual):
+        pass
 
 
-class Crossover(SearchspaceAddon):
-    """Crossover
-
+class Crossover(Operator):
+    """
     Abstract class describing what an MCrossover is for a :ref:`sp`.
     :ref:`addons` where the target must be of type :ref:`sp`.
 
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
     Attributes
     ----------
     target : :ref:`sp`, default=None
-        Object targeted by the addons
+        :ref:`sp` targeted by the addons
 
     """
 
-    def __init__(self, search_space=None):
-        super(Crossover, self).__init__(search_space)
-
-
-class Selector(SearchspaceAddon):
-    """Selector
-
-    Abstract class describing what an Selector is for a :ref:`sp`.
-    :ref:`addons` where the target must be of type :ref:`sp`.
-
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    Attributes
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    """
-
-    def __init__(self, search_space=None):
-        super(Selector, self).__init__(search_space)
-
-
-class Distance(SearchspaceAddon):
-    """Distance
-
-    Abstract class describing what an Distance is for a :ref:`sp`.
-    :ref:`addons` where the target must be of type :ref:`sp`.
-
-    Parameters
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    Attributes
-    ----------
-    target : :ref:`sp`, default=None
-        Object targeted by the addons
-
-    """
-
-    def __init__(self, search_space=None, weights=None):
-        super(Distance, self).__init__(search_space)
-        self.weights = None
+    def __init__(self):
+        super(Crossover, self).__init__()
 
     @abstractmethod
-    def __call__(self, point_a, point_b):
+    def __call__(self, children1, children2):
+        pass
+
+
+class Selection(Operator):
+    """
+    Abstract class describing what an Selection is for a :ref:`sp`.
+    :ref:`addons` where the target must be of type :ref:`sp`.
+
+    Attributes
+    ----------
+    target : :ref:`sp`, default=None
+        :ref:`sp` targeted by the addons
+
+    """
+
+    def __init__(self):
+        super(Selection, self).__init__()
+
+    @abstractmethod
+    def __call__(self, population, k) -> list:
         pass
