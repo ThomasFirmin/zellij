@@ -1,18 +1,22 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-04-06T17:28:46+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
-
+from __future__ import annotations
+from zellij.core.errors import InitializationError
 from zellij.core.metaheuristic import Metaheuristic
+
+from typing import Optional, Tuple, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from zellij.core.search_space import Searchspace
+
 import numpy as np
 
 import logging
 
-logger = logging.getLogger("zellij.Rnd")
+logger = logging.getLogger("zellij.RD")
 
 
 class Random(Metaheuristic):
@@ -23,13 +27,10 @@ class Random(Metaheuristic):
 
     Attributes
     ----------
-
     search_space : Searchspace
-        Search space object containing bounds of the search space.
-
+        :ref:`sp`.
     size : int, default=1
         Number of points to sample at each :code:`forward`.
-
     verbose : boolean, default=True
         Algorithm verbosity
 
@@ -38,13 +39,35 @@ class Random(Metaheuristic):
     :ref:`meta` : Parent class defining what a Metaheuristic is in Zellij.
     :ref:`lf` : Describes what a loss function is in Zellij.
     :ref:`sp` : Describes what a search space is in Zellij.
+
+    Examples
+    --------
+    >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.mixed import Random
+
+    >>> @Loss(objective=Minimizer("obj"))
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     return {"obj": res}
+
+    >>> a = ArrayVar(FloatVar("f1", -5, 5), FloatVar("i2", -5, 5))
+    >>> sp = ContinuousSearchspace(a)
+    >>> opt = Random(sp)
+    >>> stop = Calls(himmelblau, 4)
+    >>> exp = Experiment(opt, himmelblau, stop)
+    >>> exp.run()
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([3.0593050205475905, 0.7745988145845581])=11.910270230279236
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 4
     """
 
     def __init__(
         self,
-        search_space,
-        size=1,
-        verbose=True,
+        search_space: Searchspace,
+        size: int = 1,
+        verbose: bool = True,
     ):
         """__init__(search_space, size=1, verbose=True)
 
@@ -53,11 +76,9 @@ class Random(Metaheuristic):
         Parameters
         ----------
         search_space : Searchspace
-            Search space object containing bounds of the search space.
-
+            :ref:`sp`.
         size : int, default=1
             Number of points to sample at each :code:`forward`.
-
         verbose : boolean, default=True
             Algorithm verbosity
 
@@ -68,21 +89,31 @@ class Random(Metaheuristic):
         ##############
         # PARAMETERS #
         ##############
-
         self.size = size
 
-    # Run Random
-    def forward(self, X, Y, constraints):
-        """forward(X, Y)
-        Runs one step of Random.
+    @property
+    def size(self) -> int:
+        return self._size
 
-        Parameters
-        ----------
-        X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+    @size.setter
+    def size(self, value: int):
+        if value > 0:
+            self._size = value
+        else:
+            raise InitializationError(f"In Random, size must be > 0. Got {value}.")
+
+    # Run Random
+    def forward(
+        self,
+        X: Optional[list] = None,
+        Y: Optional[np.ndarray] = None,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ) -> Tuple[List[list], dict]:
+        """
+        Runs one step of CGS.
+
+        X, Y, secondary, or constraints are not necessary.
 
         Returns
         -------
@@ -95,9 +126,6 @@ class Random(Metaheuristic):
 
         logger.info("GA Starting")
 
-        if self.size > 2:
-            solutions = self.search_space.random_point(self.size)
-        else:
-            solutions = [self.search_space.random_point(self.size)]
+        solutions = self.search_space.random_point(self.size)
 
         return solutions, {"algorithm": "Random"}
