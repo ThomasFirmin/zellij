@@ -1,14 +1,17 @@
-# @Author: Thomas Firmin <ThomasFirmin>
-# @Date:   2022-05-03T15:41:48+02:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-05-23T15:08:28+02:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
+from __future__ import annotations
 from zellij.core.search_space import ContinuousSearchspace
 from zellij.core.metaheuristic import ContinuousMetaheuristic
-from zellij.strategies.tools.chaos_map import Chaos_map, Henon
+
+from typing import Tuple, Optional, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from zellij.core.search_space import ContinuousSearchspace
+    from zellij.strategies.tools.chaos_map import ChaosMap
 
 import numpy as np
 
@@ -19,19 +22,17 @@ logger = logging.getLogger("zellij.CO")
 
 class CGS(ContinuousMetaheuristic):
 
-    """Chaotic Global search
-
+    """
     CGS is an exploration :ref:`meta` using chaos to violently move in the :ref:`sp`.
-    It is continuous optimization, so the :ref:`sp` is converted to continuous.
-    To do so, it uses a :ref:`cmap`, such as Henon or Kent map.
+    It uses a :ref:`cmap`, such as Henon or Kent map.
 
     Attributes
     ----------
-    search_space : Searchspace
+    search_space : ContinuousSearchspace
         Search space object containing bounds of the search space
     level : int
         Chaotic level corresponds to the number of vectors of the chaotic map
-    map : Chaos_map
+    map : ChaosMap
         Chaotic map used to sample points. See :ref:`cmap` object.
     verbose : boolean, default=True
         Algorithm verbosity.
@@ -54,36 +55,44 @@ class CGS(ContinuousMetaheuristic):
 
     Examples
     --------
-    >>> from zellij.core import Loss, Threshold, Experiment
-    >>> from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar
-    >>> from zellij.utils.benchmarks import himmelblau
-    >>> from zellij.strategies import CGS
+    >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.continuous import CGS
     >>> from zellij.strategies.tools import Henon
-    ...
-    >>> lf = Loss()(himmelblau)
-    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
-    >>> stop = Threshold(lf, 'calls', 100)
-    >>> zcgs = CGS(sp,Henon(5,sp.size))
-    >>> exp = Experiment(zcgs, stop)
-    >>> exp.run()
-    >>> print(f"Best solution:f({lf.best_point})={lf.best_score}")
 
+
+    >>> @Loss(objective=Minimizer("obj"))
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     return {"obj": res}
+
+
+    >>> a = ArrayVar(FloatVar("f1", -5, 5), FloatVar("i2", -5, 5))
+    >>> sp = ContinuousSearchspace(a)
+    >>> cmap = Henon(100, sp.size)
+    >>> opt = CGS(sp, cmap)
+    >>> stop = Calls(himmelblau, 100)
+    >>> exp = Experiment(opt, himmelblau, stop)
+    >>> exp.run()
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([-3.9146957930510133, -3.8090645073989187])=13.184852092364691
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 100
 
     """
 
     def __init__(
         self,
-        search_space,
-        map,
-        verbose=True,
+        search_space: ContinuousSearchspace,
+        map: ChaosMap,
+        verbose: bool = True,
     ):
-        """__init__(search_space, map, verbose=True)
-
+        """
         Initialize CGS class
 
         Parameters
         ----------
-        search_space : Searchspace
+        search_space : ContinuousSearchspace
             Search space object containing bounds of the search space
         map : Chaos_map
             Chaotic map used to sample points. See :ref:`cmap` object.
@@ -92,26 +101,24 @@ class CGS(ContinuousMetaheuristic):
 
         """
 
+        super().__init__(search_space, verbose)
         ##############
         # PARAMETERS #
         ##############
-        super().__init__(search_space, verbose)
-
         self.map = map
-        self.level = self.map.vectors
+        self.level = self.map.nvectors
 
         #############
         # VARIABLES #
         #############
-
         self.iteration = 0
 
     @property
-    def search_space(self):
+    def search_space(self) -> ContinuousSearchspace:
         return self._search_space
 
     @search_space.setter
-    def search_space(self, value):
+    def search_space(self, value: ContinuousSearchspace):
         self._search_space = value
         self.up_plus_lo = value.upper + value.lower
         self.up_m_lo = value.upper - value.lower
@@ -119,17 +126,22 @@ class CGS(ContinuousMetaheuristic):
         self.radius = np.multiply(0.5, self.up_m_lo)
         self.center_m_lo_bounds = self.center - self.search_space.lower
 
-    def forward(self, X, Y, constraint=None):
-        """forward(x, Y)
+    def forward(
+        self,
+        X: Optional[list] = None,
+        Y: Optional[np.ndarray] = None,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ) -> Tuple[List[list], dict]:
+        """
         Runs one step of CGS.
 
         Parameters
         ----------
         X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+            List of points.
+        Y : numpy.ndarray[float]
+            List of loss values.
 
         Returns
         -------
@@ -153,19 +165,6 @@ class CGS(ContinuousMetaheuristic):
 
             # Apply 3 transformations on the selected chaotic variables
             r_mul_y = np.multiply(self.up_m_lo, self.map.map[l])
-
-            # xx = [np.add(self.center,r_mul_y), np.add(self.center,np.multiply(self.radius,np.multiply(2,y)-1)), np.subtract(self.search_space.upper,r_mul_y)]
-
-            # for each transformation of the chaotic variable
-            # for x in xx:
-            #
-            #     x_ = np.subtract(self.up_plus_lo,x)
-            #     sym = np.matrix([x,x,x_,x_])
-            #     sym[1,d] = x_[d]
-            #     sym[3,d] = x[d]
-            #     points = np.append(points,sym,axis=0)
-            #     n_points += 4
-
             xx = [self.search_space.lower + r_mul_y, self.search_space.upper - r_mul_y]
 
             # for each transformation of the chaotic variable
@@ -177,21 +176,21 @@ class CGS(ContinuousMetaheuristic):
 
         logger.info("CGS forward done")
 
-        return points, {"algorithm": "CGS", "seed": self.map.seed}
+        return points.tolist(), {"algorithm": "CGS", "seed": self.map.seed}
 
 
 class CLS(ContinuousMetaheuristic):
 
-    """Chaotic Local Search
-
-    CLS is an exploitation :ref:`meta` using chaos to wiggle points arround an initial solution.\
-     It uses a rotating polygon to distribute those points, a progressive and mooving zoom on the best solution found, to refine it.
-    It is continuous optimization, so the :ref:`sp` is converted to continuous.
-    To do so, it uses a :ref:`cmap`, such as Henon or Kent map.
+    """
+    CLS is an exploitation :ref:`meta` using chaos to wiggle points arround an initial solution.
+    It uses a rotating polygon to distribute those points, a progressive and mooving zoom on the best solution found, to refine it.
+    It uses a :ref:`cmap`, such as Henon or Kent map.
+    CLS is a local search and needs a starting point.
+    X and Y must not be None at the first forward.
 
     Attributes
     ----------
-    search_space : Searchspace
+    search_space : ContinuousSearchspace
         Search space object containing bounds of the search space
     level : int
         Chaotic level corresponds to the number of vectors of the chaotic map
@@ -219,41 +218,47 @@ class CLS(ContinuousMetaheuristic):
 
     Examples
     --------
-    >>> from zellij.core import Loss, Threshold, Experiment
-    >>> from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar
-    >>> from zellij.utils.benchmarks import himmelblau
-    >>> from zellij.strategies import CLS
+    >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.continuous import CGS
     >>> from zellij.strategies.tools import Henon
-    ...
-    >>> lf = Loss()(himmelblau)
-    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
-    >>> stop = Threshold(lf, 'calls', 100)
-    >>> zcls = CLS(sp,8,Henon(5,sp.size))
-    >>> x_start = [sp.random_point()]
-    >>> _, y_start = lf(x_start)
-    >>> exp = Experiment(zcls, stop)
-    >>> exp.run(x_start, y_start)
-    >>> print(f"Best solution:f({lf.best_point})={lf.best_score}")
+
+
+    >>> @Loss(objective=Minimizer("obj"), constraint=["c0", "c1"])
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     # coordinates must be <0
+    ...     return {"obj": res, "c0": x[0], "c1": x[1]}
+
+
+    >>> a = ArrayVar(FloatVar("f1", -5, 5), FloatVar("i2", -5, 5))
+    >>> sp = ContinuousSearchspace(a)
+    >>> cmap = Henon(100, sp.size)
+    >>> opt = CGS(sp, cmap)
+    >>> stop = Calls(himmelblau, 100)
+    >>> exp = Experiment(opt, himmelblau, stop)
+    >>> exp.run()
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([-3.9146957930510133, -3.8090645073989187])=13.184852092364691
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 100
 
     """
 
     def __init__(
         self,
-        search_space,
-        polygon,
-        map,
-        verbose=True,
+        search_space: ContinuousSearchspace,
+        polygon: int,
+        map: ChaosMap,
+        verbose: bool = True,
     ):
-        """__init__(self,search_space,level,polygon,map,verbose=True)
-
+        """
         Initialize CLS class
 
         Parameters
         ----------
-        search_space : Searchspace
+        search_space : ContinuousSearchspace
             Search space object containing bounds of the search space
-        level : int
-            Chaotic level corresponds to the number of vectors of the chaotic map
         polygon : int
             Vertex number of the rotating polygon (has an influence on the number of evaluated points)
         map : Chaos_map
@@ -270,7 +275,7 @@ class CLS(ContinuousMetaheuristic):
 
         self.polygon = polygon
         self.map = map
-        self.level = self.map.vectors
+        self.level = self.map.nvectors
 
         trigo_val = 2 * np.pi / self.polygon
         self.H = [np.zeros(self.polygon), np.zeros(self.polygon)]
@@ -281,11 +286,11 @@ class CLS(ContinuousMetaheuristic):
             self.H[1][i - 1] = np.sin(trigo_val * i)
 
     @property
-    def search_space(self):
+    def search_space(self) -> ContinuousSearchspace:
         return self._search_space
 
     @search_space.setter
-    def search_space(self, value):
+    def search_space(self, value: ContinuousSearchspace):
         self._search_space = value
         self.up_plus_lo = value.upper + value.lower
         self.up_m_lo = value.upper - value.lower
@@ -293,18 +298,24 @@ class CLS(ContinuousMetaheuristic):
         self.radius = np.multiply(0.5, self.up_m_lo)
         self.center_m_lo_bounds = self.center - value.lower
 
-    def forward(self, X, Y, constraint=None):
-        """forward(X, Y)
-
+    def forward(
+        self,
+        X: list,
+        Y: np.ndarray,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ) -> Tuple[List[list], dict]:
+        """
         Runs one step of CLS.
+        CLS is a local search and needs a starting point.
+        X and Y must not be None.
 
         Parameters
         ----------
         X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+            List of points.
+        Y : numpy.ndarray[float]
+            List of loss values.
 
         Returns
         -------
@@ -313,6 +324,32 @@ class CLS(ContinuousMetaheuristic):
         info
             Additionnal information linked to :code:`points`
 
+        Examples
+        --------
+        >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+        >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+        >>> from zellij.strategies.continuous import CLS
+        >>> from zellij.strategies.tools import Henon
+
+
+        >>> @Loss(objective=Minimizer("obj"))
+        >>> def himmelblau(x):
+        ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+        ...     return {"obj": res}
+
+
+        >>> a = ArrayVar(FloatVar("f1", -5, 5), FloatVar("i2", -5, 5))
+        >>> sp = ContinuousSearchspace(a)
+        >>> first_point = sp.random_point(1)
+        >>> cmap = Henon(100, sp.size)
+        >>> opt = CLS(sp, 5, cmap)
+        >>> stop = Calls(himmelblau, 1000)
+        >>> exp = Experiment(opt, himmelblau, stop)
+        >>> exp.run(X=first_point)
+        >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+        f([-3.958194530360954, -3.4004586479597])=1.9708306283302715
+        >>> print(f"Calls: {himmelblau.calls}")
+        Calls: 1000
         """
 
         x_best = np.array(X[np.argmin(Y)])
@@ -359,21 +396,21 @@ class CLS(ContinuousMetaheuristic):
 
         logger.info("CLS forward ending")
 
-        return points, {"algorithm": "CLS", "seed": self.map.seed}
+        return points.tolist(), {"algorithm": "CLS", "seed": self.map.seed}
 
 
 class CFS(ContinuousMetaheuristic):
 
-    """Chaotic Fine Search
-
+    """
     CFS is an exploitation :ref:`meta` using chaos to wiggle points arround an initial solution.\
-     Contrary to CLS, CFS uses an exponential zoom on the best solution found, it works at a much smaller scale than the CLS.
-    It is continuous optimization, so the :ref:`sp` is converted to continuous.
-    To do so, it uses a :ref:`cmap`, such as Henon or Kent map.
+    Contrary to CLS, CFS uses an exponential zoom on the best solution found, it works at a much smaller scale than the CLS.
+    It uses a :ref:`cmap`, such as Henon or Kent map.
+    CFS is a local search and needs a starting point.
+    X and Y must not be None at the first forward.
 
     Attributes
     ----------
-    search_space : Searchspace
+    search_space : ContinuousSearchspace
         Search space object containing bounds of the search space
     map : Chaos_map
         Chaotic map used to sample points. See Chaos_map object.
@@ -394,41 +431,50 @@ class CFS(ContinuousMetaheuristic):
     Chaotic_optimization : CLS is used here to perform an exploitation
     CGS : Chaotic Global Search
     CLS : Chaotic Local Search
-
+    
     Examples
     --------
-    >>> from zellij.core import Loss, Threshold, Experiment
-    >>> from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar
-    >>> from zellij.utils.benchmarks import himmelblau
-    >>> from zellij.strategies import CFS
+    >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.continuous import CFS
     >>> from zellij.strategies.tools import Henon
-    ...
-    >>> lf = Loss()(himmelblau)
-    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
-    >>> stop = Threshold(lf, 'calls', 100)
-    >>> zcfs = CFS(sp,8,Henon(5,sp.size))
-    >>> x_start = [sp.random_point()]
-    >>> _, y_start = lf(x_start)
-    >>> exp = Experiment(zcfs, stop)
-    >>> exp.run(x_start, y_start)
-    >>> print(f"Best solution:f({lf.best_point})={lf.best_score}")
 
+
+    >>> @Loss(objective=Minimizer("obj"))
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     return {"obj": res}
+
+
+    >>> a = ArrayVar(FloatVar("f1", -5, 5), FloatVar("i2", -5, 5))
+    >>> sp = ContinuousSearchspace(a)
+    >>> first_point = sp.random_point(1)
+    >>> cmap = Henon(100, sp.size)
+    >>> opt = CFS(sp, 5, cmap)
+    >>> stop = Calls(himmelblau, 1000)
+    >>> exp = Experiment(opt, himmelblau, stop)
+    >>> exp.run(X=first_point)
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([3.6504859250093644, -0.026884720842520162])=16.500552515448756
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 1000
+        
     """
 
     def __init__(
         self,
-        search_space,
-        polygon,
-        map,
-        verbose=True,
+        search_space: ContinuousSearchspace,
+        polygon: int,
+        map: ChaosMap,
+        verbose: bool = True,
     ):
-        """__init__(self,search_space,polygon,map,verbose=True)
+        """__init__
 
         Initialize CLS class
 
         Parameters
         ----------
-        search_space : Searchspace
+        search_space : ContinuousSearchspace
             Search space object containing bounds of the search space
         polygon : int
             Vertex number of the rotating polygon (has an influence on the number of evaluated points)
@@ -446,7 +492,7 @@ class CFS(ContinuousMetaheuristic):
 
         self.polygon = polygon
         self.map = map
-        self.level = self.map.vectors
+        self.level = self.map.nvectors
 
         #############
         # VARIABLES #
@@ -461,11 +507,11 @@ class CFS(ContinuousMetaheuristic):
             self.H[1][i - 1] = np.sin(trigo_val * i)
 
     @property
-    def search_space(self):
+    def search_space(self) -> ContinuousSearchspace:
         return self._search_space
 
     @search_space.setter
-    def search_space(self, value):
+    def search_space(self, value: ContinuousSearchspace):
         self._search_space = value
         self.up_plus_lo = value.upper + value.lower
         self.up_m_lo = value.upper - value.lower
@@ -473,7 +519,7 @@ class CFS(ContinuousMetaheuristic):
         self.radius = np.multiply(0.5, self.up_m_lo)
         self.center_m_lo_bounds = self.center - value.lower
 
-    def _stochastic_round(self, solution, k):
+    def _stochastic_round(self, solution: list, k: int):
         s = np.array(solution)
         r = np.random.uniform(-1, 1, len(s))
         # perturbation on CFS zoom
@@ -481,18 +527,25 @@ class CFS(ContinuousMetaheuristic):
 
         return z
 
-    def forward(self, X, Y, constraint=None):
-        """forward(X, Y)
+    def forward(
+        self,
+        X: list,
+        Y: np.ndarray,
+        secondary: Optional[np.ndarray] = None,
+        constraint: Optional[np.ndarray] = None,
+    ) -> Tuple[List[list], dict]:
+        """forward
 
         Runs one step of CFS.
+        CFS is a local search and needs a starting point.
+        X and Y must not be None at the first forward.
 
         Parameters
         ----------
         X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+            List of points.
+        Y : numpy.ndarray[float]
+            List of loss values.
 
         Returns
         -------
@@ -552,46 +605,37 @@ class CFS(ContinuousMetaheuristic):
 
         logger.info("CLS forward ending")
 
-        return points, {"algorithm": "CFS", "seed": self.map.seed}
+        return points.tolist(), {"algorithm": "CFS", "seed": self.map.seed}
 
 
-class Chaotic_optimization(ContinuousMetaheuristic):
+class ChaoticOptimization(ContinuousMetaheuristic):
 
-    """Chaotic_optimization
+    """ChaoticOptimization
 
     Chaotic optimization combines CGS, CLS and CFS.
 
     Attributes
     ----------
-
     chaos_map : {'henon', 'kent', 'tent', 'logistic', 'random', Chaos_map}
         If a string is given, the algorithm will select the corresponding map. The chaotic map is used to sample points.\
          If it is a map, it will directly use it. Be carefull, the map size must be sufficient according to the parametrization.
-
     exploration_ratio : float
         It will determine the number of calls to the loss function dedicated to exploration and exploitation, according to chaotic levels associated to CGS, CLS and CFS.
-
     polygon : int
         Vertex number of the rotating polygon (has an influence on the number of evaluated points) for CLS and CFS
-
     red_rate : float
         Reduction rate of the progressive zoom on the best solution found for CLS and CFS
-
     CGS_level : int
         Number of chaotic level associated to CGS
-
     CLS_level : int
         Number of chaotic level associated to CLS
-
     CFS_level : int
         Number of chaotic level associated to CFS
-
     verbose : boolean, default=True
         Algorithm verbosity
 
     Methods
     -------
-
     run(self, n_process=1)
         Runs Chaotic_optimization
 
@@ -604,35 +648,57 @@ class Chaotic_optimization(ContinuousMetaheuristic):
 
     Examples
     --------
-
-    >>> from zellij.core import Loss, Threshold, Experiment
-    >>> from zellij.core import ContinuousSearchspace, FloatVar, ArrayVar
-    >>> from zellij.utils.benchmarks import himmelblau
-    >>> from zellij.strategies import CGS, CLS, CFS, Chaotic_optimization
+    >>> from zellij.core import ContinuousSearchspace, ArrayVar, FloatVar
+    >>> from zellij.core import Experiment, Loss, Minimizer, Calls
+    >>> from zellij.strategies.continuous import ChaoticOptimization, CGS, CLS, CFS
     >>> from zellij.strategies.tools import Henon
-    ...
-    >>> lf = Loss()(himmelblau)
-    >>> sp = ContinuousSearchspace(ArrayVar(FloatVar("a",-5,5), FloatVar("b",-5,5)),lf)
-    >>> stop = Threshold(lf, 'calls', 100)
-    >>> zcgs = CGS(sp,Henon(5,sp.size))
-    >>> zcls = CLS(sp,8,Henon(2,sp.size))
-    >>> zcfs = CFS(sp,8,Henon(2,sp.size))
-    >>> co = Chaotic_optimization(sp,zcgs,zcls,zcfs)
-    >>> exp = Experiment(co, stop)
-    >>> exp.run()
-    >>> print(f"Best solution:f({lf.best_point})={lf.best_score}")
 
 
+    >>> @Loss(objective=Minimizer("obj"))
+    >>> def himmelblau(x):
+    ...     res = (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+    ...     return {"obj": res}
+
+
+    >>> a = ArrayVar(FloatVar("f1", -5, 5), FloatVar("i2", -5, 5))
+    >>> sp = ContinuousSearchspace(a)
+    >>> first_point = sp.random_point(1)
+
+    >>> cmap1 = Henon(20, sp.size)
+    >>> cmap2 = Henon(40, sp.size)
+    >>> cmap3 = Henon(60, sp.size)
+
+    >>> ocgs = CGS(sp, cmap1)
+    >>> ocls = CLS(sp, 5, cmap2)
+    >>> ocfs = CFS(sp, 5, cmap3)
+
+    >>> opt = ChaoticOptimization(sp, ocgs, ocls, ocfs)
+    >>> stop = Calls(himmelblau, 5000)
+    >>> exp = Experiment(opt, himmelblau, stop)
+    >>> exp.run(X=first_point)
+    >>> print(f"f({himmelblau.best_point})={himmelblau.best_score}")
+    f([-3.7846701960436095, -3.2898514141766624])=0.002626222860246351
+    >>> print(f"Calls: {himmelblau.calls}")
+    Calls: 5000
+    
     """
 
-    def __init__(self, search_space, cgs, cls, cfs, inner=5, verbose=True):
+    def __init__(
+        self,
+        search_space: ContinuousSearchspace,
+        cgs: CGS,
+        cls: CLS,
+        cfs: CFS,
+        inner: int = 5,
+        verbose: bool = True,
+    ):
         """__init__(search_space, cgs, cls, cfs, verbose=True)
 
         Initialize CGS class
 
         Parameters
         ----------
-        search_space : Searchspace
+        search_space : ContinuousSearchspace
             Search space object containing bounds of the search space
         cgs : CGS
             CGS :ref:`meta`
@@ -644,20 +710,13 @@ class Chaotic_optimization(ContinuousMetaheuristic):
             Number of iterations of CLS and CFS.
         verbose : boolean, default=True
             Algorithm verbosity
+
         """
 
         ##############
         # PARAMETERS #
         ##############
         super().__init__(search_space, verbose)
-
-        assert hasattr(search_space, "convert") or isinstance(
-            search_space, ContinuousSearchspace
-        ), logger.error(
-            f"""If the `search_space` is not a `ContinuousSearchspace`,
-            the user must give a `Converter` to the :ref:`sp` object
-            with the kwarg `convert`"""
-        )
 
         # Initialize CGS/CLS/CFS
         self.cgs = cgs
@@ -699,7 +758,7 @@ class Chaotic_optimization(ContinuousMetaheuristic):
         self.cls.reset()
         self.cfs.reset()
 
-    def _do_cgs(self, X, Y):
+    def _do_cgs(self, X: list, Y: np.ndarray) -> Tuple[List[list], dict]:
         self.cgs.map.sample(np.random.randint(0, 1000000))
         # Outer loop (exploration)
         logger.info("Chaotic optimization: Exploration phase")
@@ -710,14 +769,14 @@ class Chaotic_optimization(ContinuousMetaheuristic):
         # If there is CGS
         if self.cgs:
             return self.cgs.forward(X, Y)
-
         # Else select random point for the exploitation
         else:
             logger.warning("Chaotic optimization: using random instead of CGS")
+            return np.random.random((1, self.search_space.size)).tolist(), {
+                "algorithm": "random"
+            }
 
-            return [np.random.random(self.search_space.size)], {"algorithm": "random"}
-
-    def _do_cls(self, X, Y):
+    def _do_cls(self, X: list, Y: np.ndarray) -> Tuple[List[list], dict]:
         self.cls.map.sample(np.random.randint(0, 1000000))
 
         self.CLS_switch = False
@@ -725,7 +784,7 @@ class Chaotic_optimization(ContinuousMetaheuristic):
 
         return self.cls.forward(X, Y)
 
-    def _do_cfs(self, X, Y):
+    def _do_cfs(self, X: list, Y: np.ndarray) -> Tuple[List[list], dict]:
         self.cfs.map.sample(np.random.randint(0, 1000000))
 
         self.CLS_switch = True
@@ -733,18 +792,23 @@ class Chaotic_optimization(ContinuousMetaheuristic):
 
         return self.cfs.forward(X, Y)
 
-    def forward(self, X, Y, constraint=None):
-        """forward(H=None, n_process=1)
+    def forward(
+        self,
+        X: list,
+        Y: np.ndarray,
+        secondary: Optional[np.ndarray],
+        constraint: Optional[np.ndarray] = None,
+    ):
+        """forward
 
-        Runs one step of BO.
+        Runs one step of CO.
 
         Parameters
         ----------
         X : list
-            List of previously computed points
-        Y : list
-            List of loss value linked to :code:`X`.
-            :code:`X` and :code:`Y` must have the same length.
+            List of points.
+        Y : numpy.ndarray[float]
+            List of loss values.
 
         Returns
         -------
@@ -800,5 +864,3 @@ class Chaotic_optimization(ContinuousMetaheuristic):
             self.inner_it = 0
 
             return self._do_cgs(X, Y)
-
-        logger.info("Chaotic optimization forward ending")
