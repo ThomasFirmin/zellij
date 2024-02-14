@@ -1,12 +1,12 @@
-# @Author: Thomas Firmin <tfirmin>
-# @Date:   2023-01-02T11:36:10+01:00
-# @Email:  thomas.firmin@univ-lille.fr
-# @Project: Zellij
-# @Last modified by:   tfirmin
-# @Last modified time: 2023-01-12T15:00:19+01:00
-# @License: CeCILL-C (http://www.cecill.info/index.fr.html)
+# Author Thomas Firmin
+# Email:  thomas.firmin@univ-lille.fr
+# Project: Zellij
+# License: CeCILL-C (http://www.cecill.info/index.fr.html)
 
+from __future__ import annotations
 from abc import ABC, abstractmethod
+from typing import Callable
+import time
 
 
 class Stopping(ABC):
@@ -52,32 +52,40 @@ class Stopping(ABC):
     def attribute(self, value):
         self._attribute = value
 
+    @abstractmethod
+    def __call__(self) -> bool:
+        pass
+
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
     def __and__(self, other):
-        return Combined(self, other, lambda a, b: a() & b())
+        return Combined(self, other, lambda a, b: a() & b(), "&")
 
     def __or__(self, other):
-        return Combined(self, other, lambda a, b: a() | b())
+        return Combined(self, other, lambda a, b: a() | b(), "|")
 
     def __xor__(self, other):
-        return Combined(self, other, lambda a, b: a() ^ b())
+        return Combined(self, other, lambda a, b: a() ^ b(), "^")
 
     def __rand__(self, other):
-        return Combined(other, self, lambda a, b: a() & b())
+        return Combined(other, self, lambda a, b: a() & b(), "&")
 
     def __ror__(self, other):
-        return Combined(other, self, lambda a, b: a() | b())
+        return Combined(other, self, lambda a, b: a() | b(), "|")
 
     def __rxor__(self, other):
-        return Combined(other, self, lambda a, b: a() ^ b())
+        return Combined(other, self, lambda a, b: a() ^ b(), "^")
 
     def __iand__(self, other):
-        return Combined(self, other, lambda a, b: a() & b())
+        return Combined(self, other, lambda a, b: a() & b(), "&")
 
     def __ior__(self, other):
-        return Combined(self, other, lambda a, b: a() | b())
+        return Combined(self, other, lambda a, b: a() | b(), "|")
 
     def __ixor__(self, other):
-        return Combined(self, other, lambda a, b: a() ^ b())
+        return Combined(self, other, lambda a, b: a() ^ b(), "^")
 
 
 class Combined(Stopping):
@@ -104,16 +112,20 @@ class Combined(Stopping):
 
     """
 
-    def __init__(self, a, b, op):
+    def __init__(self, a: Stopping, b: Stopping, op: Callable, str_op: str):
         # Stopping 1
         self.a = a
         # Stopping 2
         self.b = b
         # operation between a and b
         self.op = op
+        self.str_op = str_op
 
     def __call__(self):
         return self.op(self.a, self.b)
+
+    def __str__(self) -> str:
+        return f"({self.a}{self.str_op}{self.b})"
 
 
 class Threshold(Stopping):
@@ -138,7 +150,10 @@ class Threshold(Stopping):
         self.threshold = threshold
 
     def __call__(self):
-        return getattr(self.target, self.attribute) >= self.threshold  # type: ignore
+        return getattr(self.target, self.attribute) >= self.threshold
+
+    def __str__(self) -> str:
+        return f"|T|{self.attribute}:{getattr(self.target, self.attribute)}>={self.threshold}"
 
 
 class IThreshold(Stopping):
@@ -165,6 +180,9 @@ class IThreshold(Stopping):
     def __call__(self):
         return getattr(self.target, self.attribute) <= self.threshold  # type: ignore
 
+    def __str__(self) -> str:
+        return f"|T|{self.attribute}:{getattr(self.target, self.attribute)}<={self.threshold}"
+
 
 class Calls(Threshold):
     """Calls
@@ -174,6 +192,8 @@ class Calls(Threshold):
 
     Parameters
     ----------
+    loss : LossFunc
+        A :ref:`lf`.
     threshold : int
         Int describing the maximum calls to the :ref:`lf`.
 
@@ -183,9 +203,8 @@ class Calls(Threshold):
 
     """
 
-    def __init__(self, meta, threshold):
-        super(Calls, self).__init__(meta.search_space.loss, "calls")  # type: ignore
-        self.threshold = threshold
+    def __init__(self, loss, threshold):
+        super(Calls, self).__init__(loss, "calls", threshold)
 
 
 class BooleanStop(Stopping):
@@ -201,6 +220,9 @@ class BooleanStop(Stopping):
 
     def __call__(self):
         return getattr(self.target, self.attribute)  # type: ignore
+
+    def __str__(self) -> str:
+        return f"|B|{self.attribute}:{getattr(self.target, self.attribute)}"
 
 
 class Convergence(Stopping):
@@ -237,3 +259,35 @@ class Convergence(Stopping):
             self.acc += 1
 
         return self.acc >= self.patience
+
+    def __str__(self) -> str:
+        return f"|P|{self.attribute}:{self.acc}>={self.patience}"
+
+
+class Time(Stopping):
+    """Time
+
+    Stoppping criterion based on time in seconds.
+
+    Parameters
+    ----------
+    ttime : float
+        Total time of the experiment.
+
+    Attributes
+    ----------
+    threshold
+    """
+
+    def __init__(self, ttime, target=None, attribute=""):
+        super(Time, self).__init__(target, attribute)
+        self.ttime = ttime
+        self.start_time = time.time()
+
+    def __call__(self):
+        elapsed = time.time() - self.start_time
+        return elapsed >= self.ttime
+
+    def __str__(self) -> str:
+        elapsed = time.time() - self.start_time
+        return f"|T|Elapsed Time:{elapsed}>={self.ttime}"
