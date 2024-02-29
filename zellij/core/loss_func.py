@@ -33,7 +33,6 @@ except ImportError as err:
 
 
 class LossFunc(ABC):
-
     """LossFunc
 
     LossFunc allows to wrap function of type :math:`f(x)=dict`.
@@ -538,7 +537,6 @@ class LossFunc(ABC):
 
 
 class SequentialLoss(LossFunc):
-
     """SequentialLoss
 
     SequentialLoss adds methods to save and evaluate the original loss function.
@@ -966,6 +964,7 @@ class MPILoss(LossFunc):
                 cnt = self._parse_message(
                     msg, self.pqueue, self.p_historic, self.idle, self.status
                 )
+            time.sleep(0.1)
 
         logger.debug(f"MASTER{self.rank}, calls:{self.calls} |!| STOPPING |!|")
 

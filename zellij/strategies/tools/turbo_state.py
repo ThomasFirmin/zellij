@@ -340,6 +340,160 @@ class ConstrainedCostAwareMaxPosteriorSampling(MaxPosteriorSampling):
         posterior = self.model.posterior(
             X=X,
             observation_noise=observation_noise,
+        )
+        Y_samples = posterior.rsample(sample_shape=torch.Size([num_samples]))
+        print(Y_samples)
+        # Constraints
+        c_posterior = self.constraint_model.posterior(
+            X=X, observation_noise=observation_noise
+        )
+        C_samples = c_posterior.rsample(sample_shape=torch.Size([num_samples]))
+
+        # Cost
+        Cost_samples = self.cost_model(X=X)
+
+        # Convert the objective and constraint samples into a scalar-valued "score"
+        scores = self._convert_samples_to_scores(
+            Y_samples=Y_samples,
+            C_samples=C_samples,
+            Cost_samples=Cost_samples,
+            num_samples=num_samples,
+        )
+        return self.maximize_samples(X=X, samples=scores, num_samples=num_samples)
+
+
+class ConstrainedTSPerUnitPosteriorSampling(MaxPosteriorSampling):
+    r"""Constrained Cost Aware max posterior sampling.
+
+    Posterior sampling where we try to maximize an objective function while
+    simulatenously satisfying a set of constraints c1(x) <= 0, c2(x) <= 0,
+    ..., cm(x) <= 0 where c1, c2, ..., cm are black-box constraint functions.
+    Each constraint function is modeled by a seperate GP model. We follow the
+    procedure as described in https://doi.org/10.48550/arxiv.2002.08526.
+
+    Example:
+        >>> CMPS = ConstrainedMaxPosteriorSampling(
+                model,
+                constraint_model=ModelListGP(cmodel1, cmodel2),
+            )
+        >>> X = torch.rand(2, 100, 3)
+        >>> sampled_X = CMPS(X, num_samples=5)
+    """
+
+    def __init__(
+        self,
+        model: Model,
+        cost_model: Model,
+        constraint_model: Union[ModelListGP, MultiTaskGP],
+        temperature: float,
+        best_score: float,
+        best_cost: float,
+        objective: Optional[MCAcquisitionObjective] = None,
+        posterior_transform: Optional[PosteriorTransform] = None,
+        replacement: bool = True,
+        epsilon: float = 1e3,
+    ) -> None:
+        r"""Constructor for the SamplingStrategy base class.
+
+        Args:
+            model: A fitted model.
+            objective: The MCAcquisitionObjective under which the samples are evaluated.
+                Defaults to `IdentityMCObjective()`.
+            posterior_transform: An optional PosteriorTransform for the objective
+                function (corresponding to `model`).
+            replacement: If True, sample with replacement.
+            constraint_model: either a ModelListGP where each submodel is a GP model for
+                one constraint function, or a MultiTaskGP model where each task is one
+                constraint function. All constraints are of the form c(x) <= 0. In the
+                case when the constraint model predicts that all candidates
+                violate constraints, we pick the candidates with minimum violation.
+        """
+        if objective is not None:
+            raise NotImplementedError(
+                "`objective` is not supported for `ConstrainedMaxPosteriorSampling`."
+            )
+
+        super().__init__(
+            model=model,
+            objective=objective,
+            posterior_transform=posterior_transform,
+            replacement=replacement,
+        )
+        self.cost_model = cost_model
+        self.constraint_model = constraint_model
+        self.temperature = temperature
+        self.best_score = best_score
+        self.best_cost = best_cost
+        self.epsilon = epsilon
+
+    def _convert_samples_to_scores(self, Y_samples, Cost_samples, C_samples) -> Tensor:
+        r"""Convert the objective and constraint samples into a score.
+
+        The logic is as follows:
+            - If a realization has at least one feasible candidate we use the objective
+                value as the score and set all infeasible candidates to -inf.
+            - If a realization doesn't have a feasible candidate we set the score to
+                the negative total violation of the constraints to incentivize choosing
+                the candidate with the smallest constraint violation.
+
+        Args:
+            Y_samples: A `num_samples x batch_shape x num_cand x 1`-dim Tensor of
+                samples from the objective function.
+            Cost_samples: A `num_samples x batch_shape x num_cand x 1`-dim Tensor of
+                samples from the cost model.
+            C_samples: A `num_samples x batch_shape x num_cand x num_constraints`-dim
+                Tensor of samples from the constraints.
+
+        Returns:
+            A `num_samples x batch_shape x num_cand x 1`-dim Tensor of scores.
+        """
+        is_feasible = (C_samples <= 0).all(
+            dim=-1
+        )  # num_samples x batch_shape x num_cand
+        has_feasible_candidate = is_feasible.any(dim=-1)
+
+        cost_anneal = (
+            (Cost_samples**self.temperature).repeat(Y_samples.shape[0], 1).unsqueeze(-1)
+        )
+
+        scores = Y_samples.clone()
+        scores[~is_feasible] = -float("inf")
+        if not has_feasible_candidate.all():
+            # Use negative total violation for samples where no candidate is feasible
+            total_violation = (
+                C_samples[~has_feasible_candidate]
+                .clamp(min=0)
+                .sum(dim=-1, keepdim=True)
+            )
+            scores[~has_feasible_candidate] = (
+                -total_violation * cost_anneal[~has_feasible_candidate]
+            )
+        else:
+            scores = scores - self.best_score
+            mask = scores > 0
+            scores[mask] /= cost_anneal[mask]
+            scores[~mask] *= cost_anneal[~mask]
+
+        return scores
+
+    def forward(
+        self, X: Tensor, num_samples: int = 1, observation_noise: bool = False
+    ) -> Tensor:
+        r"""Sample from the model posterior.
+
+        Args:
+            X: A `batch_shape x N x d`-dim Tensor from which to sample (in the `N`
+                dimension) according to the maximum posterior value under the objective.
+            num_samples: The number of samples to draw.
+            observation_noise: If True, sample with observation noise.
+
+        Returns:
+            A `batch_shape x num_samples x d`-dim Tensor of samples from `X`, where
+                `X[..., i, :]` is the `i`-th sample.
+        """
+        posterior = self.model.posterior(
+            X=X,
+            observation_noise=observation_noise,
             # Note: `posterior_transform` is only used for the objective
             posterior_transform=self.posterior_transform,
         )
@@ -359,7 +513,6 @@ class ConstrainedCostAwareMaxPosteriorSampling(MaxPosteriorSampling):
             Y_samples=Y_samples,
             C_samples=C_samples,
             Cost_samples=Cost_samples,
-            num_samples=num_samples,
         )
         return self.maximize_samples(X=X, samples=scores, num_samples=num_samples)
 
