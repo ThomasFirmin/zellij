@@ -9,6 +9,7 @@
 
 from zellij.core.addons import VarAddon
 from abc import ABC, abstractmethod
+from collections.abc import Iterable
 import math
 import numpy as np
 import random
@@ -401,7 +402,6 @@ class CatVar(Variable):
     """
 
     def __init__(self, label, features, weights=None, **kwargs):
-        super(CatVar, self).__init__(label, **kwargs)
 
         assert isinstance(
             features, list
@@ -421,6 +421,7 @@ class CatVar(Variable):
         assert (
             isinstance(weights, (list, np.ndarray)) or weights == None
         ), f"""`weights` must be a list or equal to None, got {weights}"""
+        super(CatVar, self).__init__(label, **kwargs)
 
         if weights:
             self.weights = weights
@@ -718,6 +719,7 @@ class Block(Variable):
     """
 
     def __init__(self, label, value, repeat, **kwargs):
+        self.value = value
         super(Block, self).__init__(label, **kwargs)
 
         assert isinstance(
@@ -725,8 +727,6 @@ class Block(Variable):
         ), f"""
         Value must inherit from :ref:`var`, got {args}
         """
-
-        self.value = value
 
         assert (
             isinstance(repeat, int) and repeat > 0
@@ -751,18 +751,22 @@ class Block(Variable):
             method, repeated `repeat` times. If size > 1, return a list of list.
 
         """
-
         res = []
-
         if size > 1:
             for _ in range(size):
                 block = []
                 for _ in range(self.repeat):
-                    block.append([v.random() for v in self.value])
+                    if isinstance(self.value, list) and (len(self.value) > 0):
+                        block.append([v.random() for v in self.value])
+                    else:
+                        block.append(self.value.random())
                 res.append(block)
         else:
             for _ in range(self.repeat):
-                res.append([v.random() for v in self.value])
+                if isinstance(self.value, list) and (len(self.value) > 0):
+                    res.append([v.random() for v in self.value])
+                else:
+                    res.append(self.value.random())
 
         return res
 
@@ -787,10 +791,13 @@ class Block(Variable):
 
     def __repr__(self):
         values_reprs = ""
-        for v in self.value:
-            values_reprs += v.__repr__() + ","
+        if isinstance(self.value, Iterable) and (len(self.value) > 0):
+            for v in self.value:
+                values_reprs += v.__repr__() + ","
 
-        return super(Block, self).__repr__() + f"[{values_reprs}])"
+            return super(Block, self).__repr__() + f"[{values_reprs}])"
+        else:
+            return super(Block, self).__repr__() + f"{self.value.__repr__()}"
 
 
 # Block of variables, with random size.
@@ -830,15 +837,17 @@ class DynamicBlock(Block):
     """
 
     def __init__(self, label, value, repeat, **kwargs):
+        self.value = value
         super(DynamicBlock, self).__init__(label, value, repeat, **kwargs)
 
-    def random(self, size=1):
+    def random(self, size=1, n_repeat=None):
         """random(size=1)
 
         Parameters
         ----------
         size : int, default=None
             Number of draws.
+        n_repeat : max size of randomly generated block
 
         Returns
         -------
@@ -852,14 +861,19 @@ class DynamicBlock(Block):
         if size > 1:
             for _ in range(size):
                 block = []
-                n_repeat = np.random.randint(1, self.repeat)
+                if n_repeat is None:
+                    n_repeat = np.random.randint(1, self.repeat)
                 for _ in range(n_repeat):
                     block.append([v.random() for v in self.value])
                 res.append(block)
         else:
-            n_repeat = np.random.randint(1, self.repeat)
+            if n_repeat is None:
+                n_repeat = np.random.randint(1, self.repeat)
             for _ in range(n_repeat):
-                res.append([v.random() for v in self.value])
+                if isinstance(self.value, list) and (len(self.value) > 0):
+                    res.append([v.random() for v in self.value])
+                else:
+                    res.append(self.value.random())
 
         return res
 
