@@ -27,3 +27,5 @@ from .stop import (
 from .backup import AutoSave, load_backup
 
 from .metaheuristic import MockMixedMeta
+
+from .handlers import *

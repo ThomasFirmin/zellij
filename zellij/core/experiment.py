@@ -8,6 +8,7 @@ from abc import ABC
 
 from typing import Optional, Tuple, List, TYPE_CHECKING
 
+
 if TYPE_CHECKING:
     from zellij.core.stop import Stopping
     from zellij.core.metaheuristic import Metaheuristic
@@ -17,6 +18,8 @@ from zellij.core.errors import InitializationError, UnassignedProcess
 
 from zellij.core.loss_func import LossFunc, MPILoss
 from zellij.core.backup import AutoSave
+from zellij.core.handlers import SolutionHandler
+
 
 import time
 import os
@@ -56,7 +59,7 @@ class RunExperiment(ABC):
         Y: Optional[np.ndarray] = None,
         secondary: Optional[np.ndarray] = None,
         constraint: Optional[np.ndarray] = None,
-        info: Optional[np.ndarray] = None,
+        info: Optional[np.ndarray] = None
     ) -> Tuple[
         Optional[list],
         Optional[np.ndarray],
@@ -106,7 +109,8 @@ class RunExperiment(ABC):
                 # convert from metaheuristic space to loss space
                 X = meta.search_space.reverse(X)
                 # compute loss
-                X, Y, secondary, constraint, info = loss(X, stop_obj=stop, **info_dict)
+                X, Y, secondary, constraint, info = loss(
+                    X, stop_obj=stop, **info_dict)
                 # if meta return empty solutions
                 if X:
                     # convert from loss space to metaheuristic space
@@ -114,7 +118,8 @@ class RunExperiment(ABC):
                 else:
                     cnt = False  # stop optimization
             else:
-                X, Y, secondary, constraint, info = loss(X, stop_obj=stop, **info_dict)
+                X, Y, secondary, constraint, info = loss(
+                    X, stop_obj=stop, **info_dict)
                 # if meta return empty solutions
                 if X is None:
                     cnt = False  # stop optimization
@@ -131,6 +136,7 @@ class RunExperiment(ABC):
         secondary: Optional[np.ndarray] = None,
         constraint: Optional[np.ndarray] = None,
         info: Optional[np.ndarray] = None,
+        solution_handler: SolutionHandler = None
     ):
         """
         Optimization loop.
@@ -161,6 +167,10 @@ class RunExperiment(ABC):
         while not stop() and cnt:
             if self.exp.verbose:
                 print(f"STATUS: {stop}", end="\r", flush=True)
+
+            if solution_handler:
+                X, Y = solution_handler(X, Y)
+
             X, Y, secondary, constraint, info, cnt = self._run_forward_loss(
                 meta, loss, stop, X, Y, secondary, constraint, info
             )
@@ -196,7 +206,8 @@ class RunParallelExperiment(RunExperiment):
             loss.worker()  # type: ignore
         else:
             raise UnassignedProcess(
-                f"Role of process of rank {loss.rank} is undefined."  # type: ignore
+                # type: ignore
+                f"Role of process of rank {loss.rank} is undefined."
             )
 
     def run(
@@ -340,7 +351,8 @@ class Experiment:
     def loss(self, value: LossFunc):
         if isinstance(value, LossFunc):
             self._loss = value
-            self._loss.labels = [v.label for v in self.meta.search_space.variables]  # type: ignore
+            self._loss.labels = [
+                v.label for v in self.meta.search_space.variables]  # type: ignore
             if self.meta.info:
                 self._loss.info = self.meta.info
 
@@ -351,7 +363,8 @@ class Experiment:
                 self.strategy = RunExperiment(self)
 
         else:
-            raise InitializationError(f"`loss` must be a `LossFunc`, got {type(value)}")
+            raise InitializationError(
+                f"`loss` must be a `LossFunc`, got {type(value)}")
 
     @property
     def save(self) -> Optional[str]:
@@ -379,10 +392,11 @@ class Experiment:
         secondary: Optional[np.ndarray] = None,
         constraint: Optional[np.ndarray] = None,
         info: Optional[np.ndarray] = None,
+        solution_handler: SolutionHandler = None
     ):
         start = time.time()
         self.strategy.run(
-            self.meta, self.loss, self.stop, X, Y, secondary, constraint, info
+            self.meta, self.loss, self.stop, X, Y, secondary, constraint, info, solution_handler
         )
         end = time.time()
         self.ttime += end - start
@@ -402,7 +416,8 @@ class Experiment:
         self.loss._create_folder()
 
         if self.backup_interval:
-            self.backup_folder = os.path.join(self.save, "backup")  # type: ignore
+            self.backup_folder = os.path.join(
+                self.save, "backup")  # type: ignore
             # Create a valid folder
             try:
                 os.makedirs(self.backup_folder)
@@ -415,4 +430,5 @@ class Experiment:
 
     def backup(self):
         logger.info(f"INFO: Saving BACKUP in {self.backup_folder}")
-        pickle.dump(self, open(os.path.join(self.backup_folder, "experiment.p"), "wb"))  # type: ignore
+        pickle.dump(self, open(os.path.join(self.backup_folder,
+                    "experiment.p"), "wb"))  # type: ignore

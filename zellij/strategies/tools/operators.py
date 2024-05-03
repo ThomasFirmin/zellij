@@ -6,6 +6,7 @@
 from __future__ import annotations
 from zellij.core.errors import InitializationError
 from zellij.core.addons import Mutation, Crossover, Selection
+from zellij.core.variables import FloatVar
 
 from typing import TYPE_CHECKING
 
@@ -69,9 +70,46 @@ class NeighborMutation(Mutation):
         for idx, val in enumerate(self.target.variables):
             if np.random.random() < self.probability:
                 # Get a neighbor of the selected attribute
-                individual[idx] = val.neighborhood(individual[idx])  # type: ignore
+                individual[idx] = val.neighborhood(
+                    individual[idx])  # type: ignore
 
         return (individual,)
+
+
+class DeapMutation(Mutation):
+
+    def __init__(self, eta: int, indpb: float):
+        super(Mutation, self).__init__()
+        self._eta = eta
+        self._indpb = indpb
+
+    @property
+    def eta(self):
+        return self._eta
+
+    @property
+    def indpb(self):
+        return self._indpb
+
+    @Mutation.target.setter
+    def target(self, value: Searchspace):
+        if value and all([isinstance(x, FloatVar) for x in value.variables]) and len(set([x.upper for x in value.variables])) == 1 and len(set([x.lower for x in value.variables])) == 1:
+            self._target = value
+        else:
+            raise InitializationError(
+                "In DeapMutation, all variables in the Searchspace must be FloatVar and within the same range"
+            )
+
+    def _build(self, toolbox):
+        v = self.target.variables[0]
+        toolbox.register(
+            "mutate", tools.mutPolynomialBounded,
+            eta=self._eta, low=v.lower, up=v.upper, indpb=self.indpb
+        )
+        self.toolbox = toolbox
+
+    def __call__(self, individual):
+        self.toolbox.mutate(individual)
 
 
 class DeapTournament(Selection):
@@ -138,6 +176,43 @@ class DeapOnePoint(Crossover):
 
     def _build(self, toolbox):
         toolbox.register("mate", tools.cxOnePoint)
+        self.toolbox = toolbox
+
+    def __call__(self, children1, children2):
+        self.toolbox.mate(children1, children2)
+
+
+class DeapSimulatedBinaryBounded(Crossover):
+    """SimulatedBinaryBounded
+
+    Based on `DEAP <https://deap.readthedocs.io/>`_ cxSimulatedBinaryBounded.
+    :ref:`spadd` defining a crossover method.
+
+    """
+
+    def __init__(self, eta: int):
+        super(Crossover, self).__init__()
+        self._eta = eta
+
+    @property
+    def eta(self):
+        return self._eta
+
+    @Crossover.target.setter
+    def target(self, value: Searchspace):
+        if value and all([isinstance(x, FloatVar) for x in value.variables]) and len(set([x.upper for x in value.variables])) == 1 and len(set([x.lower for x in value.variables])) == 1:
+            self._target = value
+        else:
+            raise InitializationError(
+                "In DeapSimulatedBinaryBounded, all variables in the Searchspace must be FloatVar and within the same range"
+            )
+
+    def _build(self, toolbox):
+        v = self.target.variables[0]
+        toolbox.register(
+            "mate", tools.cxSimulatedBinaryBounded,
+            eta=self._eta, low=v.lower, up=v.upper
+        )
         self.toolbox = toolbox
 
     def __call__(self, children1, children2):
