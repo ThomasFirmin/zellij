@@ -36,6 +36,8 @@ from botorch.models.transforms import Log
 
 from botorch.fit import fit_gpytorch_mll
 
+from copy import deepcopy
+
 from zellij.strategies.tools.turbo_state import (
     ConstrainedTSPerUnitPosteriorSampling,
     Temperature,
@@ -148,6 +150,7 @@ class CASCBO(UnitMetaheuristic, MultiObjective, Constrained):
         batch_size: int,
         budget: float,
         temperature: Temperature,
+        covar_module,
         verbose: bool = True,
         surrogate=SingleTaskGP,
         mll=ExactMarginalLogLikelihood,
@@ -211,6 +214,7 @@ class CASCBO(UnitMetaheuristic, MultiObjective, Constrained):
         # PARAMETERS #
         ##############
         self.surrogate = surrogate
+        self.covar_module = covar_module
         self.mll = mll
         self.likelihood = likelihood
 
@@ -345,11 +349,13 @@ class CASCBO(UnitMetaheuristic, MultiObjective, Constrained):
         train_obj = train_obj.to(self.device, dtype=self.dtype)
 
         likelihood = self.likelihood(**self.likelihood_kwargs)
+        covar_module = deepcopy(self.covar_module)
 
         # define models for objective and constraint
         model = self.surrogate(
             train_x,
             train_obj,
+            covar_module=covar_module,
             likelihood=likelihood,
             outcome_transform=Standardize(m=1),
             **self.model_kwargs,
@@ -387,11 +393,13 @@ class CASCBO(UnitMetaheuristic, MultiObjective, Constrained):
         train_obj = train_obj.to(self.device, dtype=self.dtype)
 
         likelihood = self.likelihood(**self.likelihood_kwargs)
+        covar_module = deepcopy(self.covar_module)
 
         # define models for objective and constraint
         model = self.surrogate(
             train_x,
             train_obj,
+            covar_module=covar_module,
             likelihood=likelihood,
             outcome_transform=Log(),
             **self.model_kwargs,
