@@ -365,6 +365,7 @@ class Section(Fractal):
         )
         self.section = section
         self.is_middle = False
+        self.evaluated = False
 
     @property
     def section(self) -> int:
@@ -481,6 +482,7 @@ class NMSOSection(Fractal):
         self.df = df
         self.dx = dx
         self.visited = float("inf")
+        self.evaluated = False
 
     @property
     def section(self) -> int:
@@ -606,6 +608,7 @@ class Direct(Fractal):
         measurement: Optional[Measurement] = None,
         level: int = 0,
         score: float = float("inf"),
+        save_points=True,
         lower: Optional[np.ndarray] = None,
         upper: Optional[np.ndarray] = None,
     ):
@@ -630,7 +633,7 @@ class Direct(Fractal):
             measurement,
             level=level,
             score=score,
-            save_points=True,
+            save_points=save_points,
             lower=lower,
             upper=upper,
         )
@@ -732,317 +735,6 @@ class Direct(Fractal):
                 "set_i": self.set_i,
             }
         )
-        return infos
-
-
-class LatinHypercube(Fractal):
-    """LatinHypercube
-
-    Subspaces are built according to a Latin Hypercube Sampling.
-
-
-    See Also
-    --------
-    LossFunc : Defines what a loss function is
-    Tree_search : Defines how to explore and exploit a fractal partition tree.
-    SearchSpace : Initial search space used to build fractal.
-    Fractal : Parent class. Basic object to define what a fractal is.
-    Hypersphere : Another hypervolume, with different properties
-    """
-
-    def __init__(
-        self,
-        variables: ArrayVar,
-        max_depth: int,
-        measurement: Optional[Measurement] = None,
-        ndist: int = 1,
-        grid_size: int = 2,
-        level: int = 0,
-        score: float = float("inf"),
-        save_points=False,
-        lower: Optional[np.ndarray] = None,
-        upper: Optional[np.ndarray] = None,
-        length: float = 1,
-        ismid: bool = False,
-        descending: bool = True,
-        ascending_it=0,
-        expansions: int = 5,
-        mean: float = 0,
-        var: float = 1,
-    ):
-        """__init__
-
-        Parameters
-        ----------
-        variables : ArrayVar
-            Determines the bounds of the search space.
-            For `ContinuousSearchspace` the `variables` must be an `ArrayVar`
-            of `FloatVar` and all must have converter.
-        grid_size : {int, callable}, default=1
-            Size of the grid for LHS. :code:`self.size * grid_size` hypercubes will
-            be sampled. Given value must be :code:`grid_size > 1`.
-            Can be a callable of the form Callable[[int], int].
-            A callable taking an int (level) and returning an int (grid).
-        ndist : {int, callable}, default=1
-            Number of sampled distributions.
-            Can be a callable of the form Callable[[int], int].
-            A callable taking an int (level) and returning an int (number of distribution).
-        symmetric : boolean, default=True
-            Apply a symmetrization on the LatinHypercube distribution.
-        measurement : Measurement, optional
-            Defines the measure of a fractal.
-        level : int, optional
-            Set the default level of a fractal.
-        score : float, optional
-            Set the default score of a fractal.
-        """
-
-        super(LatinHypercube, self).__init__(
-            variables,
-            measurement,
-            level=level,
-            score=score,
-            save_points=save_points,
-            lower=lower,
-            upper=upper,
-        )
-
-        self.grid_size = grid_size
-        self.ndist = ndist
-        self.length = length
-        self.ismid = ismid
-        self.max_depth = max_depth
-
-        self.expansions = expansions
-        self.expanded = 0
-        self.saved_var = np.full(expansions, var)
-        self.var = var
-        self.mean = mean
-
-        self.ascending_it = ascending_it
-        self.descending = descending
-
-        self.best_score_parent = float("inf")
-
-        self.rng = np.random.default_rng()
-
-        self.midchild = None
-
-    @property
-    def descending(self) -> bool:
-        return self._descending
-
-    @descending.setter
-    def descending(self, value: bool):
-        self._descending = value
-        if self._descending:
-            self.ascending_it = 0
-        elif self.ascending_it == 0 and self.level < self.max_depth:
-            length = 1
-            for i in range(0, self.max_depth):
-                length /= self.grid_size(length)
-            self.length = length
-            self.level = self.max_depth
-            center = self.upper - self.lower
-            self.lower = center - self.length / 2
-            self.upper = self.lower + length
-
-    @property
-    def grid_size(self) -> Callable:
-        return self._grid_size
-
-    @grid_size.setter
-    def grid_size(self, value: Union[int, Callable]):
-        if callable(value):
-            self._grid_size = value
-        elif value <= 1 and value % 2:
-            raise InitializationError(f"grid_size must be >1 and odd, got {value}")
-        else:
-            self._grid_size = lambda level: value
-
-    @property
-    def ndist(self) -> Callable:
-        return self._ndist
-
-    @ndist.setter
-    def ndist(self, value: Union[int, Callable]):
-        if callable(value):
-            self._ndist = value
-        elif value < 1:
-            raise InitializationError(f"ndist must be >0, got {value}")
-        else:
-            self._ndist = lambda level: value
-
-    def create_children(self):
-        """create_children(self)
-
-        Partition function.
-
-        attention collision grille paire
-        """
-
-        self.expanded += 1
-
-        ndist = self.ndist(self.level)
-
-        if self.descending:
-
-            grid_size = self.grid_size(self.level)
-            length = self.length / grid_size
-
-            mid = int(grid_size / 2)
-
-            range1 = np.arange(0, mid)
-            range2 = np.arange(mid + 1, grid_size)
-            combined_range = np.concatenate((range1, range2))
-
-            dimensions = np.tile(combined_range, (self.size * ndist, 1))
-            dimensions = self.rng.permuted(dimensions, axis=1, out=dimensions)
-
-            lowers = np.tile(self.lower, ((grid_size - 1) * ndist, 1))
-
-            lowers = lowers + dimensions.T * length
-            uppers = lowers + length
-
-            children = [
-                super(LatinHypercube, self).create_child(
-                    max_depth=self.max_depth,
-                    length=length,
-                    lower=l,
-                    upper=u,
-                    ndist=self.ndist,
-                    grid_size=self.grid_size,
-                )
-                for l, u in zip(lowers, uppers)
-            ]
-
-            if self.midchild is None:
-                midlow = self.lower + length * mid
-                midupp = midlow + length
-
-                midchild = super(LatinHypercube, self).create_child(
-                    max_depth=self.max_depth,
-                    length=length,
-                    lower=midlow,
-                    upper=midupp,
-                    ndist=self.ndist,
-                    grid_size=self.grid_size,
-                    score=self.score,
-                    ismid=True,
-                )
-                midchild.best_loss = self.best_loss
-                self.midchild = midchild
-
-                if self.level == 0:
-                    children.append(self.midchild)
-
-            return children
-        else:
-            next_level = self.level - int(bool(self.ascending_it))
-            next_ascending = self.ascending_it + 1
-
-            if next_level > 0:
-                grid_size = self.grid_size(next_level)
-                ndist = self.ndist(next_level)
-
-                previous_length = 1
-                for i in range(0, next_level):
-                    previous_length /= self.grid_size(i)
-
-                mid = int(grid_size / 2)
-
-                range1 = np.arange(0, mid)
-                range2 = np.arange(mid + 1, grid_size)
-                combined_range = np.concatenate((range1, range2))
-
-                dimensions = np.tile(combined_range, (self.size * ndist, 1))
-                dimensions = self.rng.permuted(dimensions, axis=1, out=dimensions)
-
-                next_lower = self.lower - previous_length / 2
-                next_upper = next_lower + previous_length
-
-                clip_min = np.min(next_lower)
-                clip_max = np.max(next_upper)
-
-                if clip_max > 1:
-                    clip = 1 - clip_max
-                else:
-                    clip = 0
-
-                clip = min(clip_min, clip_max)
-
-                if clip < 0:
-                    previous_length -= clip
-                    next_lower = self.lower - previous_length / 2
-                    next_upper = next_lower + previous_length
-
-                lowers = np.tile(next_lower, ((grid_size - 1) * ndist, 1))
-
-                length = previous_length / grid_size
-                lowers = lowers + dimensions.T * length
-                uppers = lowers + length
-
-                children = [
-                    super(LatinHypercube, self).create_child(
-                        max_depth=self.max_depth,
-                        length=length,
-                        lower=l,
-                        upper=u,
-                        ndist=self.ndist,
-                        grid_size=self.grid_size,
-                        descending=False,
-                        ascending_it=next_ascending,
-                        level=next_level,
-                    )
-                    for l, u in zip(lowers, uppers)
-                ]
-
-                if self.midchild is None:
-                    midlow = next_lower + length * mid
-                    midupp = midlow + length
-
-                    midchild = super(LatinHypercube, self).create_child(
-                        max_depth=self.max_depth,
-                        length=length,
-                        lower=midlow,
-                        upper=midupp,
-                        ndist=self.ndist,
-                        grid_size=self.grid_size,
-                        score=self.score,
-                        ismid=True,
-                        descending=False,
-                        ascending_it=next_ascending,
-                        level=next_level,
-                    )
-                    midchild.best_loss = self.best_loss
-                    self.midchild = midchild
-                    if self.level == 0:
-                        children.append(self.midchild)
-
-                return children
-
-            else:
-                return []
-
-    def get_mid(self):
-        return self.midchild
-
-    def _modify(
-        self,
-        upper: np.ndarray,
-        lower: np.ndarray,
-        level: int,
-        score: float,
-        measure: float,
-        best_loss: float,
-        best_loss_parent: float,
-    ):
-        super()._modify(level, score, measure, best_loss, best_loss_parent)
-        self.upper, self.lower = upper, lower
-
-    def _essential_info(self):
-        infos = super()._essential_info()
-        infos.update({"upper": self.upper, "lower": self.lower})
         return infos
 
 
@@ -1182,16 +874,16 @@ class LatinHypercubeUCB(Fractal):
         return children
 
     def _create_ascending(self):
-        previous_level = 1
-        next_level = 2
+        previous_level = self.level - 2
+        next_level = self.level - 1
 
         if previous_level > 0:
 
-            descending = True
+            descending = next_level == 1
 
             previous_length = 1 / self.grid_size**previous_level
 
-            center = self.lower + (self.upper - self.lower)
+            center = (self.upper + self.lower) / 2
             l = previous_length / 2
             lower = np.clip(center - l, 0, 1)
             upper = np.clip(center + l, 0, 1)

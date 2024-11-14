@@ -27,6 +27,8 @@ from botorch.models.model_list_gp_regression import ModelListGP
 from botorch.exceptions import ModelFittingError
 from botorch.fit import fit_gpytorch_mll
 
+from copy import deepcopy
+
 import numpy as np
 from datetime import datetime
 
@@ -128,6 +130,7 @@ class SCBO(UnitMetaheuristic, MonoObjective, Constrained):
         search_space: UnitSearchspace,
         turbo_state: AsyncCTurboState,
         batch_size: int,
+        covar_module,
         verbose: bool = True,
         surrogate=SingleTaskGP,
         mll=ExactMarginalLogLikelihood,
@@ -185,6 +188,7 @@ class SCBO(UnitMetaheuristic, MonoObjective, Constrained):
         # PARAMETERS #
         ##############
         self.surrogate = surrogate
+        self.covar_module = covar_module
         self.mll = mll
         self.likelihood = likelihood
 
@@ -289,11 +293,12 @@ class SCBO(UnitMetaheuristic, MonoObjective, Constrained):
         train_obj.to(self.device, dtype=self.dtype)
 
         likelihood = self.likelihood(**self.likelihood_kwargs)
-
+        covar_module = deepcopy(self.covar_module)
         # define models for objective and constraint
         model = self.surrogate(
             train_x,
             train_obj,
+            covar_module=covar_module,
             likelihood=likelihood,
             outcome_transform=Standardize(m=1),
             **self.model_kwargs,

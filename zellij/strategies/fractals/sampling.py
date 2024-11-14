@@ -16,7 +16,6 @@ from zellij.core.search_space import (
 from zellij.core.metaheuristic import Metaheuristic
 
 from zellij.strategies.tools import (
-    LatinHypercube,
     Hypersphere,
     Section,
     NMSOSection,
@@ -622,7 +621,7 @@ class CenterSOO(ContinuousSampling):
             res = []
             for i, s in enumerate(self._search_space):
                 if isinstance(s, (Section, NMSOSection)):
-                    if not s.is_middle or s.level == 1:
+                    if (not s.is_middle and not s.evaluated) or s.level == 1:
                         center = (s.upper + s.lower) / 2
                         res.append(center.tolist())
                         fracid.append(i)

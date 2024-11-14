@@ -5,37 +5,31 @@
 
 
 from __future__ import annotations
-from zellij.core.errors import InputError, InitializationError
+from zellij.core.errors import InitializationError
 from zellij.core.metaheuristic import UnitMetaheuristic, MonoObjective
 
 from typing import Tuple, List, Optional, TYPE_CHECKING
 
+from zellij.core.search_space import UnitSearchspace, BaseFractal
+
 if TYPE_CHECKING:
-    from zellij.core.search_space import UnitSearchspace
+    from zellij.strategies.fractals import Sampling
+    from zellij.core.search_space import BaseFractal
 
 import torch
 import numpy as np
 
 import gpytorch
-
 from gpytorch.mlls.sum_marginal_log_likelihood import ExactMarginalLogLikelihood
 from gpytorch.likelihoods import GaussianLikelihood
 
-from botorch.utils import standardize
+
 from botorch.models import SingleTaskGP
-from botorch.optim import optimize_acqf
-from botorch.acquisition.analytic import UpperConfidenceBound
 from botorch import fit_gpytorch_mll
 from botorch.exceptions import ModelFittingError
 
 
-if TYPE_CHECKING:
-    from zellij.strategies.tools.tree_search import TreeSearch
-    from zellij.strategies.tools.scoring import Scoring
-    from zellij.strategies.fractals import Sampling
-    from zellij.core.search_space import BaseFractal
-
-from torch.quasirandom import SobolEngine
+from collections import defaultdict
 
 import logging
 
@@ -90,9 +84,8 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
     def __init__(
         self,
         search_space: UnitSearchspace,
-        tree_search: TreeSearch,
         sampling: Sampling,
-        scoring: Scoring,
+        nu: float,
         surrogate=SingleTaskGP,
         mll=ExactMarginalLogLikelihood,
         likelihood=GaussianLikelihood,
@@ -136,15 +129,13 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
         # DBA PARAMETERS #
         ##################
 
-        self.tree_search = tree_search
         self.sampling = sampling
-        self.scoring = scoring
+        self.nu = nu
 
         #################
         # BO PARAMETERS #
         #################
 
-        self.acquisition = UpperConfidenceBound
         self.surrogate = surrogate
         self.mll = mll
         self.likelihood = likelihood
@@ -155,6 +146,9 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
         ################
         # BO VARIABLES #
         ################
+
+        self.cmll = None
+        self.cmodel = None
 
         # Prior points
         self.train_x = torch.empty((0, self.search_space.size))
@@ -177,37 +171,27 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
             self.device = torch.device("cpu")
 
         self.dtype = torch.double
-
-        self.sobol = SobolEngine(dimension=self.search_space.size, scramble=True)
         self._build_kwargs()
 
         #################
         # DBA VARIABLES #
         #################
 
-        self.info = []
-        self.default_info = {}
-        self.xinfo = ["fracid"]
+        self.vmax = float("inf")
+        self.best_score = float("inf")
+        self.N = 1
+        self.current_level = 0
+        self.current_maxlevel = 0
 
         # Children fractals
         self.children = []
-        self.parents = []
+        self.child = None
         self._fidx = []
 
-        self.extract_sample_info = []
-        self.extract_sample_xinfo = []
-        self.order_sample_info = []
-        self.order_sample_xinfo = []
-
-        for i, k in enumerate(self.info):
-            if self.sampling.info and k in self.sampling.info:
-                self.extract_sample_info.append(i)
-                self.order_sample_info.append(self.sampling.info.index(k))
-
-        for i, k in enumerate(self.xinfo):
-            if self.sampling.xinfo and k in self.sampling.xinfo:
-                self.extract_sample_xinfo.append(i)
-                self.order_sample_xinfo.append(self.sampling.xinfo.index(k))
+        self.tree = defaultdict(list)
+        self.tree_score = defaultdict(list)
+        self.tree[0].append(self.search_space)
+        self.tree_score[0].append(0)
 
     @property
     def search_space(self) -> BaseFractal:
@@ -230,38 +214,24 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
     def sampling(self, value: Sampling):
         if value:  # If there is sampling
             self._sampling = value
-            if self._sampling.info is not None:
-                self.info = list(set(self.info + self._sampling.info))
-                self.default_info = dict.fromkeys(self.info, np.nan)
-            if self._sampling.xinfo is not None:
-                self.xinfo = list(set(self.xinfo + self._sampling.xinfo))
         else:
             raise InitializationError(f"DBA must implement at least an exploration.")
 
-    # Add more info to ouputs
-    def _add_info(self, info: dict) -> dict:
-        info = self.default_info | info
-        return info
-
-    def _add_xinfo(self, xinfo: dict, npoints: int) -> dict:
-        if len(self.xinfo) > 0:
-            default_xinfo = dict.fromkeys(self.xinfo, np.full(npoints, np.nan))
-            xinfo = default_xinfo | xinfo
-        return xinfo
-
     def _sample(
         self,
-        sample: Sampling,
+        sp: BaseFractal,
         X: Optional[list],
         Y: Optional[np.ndarray],
         constraint: Optional[np.ndarray] = None,
         info: Optional[np.ndarray] = None,
         xinfo: Optional[np.ndarray] = None,
-    ):
-        points, info_dict, xinfo_dict = sample.forward(X, Y, constraint, info, xinfo)
+    ) -> Tuple[List[list], dict, dict]:
+        self.sampling.reset()
+        self.sampling.search_space = sp
+        points, info_dict, xinfo_dict = self.sampling.forward(
+            X, Y, constraint, info, xinfo
+        )
         if len(points) > 0:
-            info_dict = self._add_info(info_dict)
-            xinfo_dict = self._add_xinfo(xinfo_dict, len(points))
             return points, info_dict, xinfo_dict  # Continue exploration
         else:
             return [], {"algorithm": "EndSample"}, {}  # Exploration ending
@@ -299,8 +269,15 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
 
         return mll, model
 
-    def get_posterior(self, X, model):
-        pass
+    def get_posterior(self, X) -> Tuple[float, float]:
+        if self.cmodel is not None:
+            posterior = self.cmodel.posterior(X=X)
+            mean = posterior.mean.squeeze(-2).squeeze(-1)
+            sigma = posterior.variance.clamp_min(1e-12).sqrt().view(mean.shape)
+
+            return mean.item(), sigma.item()
+        else:
+            return float("inf"), float("inf")
 
     def _build_kwargs(self):
         # Surrogate kwargs
@@ -334,16 +311,6 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
             if isinstance(m, torch.nn.Module):
                 m.to(self.device)
 
-        # Acquisition function kwargs
-        self.acqf_kwargs = {
-            key: value
-            for key, value in self.kwargs.items()
-            if key in self.acquisition.__init__.__code__.co_varnames
-        }
-        for m in self.acqf_kwargs.values():
-            if isinstance(m, torch.nn.Module):
-                m.to(self.device)
-
         logger.debug(self.model_kwargs, self.likelihood_kwargs, self.mll_kwargs)
 
     def reset(self):
@@ -357,8 +324,31 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
         self.train_obj = torch.empty((0, 1))
         self.state_dict = {}
 
-        self.n_h = 0
-        self.current_calls = 0
+    def _get_children(self) -> List[BaseFractal]:
+        scr = self.tree_score[self.current_level]
+        if len(scr) == 0:
+            self.current_level = self.current_level % self.current_maxlevel
+            if self.current_level == 0:
+                self.vmax = float("inf")
+                self.current_level = 1
+            else:
+                self.current_level += 1
+            return self._get_children()
+        else:
+            argmin = np.argmin(scr)
+            if scr[argmin] < self.vmax:
+                parent = self.tree[self.current_level].pop(argmin)
+                self.vmax = self.tree_score[self.current_level].pop(argmin)
+                children = parent.create_children()
+                return children
+            else:
+                self.current_level = self.current_level % self.current_maxlevel
+                if self.current_level == 0:
+                    self.vmax = float("inf")
+                    self.current_level = 1
+                else:
+                    self.current_level += 1
+                return self._get_children()
 
     def forward(
         self,
@@ -387,27 +377,26 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
             Dictionnary of additionnal information linked to :code:`points`.
         """
 
-        self.sampling.reset()
+        self.iterations += 1
+        self.current_maxlevel = len(self.tree) + 1
 
-        if info is None:
-            sample_info = None
-        else:
-            sample_info = info[self.extract_sample_info][self.order_sample_info]
+        if X is not None and Y is not None and self.child is not None:
 
-        if xinfo is None:
-            sample_xinfo = None
-        else:
-            sample_xinfo = xinfo[:, self.extract_sample_xinfo][
-                :, self.order_sample_xinfo
-            ]
+            for x, y in zip(X, Y):
+                self.child.add_solutions(x, y)
 
-        if X is not None and Y is not None and sample_xinfo is not None:
+            self.child.evaluated = True
+            self.child.score = self.child.best_loss
+            self.tree[self.child.level].append(self.child)
+            self.tree_score[self.child.level].append(self.child.score)
+            if self.child.score < self.best_score:
+                self.best_score = self.child.score
 
             npx = np.array(X)
-            npy = np.array(Y)
+            npy = np.squeeze(Y)
             mask = np.isfinite(npy)
 
-            mx = npx[mask]
+            mx = npx[mask][0]
             my = npy[mask]
 
             if len(my) > 0:
@@ -418,70 +407,64 @@ class BaMSOO(UnitMetaheuristic, MonoObjective):
                 self.train_x = torch.cat([self.train_x, new_x])
                 self.train_obj = torch.cat([self.train_obj, new_obj])
 
-                train_obj_std = -standardize(self.train_obj)
-
                 # reinitialize the models so they are ready for fitting on next iteration
                 # use the current state dict to speed up fitting
-                mll, model = self._initialize_model(
+                self.cmll, self.cmodel = self._initialize_model(
                     self.train_x,
-                    train_obj_std,
+                    self.train_obj,
                     self.state_dict,
                 )
 
-                self.state_dict = model.state_dict()
+                self.state_dict = self.cmodel.state_dict()
+                try:
+                    with gpytorch.settings.max_cholesky_size(300):
+                        # run N_BATCH rounds of BayesOpt after the initial random batch
+                        # fit the models
+                        fit_gpytorch_mll(self.cmll)
 
-            if isinstance(self.sampling.search_space, list):
-                for x, y, fracid in zip(X, Y, sample_xinfo[:, 0]):
-                    self.sampling.search_space[int(fracid)].add_solutions(x, y)
-                    self.parents[self._fidx[int(fracid)]].add_solutions(x, y)
+                except ModelFittingError:
+                    logger.warning("ModelFittingError, previous model will be used.")
             else:
-                self.sampling.search_space.add_solutions(X, Y)
-                self.parents[0].add_solutions(X, Y)
-
-            for f in self.parents:
-                self.scoring(f)
-
-            for fracid in sample_xinfo[:, 0]:
-                c = self.sampling.search_space[int(fracid)]
-                f = self.parents[self._fidx[int(fracid)]]
-                self.scoring(c)
-                c.var = 0
-                self.tree_search.add(c)
-
-        self.iteration += 1
-
-        try:
-            with gpytorch.settings.max_cholesky_size(300):
-                # run N_BATCH rounds of BayesOpt after the initial random batch
-                # fit the models
-                fit_gpytorch_mll(mll)
-
-                # Add potentially usefull kwargs for acqf kwargs
-                self.acqf_kwargs["best_f"] = torch.max(train_obj_std)
-                if "X_baseline" in self.acquisition.__init__.__code__.co_varnames:
-                    self.acqf_kwargs["X_baseline"] = (self.train_x,)
-
-                # Build acqf kwargs
-                acqf = self.acquisition(model=model, **self.acqf_kwargs)
-
-                # optimize and get new observation
-                new_x, acqf_value = self._optimize_acqf_and_get_observation(acqf)
-
-                return (
-                    new_x.cpu().numpy().tolist(),
-                    {
-                        "acquisition": acqf_value.cpu().item(),
-                        "algorithm": "BO",
-                    },
-                    {},
+                logger.warning(
+                    "InputError, Y are not finite. Previous model will be used"
                 )
-        except ModelFittingError:
-            new_x = self._generate_initial_data(1)
-            return (
-                new_x.cpu().numpy().tolist(),
-                {
-                    "acquisition": 0,
-                    "algorithm": "ModelFittingError",
-                },
-                {},
-            )
+
+        if len(self.children) == 0:
+            self.children = self._get_children()
+
+        self.child = self.children.pop()
+        print(f"LEVEL : {self.child.level}")
+
+        self.N += 1
+
+        points, info_dict, xinfo_dict = self._sample(
+            self.child, X, Y, constraint, info, xinfo
+        )
+
+        if len(points) == 0:
+            return self.forward(None, None, None, None, None)
+
+        if self.cmodel is None:
+            xinfo_dict["mean"] = float("inf")
+            xinfo_dict["std"] = float("inf")
+            xinfo_dict["beta"] = float("inf")
+            return points, info_dict, xinfo_dict
+        else:
+            x = torch.FloatTensor(points).to(self.device)
+            mean, std = self.get_posterior(x)
+
+        beta = np.sqrt(2 * np.log(np.pi**2 * self.N**2 / (6 * self.nu)))
+        right_part = beta * std
+        if mean - right_part <= self.best_score:
+            xinfo_dict["mean"] = mean
+            xinfo_dict["std"] = std
+            xinfo_dict["beta"] = beta
+            return points, info_dict, xinfo_dict
+        else:
+            self.child.score = mean + right_part
+            self.tree[self.child.level].append(self.child)
+            self.tree_score[self.child.level].append(self.child.score)
+            if self.child.score < self.best_score:
+                self.best_score = self.child.score
+
+            return self.forward(None, None, None, None, None)

@@ -20,7 +20,6 @@ from .geometry import (
     Hypersphere,
     Section,
     Direct,
-    LatinHypercube,
     LatinHypercubeUCB,
     PermFractal,
     NMSOSection,
@@ -39,7 +38,7 @@ from .tree_search import (
     MoveUp,
     CyclicBestFirstSearch,
     NMSOTreeSearch,
-    TSImprovement,
+    SOOUCB,
 )
 
 

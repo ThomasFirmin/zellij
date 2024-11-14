@@ -12,7 +12,6 @@ from zellij.core.search_space import BaseFractal
 from zellij.core.errors import InitializationError
 from zellij.strategies.tools.geometry import (
     NMSOSection,
-    LatinHypercube,
     LatinHypercubeUCB,
 )
 
@@ -1692,591 +1691,8 @@ class NMSOTreeSearch(TreeSearch):
             return sel_node
 
 
-class TSImprovement(TreeSearch):
-    """TSImprovement
-
-    Breadth First Search algorithm (BFS).
-    Fractal are first sorted by lowest level, then by lowest score.
-
-    Attributes
-    ----------
-    openl : list[BaseFractal]
-        Initial Open list containing not explored nodes from the partition tree.
-    max_depth : int
-        Maximum depth of the partition tree.
-    Q : int, default=1
-        Q-Breadth_first_search, at each get_next, tries to return Q nodes.
-
-    Methods
-    -------
-    add(c)
-        Add a node c to the fractal tree.
-    get_next()
-        Get the next node to evaluate.
-
-    See Also
-    --------
-    Fractal : Abstract class defining what a fractal is.
-    FDA : Fractal Decomposition Algorithm.
-    TreeSearch : Base class.
-    DepthFirstSearch : Tree search Depth based startegy.
-
-    Examples
-    --------
-    >>> from zellij.core.variables import ArrayVar, FloatVar
-    >>> from zellij.strategies.tools import Hypercube, BreadthFirstSearch
-
-    >>> a = ArrayVar(FloatVar("f1", 0, 1), FloatVar("i2", 0, 1))
-    >>> sp = Hypercube(a)
-    >>> ts = BreadthFirstSearch(sp, 3)
-    >>> children = sp.create_children()
-    >>> for idx, c in enumerate(children):
-    ...     c.score = idx
-    ...     ts.add(c)
-    >>> print(ts.openl)
-    [Hypercube(0,-1,0)]
-    >>> new = ts.get_next()
-    >>> print(new)
-    [Hypercube(0,-1,0)]
-    >>> print(ts.openl)
-    [Hypercube(1,0,0), Hypercube(1,0,1), Hypercube(1,0,2), Hypercube(1,0,3)]
-    >>> print(ts.close)
-    [Hypercube(0,-1,0)]
-    """
-
-    def __init__(
-        self,
-        openl: Union[BaseFractal, List[BaseFractal]],
-        max_depth: int,
-        sp: BaseFractal,
-        save_close: bool = False,
-        Q: int = 1,
-    ):
-        """__init__
-
-        Parameters
-        ----------
-        openl : {LatinHypercube, list[LatinHypercube]}
-            Initial Open list containing not explored nodes from the partition tree.
-        max_depth : int
-            Maximum depth of the partition tree.
-        sp: LatinHypercube
-            Initial search space.
-        save_close : boolean, default=True
-            If True save expanded, explored and scored fractal within a :code:`close` list.
-        Q : int, default=1
-            Q-Breadth_first_search, at each get_next, tries to return Q nodes.
-        """
-
-        super().__init__(openl, max_depth, save_close)
-        self.sp = sp
-        self.bad = []
-        self.max_leaves = []
-
-        ##############
-        # PARAMETERS #
-        ##############
-
-        self.Q = Q
-        self.improvements = 0
-
-        self.best_levels = np.full(self.max_depth + 1, float("inf"))
-        self.next_bests = self.best_levels.copy()
-        self.best_fractal = None
-
-    def add(self, c: LatinHypercube):
-        print(
-            c.score,
-            c.best_loss,
-            c.length,
-            c.level,
-            1 / (5**c.level),
-            c.lower + (c.upper - c.lower) / 2,
-            c.descending,
-            c.ascending_it,
-        )
-        if c.best_loss < self.best_levels[c.level]:
-            if c.level < self.max_depth:
-                c.descending = True
-                insort_left(self.openl, c, key=lambda x: x.score)
-            else:
-                c.descending = False
-                insort_left(self.bad, c, key=lambda x: x.best_loss)
-
-            if c.best_loss < self.next_bests[c.level]:
-                self.next_bests[c.level] = c.best_loss
-
-    def add_bad(self, c: LatinHypercube):
-        if c.level <= self.max_depth and c.best_loss <= self.best_levels[c.level]:
-            c.descending = False
-            insort_left(self.bad, c, key=lambda x: x.best_loss)
-            if c.best_loss < self.next_bests[c.level]:
-                self.next_bests[c.level] = c.best_loss
-
-    def get_next(self) -> List[BaseFractal]:
-        # print("LENGTH ", len(self.openl), len(self.bad), "\n")
-        self.best_levels = self.next_bests.copy()
-        print(self.best_levels)
-        if len(self.openl) > 0:
-            sel_nodes = self.openl[: self.Q]
-            self.openl = self.openl[self.Q :]
-        elif len(self.bad) > 0:
-            print(
-                f"RETURNING BAD {[(b.best_loss, b.length, b.lower) for b in self.bad]}"
-            )
-            sel_nodes = self.bad[: self.Q]
-            self.bad = self.bad[self.Q :]
-        else:
-            print("RESTART")
-            sel_nodes = [self.sp]
-
-        self.add_close(sel_nodes)
-        return sel_nodes
-
-
-class DoubleUCB(TreeSearch):
-    """DoubleUCB
-
-    Attributes
-    ----------
-    openl : list[BaseFractal]
-        Initial Open list containing not explored nodes from the partition tree.
-    max_depth : int
-        Maximum depth of the partition tree.
-
-    Methods
-    -------
-    add(c)
-        Add a node c to the fractal tree.
-    get_next()
-        Get the next node to evaluate.
-
-    See Also
-    --------
-    Fractal : Abstract class defining what a fractal is.
-    FDA : Fractal Decomposition Algorithm.
-    TreeSearch : Base class.
-    DepthFirstSearch : Tree search Depth based startegy.
-    """
-
-    def __init__(
-        self,
-        openl: BaseFractal,
-        max_depth: int,
-        save_close: bool = False,
-    ):
-        """__init__
-
-        Parameters
-        ----------
-        openl : {LatinHypercube, list[LatinHypercube]}
-            Initial Open list containing not explored nodes from the partition tree.
-        max_depth : int
-            Maximum depth of the partition tree.
-        sp: LatinHypercube
-            Initial search space.
-        save_close : boolean, default=True
-            If True save expanded, explored and scored fractal within a :code:`close` list.
-        """
-
-        super().__init__(openl, max_depth, save_close)
-
-        ##############
-        # PARAMETERS #
-        ##############
-        self.size = self.openl[0].size
-        self.last_gs = self.openl[0].grid_size(self.max_depth)
-
-        self.layers = [[] for _ in range(self.max_depth)]
-        self.layers_avg = [[] for _ in range(self.max_depth)]
-        self.layers_var = [[] for _ in range(self.max_depth)]
-        self.layers_vis = [[] for _ in range(self.max_depth)]
-
-        self.levels_weights = np.ones(self.max_depth)
-        self.levels_range = np.arange(1, self.max_depth + 1)
-        self.tin = np.zeros(self.max_depth, dtype=int)
-        self.tin[-1] = self.last_gs * (self.max_depth - 1)
-
-        self.initialized = False
-        self.current_level = 0
-
-    def add(self, c: LatinHypercubeUCB):
-
-        self.layers[c.level].append(c)
-        self.layers_avg[c.level].append(c.mean)
-        self.layers_var[c.level].append(c.var)
-        self.layers_vis[c.level].append(c.visits)
-        if c.level > self.current_level:
-            self.current_level = c.level
-            self.levels_weights[c.level] = c.length
-
-    def add_father(self, c: LatinHypercubeUCB):
-        self.layers[c.level].append(c)
-        self.layers_avg[c.level].append(c.mean)
-        self.layers_var[c.level].append(c.var)
-        self.layers_vis[c.level].append(c.visits)
-        self.tin[c.level] += c.grid_size(c.level) * c.ndist(c.level)
-
-    def _level_proba(self, crlevel):
-        pp = 6
-
-        if np.min(self.tin) >= 500:
-            self.tin = self.tin // 500
-            self.tin[-1] += self.last_gs * (self.max_depth - 1)
-        print(f"TIN : {self.tin}")
-        wp = self.levels_weights[:crlevel] / (1 + self.tin[:crlevel]) ** pp
-        nb_g = self.layers[0][0].grid_size(0) ** self.size
-        col = (1 - 1 / nb_g) ** self.tin[0]
-        if col < 0.99:
-            wp[0] *= col
-        if self.current_level + 1 == self.max_depth:
-            wp[-1] *= len(self.layers[-1]) > 0
-        wp[wp < 0] = 0
-        wp /= wp.sum()
-        return wp
-
-    def get_next(self, n: int) -> Tuple[List[BaseFractal], int, float, float]:
-        p = 4
-        # print(
-        #     "TIN",
-        #     self.tin,
-        #     self.current_level,
-        #     [len(l) for l in self.layers],
-        #     self.levels_weights,
-        # )
-        if self.initialized:
-            crlevel = self.current_level + 1
-            proba = self._level_proba(crlevel)
-
-            # print("PROBA: ", proba)
-            minlevel = np.random.choice(self.levels_range[:crlevel], p=proba) - 1
-            if minlevel > 0:
-                # print(f"MINLEVEL : {minlevel}")
-                avgfrac = np.array(self.layers_avg[minlevel])
-                varfrac = np.array(self.layers_var[minlevel])
-                visfrac = np.array(self.layers_vis[minlevel])
-
-                logvis = 2 * (np.log(4) + p * np.log(n)) / visfrac
-                var = np.sqrt(varfrac * logvis) + (8 / 3) * logvis
-                mask = varfrac == 0
-                var[mask] = 0
-                ucbfrac = -(avgfrac + self.layers[minlevel][0].length * var)
-                minsort = np.argsort(ucbfrac)
-
-                nb_g = self.layers[minlevel][0].grid_size(minlevel) ** self.size
-                idx = 0
-                maxidx = len(minsort) - 1
-                while (
-                    np.random.random()
-                    > (1 - 1 / nb_g) ** self.layers_vis[minlevel][minsort[idx]]
-                ) and idx < maxidx:
-                    idx += 1
-
-                minfrac = minsort[idx]
-                sel_node = self.layers[minlevel].pop(minfrac)
-                self.layers_avg[minlevel].pop(minfrac)
-                self.layers_var[minlevel].pop(minfrac)
-                self.layers_vis[minlevel].pop(minfrac)
-                return [sel_node], minlevel, proba[minlevel], ucbfrac[minfrac]
-            else:
-                sel_node = self.layers[minlevel].pop(0)
-                self.layers_avg[minlevel].pop(0)
-                self.layers_var[minlevel].pop(0)
-                self.layers_vis[minlevel].pop(0)
-                return [sel_node], 0, proba[minlevel], 1
-
-        else:
-            sel_node = self.openl[0]
-            self.openl = []
-            self.initialized = True
-            return [sel_node], 0, float("inf"), float("inf")
-
-
-# class SimpleUCB(TreeSearch):
-#     """SimpleUCB
-
-#     Attributes
-#     ----------
-#     openl : list[BaseFractal]
-#         Initial Open list containing not explored nodes from the partition tree.
-#     max_depth : int
-#         Maximum depth of the partition tree.
-
-#     Methods
-#     -------
-#     add(c)
-#         Add a node c to the fractal tree.
-#     get_next()
-#         Get the next node to evaluate.
-
-#     See Also
-#     --------
-#     Fractal : Abstract class defining what a fractal is.
-#     FDA : Fractal Decomposition Algorithm.
-#     TreeSearch : Base class.
-#     DepthFirstSearch : Tree search Depth based startegy.
-#     """
-
-#     def __init__(
-#         self,
-#         openl: BaseFractal,
-#         max_depth: int,
-#         save_close: bool = False,
-#     ):
-#         """__init__
-
-#         Parameters
-#         ----------
-#         openl : {LatinHypercube, list[LatinHypercube]}
-#             Initial Open list containing not explored nodes from the partition tree.
-#         max_depth : int
-#             Maximum depth of the partition tree.
-#         sp: LatinHypercube
-#             Initial search space.
-#         save_close : boolean, default=True
-#             If True save expanded, explored and scored fractal within a :code:`close` list.
-#         """
-
-#         super().__init__(openl, max_depth, save_close)
-
-#         ##############
-#         # PARAMETERS #
-#         ##############
-#         self.size = self.openl[0].size
-
-#         self.layers = [[] for _ in range(self.max_depth)]
-#         self.layers[0].append(self.openl[0])
-#         self.openl = []
-
-#         self.layers_avg = [[] for _ in range(self.max_depth)]
-#         self.layers_var = [[] for _ in range(self.max_depth)]
-
-#         self.levels_weights = np.ones(self.max_depth, dtype=float)
-#         self.grid_sizes = np.zeros(self.max_depth, dtype=int)
-
-#         self.levels_bests = np.full(self.max_depth, float("inf"), dtype=float)
-#         self.levels_range = np.arange(1, self.max_depth + 1, dtype=int)
-#         self.levels_sizes = np.zeros(self.max_depth, dtype=int)
-#         self.levels_sizes[0] = 1
-#         self.tin = np.ones(self.max_depth, dtype=int)
-
-#         self.initialized = False
-#         self.current_level = 0
-
-#     def add(self, c: LatinHypercubeUCB):
-
-#         self.layers[c.level].append(c)
-#         self.layers_avg[c.level].append(c.mean)
-#         self.layers_var[c.level].append(c.mean)
-
-#         self.levels_sizes[c.level] += 1
-#         if c.descending:
-#             self.tin[c.level - 1] += 1
-#         else:
-#             self.tin[c.level] += 1
-
-#         if c.best_loss < self.levels_bests[c.level]:
-#             self.levels_bests[c.level] = c.best_loss
-
-#         if c.level > self.current_level:
-#             self.current_level = c.level
-#             self.levels_weights[c.level] = c.length
-#             self.grid_sizes[c.level] = c.grid_size(c.level)
-
-#     def _level_proba(self, crlevel):
-#         pp = 6
-#         wp = np.flip(self.levels_range[:crlevel]) / (
-#             1 + pp * np.log(self.tin[:crlevel])
-#         )
-
-#         # if np.min(self.tin) >= 200:
-#         #     self.tin = self.tin // 200
-#         #     self.tin *= self.grid_sizes
-
-#         # wp = self.levels_weights[:crlevel] / (1 + self.tin[:crlevel]) ** pp
-#         wp *= self.levels_sizes[:crlevel] > 0
-#         wp /= wp.sum()
-#         # print(self.tin[:crlevel], np.log(self.tin[:crlevel]))
-#         return wp
-
-#     def get_next(self, n: int) -> Tuple[List[BaseFractal], int, float, float]:
-#         if self.initialized:
-#             crlevel = self.current_level + 1
-#             proba = self._level_proba(crlevel)
-#             # print("PROBA: ", proba, self.levels_sizes)
-#             minlevel = np.random.choice(self.levels_range[:crlevel], p=proba) - 1
-#             if minlevel > 0:
-#                 # print(f"MINLEVEL : {minlevel}")
-#                 avgfrac = np.array(self.layers_avg[minlevel])
-#                 var = np.array(self.layers_var[minlevel])
-
-#                 ucb = avgfrac - self.levels_weights[minlevel] * var
-
-#                 mask = ucb > self.levels_bests[minlevel]
-#                 ucb[mask] = avgfrac[mask] + self.levels_weights[minlevel] * var[mask]
-#                 minfrac = np.argmin(ucb)
-
-#                 sel_node = self.layers[minlevel].pop(minfrac)
-#                 self.layers_avg[minlevel].pop(minfrac)
-#                 self.layers_var[minlevel].pop(minfrac)
-#                 self.levels_sizes[minlevel] -= 1
-
-#                 if minlevel == self.max_depth - 1:
-#                     sel_node.descending = False
-
-#                 return [sel_node], minlevel, proba[minlevel], ucb[minfrac]
-#             else:
-#                 return self.layers[minlevel], 0, proba[minlevel], 1
-
-#         else:
-#             self.initialized = True
-#             return self.layers[0], 0, float("inf"), float("inf")
-
-
-class SimpleUCB(TreeSearch):
-    """SimpleUCB
-
-    Attributes
-    ----------
-    openl : list[BaseFractal]
-        Initial Open list containing not explored nodes from the partition tree.
-    max_depth : int
-        Maximum depth of the partition tree.
-
-    Methods
-    -------
-    add(c)
-        Add a node c to the fractal tree.
-    get_next()
-        Get the next node to evaluate.
-
-    See Also
-    --------
-    Fractal : Abstract class defining what a fractal is.
-    FDA : Fractal Decomposition Algorithm.
-    TreeSearch : Base class.
-    DepthFirstSearch : Tree search Depth based startegy.
-    """
-
-    def __init__(
-        self,
-        openl: BaseFractal,
-        max_depth: int,
-        save_close: bool = False,
-        pp: float = 1.0,
-    ):
-        """__init__
-
-        Parameters
-        ----------
-        openl : {LatinHypercube, list[LatinHypercube]}
-            Initial Open list containing not explored nodes from the partition tree.
-        max_depth : int
-            Maximum depth of the partition tree.
-        sp: LatinHypercube
-            Initial search space.
-        save_close : boolean, default=True
-            If True save expanded, explored and scored fractal within a :code:`close` list.
-        """
-
-        super().__init__(openl, max_depth, save_close)
-
-        ##############
-        # PARAMETERS #
-        ##############
-        self.size = self.openl[0].size
-
-        self.layers = [[] for _ in range(self.max_depth)]
-        self.layers[0].append(self.openl[0])
-        self.openl = []
-
-        self.layers_avg = [[] for _ in range(self.max_depth)]
-        self.layers_var = [[] for _ in range(self.max_depth)]
-
-        self.levels_weights = np.ones(self.max_depth, dtype=float)
-        self.grid_sizes = np.zeros(self.max_depth, dtype=int)
-
-        self.levels_bests = np.full(self.max_depth, float("inf"), dtype=float)
-        self.levels_range = np.arange(1, self.max_depth + 1, dtype=int)
-        self.levels_sizes = np.zeros(self.max_depth, dtype=int)
-        self.levels_sizes[0] = 1
-        self.tin = np.ones(self.max_depth, dtype=int)
-
-        self.initialized = False
-        self.current_level = 0
-        self.pp = pp
-
-    def add(self, c: LatinHypercubeUCB):
-
-        self.layers[c.level].append(c)
-        self.layers_avg[c.level].append(c.mean)
-        self.layers_var[c.level].append(c.mean)
-
-        self.levels_sizes[c.level] += 1
-        if c.descending:
-            self.tin[c.level - 1] += 1
-        else:
-            self.tin[c.level] += 1
-
-        if c.best_loss < self.levels_bests[c.level]:
-            self.levels_bests[c.level] = c.best_loss
-
-        if c.level > self.current_level:
-            self.current_level = c.level
-            self.levels_weights[c.level] = c.length
-            self.grid_sizes[c.level] = c.grid_size(c.level)
-
-    def _level_proba(self, crlevel):
-        wp = np.flip(self.levels_range[:crlevel]) / (
-            1 + self.pp * np.log(self.tin[:crlevel])
-        )
-
-        # if np.min(self.tin) >= 200:
-        #     self.tin = self.tin // 200
-        #     self.tin *= self.grid_sizes
-
-        # wp = self.levels_weights[:crlevel] / (1 + self.tin[:crlevel]) ** pp
-        wp *= self.levels_sizes[:crlevel] > 0
-        wp /= wp.sum()
-        # print(self.tin[:crlevel], np.log(self.tin[:crlevel]))
-        return wp
-
-    def get_next(self, n: int) -> Tuple[List[BaseFractal], int, float, float]:
-        if self.initialized:
-            crlevel = self.current_level + 1
-            proba = self._level_proba(crlevel)
-            # print("PROBA: ", proba, self.levels_sizes)
-            minlevel = np.random.choice(self.levels_range[:crlevel], p=proba) - 1
-            if minlevel > 0:
-                # print(f"MINLEVEL : {minlevel}")
-                avgfrac = np.array(self.layers_avg[minlevel])
-                var = np.array(self.layers_var[minlevel])
-
-                ucb = avgfrac - self.levels_weights[minlevel] * var
-
-                mask = ucb > self.levels_bests[minlevel]
-                ucb[mask] = avgfrac[mask] + self.levels_weights[minlevel] * var[mask]
-                minfrac = np.argmin(ucb)
-
-                sel_node = self.layers[minlevel].pop(minfrac)
-                self.layers_avg[minlevel].pop(minfrac)
-                self.layers_var[minlevel].pop(minfrac)
-                self.levels_sizes[minlevel] -= 1
-
-                if minlevel == self.max_depth - 1:
-                    sel_node.descending = False
-
-                return [sel_node], minlevel, proba[minlevel], ucb[minfrac]
-            else:
-                return self.layers[minlevel], 0, proba[minlevel], 1
-
-        else:
-            self.initialized = True
-            return self.layers[0], 0, float("inf"), float("inf")
-
-
-class BaMSOOUCB(TreeSearch):
-    """BaMSOOUCB
+class SOOUCB(TreeSearch):
+    """SOOUCB
 
     Attributes
     ----------
@@ -2349,8 +1765,6 @@ class BaMSOOUCB(TreeSearch):
         self.initialized = False
         self.current_level = 0
         self.N = 1
-        self.improvement = False
-        self.counter = 5
 
     def add(self, c: LatinHypercubeUCB):
 
@@ -2358,7 +1772,7 @@ class BaMSOOUCB(TreeSearch):
 
         self.layers[c.level].append(c)
         self.layers_avg[c.level].append(c.mean)
-        self.layers_var[c.level].append(c.var)
+        self.layers_var[c.level].append(np.sqrt(c.var))
         self.layers_scr[c.level].append(c.best_loss)
 
         if c.level > self.current_level:
@@ -2366,8 +1780,7 @@ class BaMSOOUCB(TreeSearch):
             self.levels_weights[c.level] = c.length
 
     def get_next(self) -> List[BaseFractal]:
-        self.improvement = False
-        beta = np.sqrt(2 * np.log(np.pi**2 * self.N**2 / (6 * self.nu)))
+        beta = np.sqrt(4 * (np.log(np.pi) + np.log(self.N)) - np.log(6 * self.nu))
         crlevel = self.current_level + 1
         vmax = float("inf")
 
@@ -2381,36 +1794,30 @@ class BaMSOOUCB(TreeSearch):
 
                 ucb = mean - beta * var
 
-                mask = ucb > self.levels_bests[l]
+                mask = ucb > self.best_score
                 ucb[mask] = mean[mask] + beta * var[mask]
                 ucb[~mask] = scr[~mask]
 
                 minidx = np.argmin(ucb)
                 gscore = ucb[minidx]
 
-                sf = self.layers[l][minidx]
-
                 if gscore < vmax:
                     sf = self.layers[l].pop(minidx)
+
+                    if mask[minidx] and l < (self.max_depth - 1):
+                        sf.descending = True
+
                     sel_node.append(sf)
                     self.layers_avg[l].pop(minidx)
                     self.layers_var[l].pop(minidx)
+                    self.layers_scr[l].pop(minidx)
                     vmax = gscore
 
-                if sf.best_loss < self.levels_bests[l]:
-                    self.levels_bests[l] = sf.best_loss
-                    self.levels_bf[l] = sf
-                    self.improvement = True
-                    self.counter = 0
-                    if sf.best_loss < self.best_score:
-                        self.best_score = sf.best_loss
-                        self.best_f = sf
+                    if sf.best_loss < self.levels_bests[l]:
+                        self.levels_bests[l] = sf.best_loss
+                        self.levels_bf[l] = sf
+                        if sf.best_loss < self.best_score:
+                            self.best_score = sf.best_loss
+                            self.best_f = sf
 
-        if self.improvement:
-            return sel_node
-        else:
-            self.counter += 1
-            if self.counter == 5:
-                return [self.best_f]
-            else:
-                return sel_node
+        return sel_node
