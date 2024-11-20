@@ -20,46 +20,20 @@
 It includes tools to define mixed search spaces, manage objective functions, and a few algorithms.
 **Zellij** is defined as an easy-to-use and modular framework, based on Python object-oriented paradigm.
 
-See [documentation](https://zellij.readthedocs.io/en/latest/).
+
+This version is a frozen current state of **Zellij** for the thesis:
+> [Parallel hyperparameter optimization of spiking neural networks](https://gitlab.cristal.univ-lille.fr/tfirmin/mythesis)
+
 
 ## Install Zellij
 
-#### Original version
+#### Thesis version
 ```
-$ pip install zellij
-```
-
-#### Distributed Zellij
-
-This version requires a MPI library, such as [MPICH](https://www.mpich.org/) or [Open MPI](https://www.open-mpi.org/).
-It is based on [mpi4py](https://mpi4py.readthedocs.io/en/stable/intro.html#what-is-mpi)
-
-```
-$ pip install zellij[mpi]
-```
-
-The user will then be able to use the `MPI` option of the `Loss` decorator.
-```python
-@Loss(MPI=True)
-```
-Then the python script must be executed using `mpiexec`:
-```python
-$ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path/to/python/script>
+$ pip install https://github.com/ThomasFirmin/zellij/archive/thesis_freeze.zip
 ```
 
 ## Dependencies
 
-#### Original version
-
-* **Python** >=3.6
-* [numpy](https://numpy.org/)=>1.21.4
-* [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
-* [botorch](https://botorch.org/)>=0.6.3.1
-* [gpytorch](https://gpytorch.ai/)>=1.6.0
-* [pandas](https://pandas.pydata.org/)>=1.3.4
-* [scipy](https://scipy.org/)>=1.9.3
-
-#### MPI version
 * **Python** >=3.6
 * [numpy](https://numpy.org/)=>1.21.4
 * [DEAP](https://deap.readthedocs.io/en/master/)>=1.3.1
@@ -69,20 +43,6 @@ $ mpiexec -machinefile <path/to/hostfile> -n <number of processes> python3 <path
 * [scipy](https://scipy.org/)>=1.9.3
 * [mpi4py](https://mpi4py.readthedocs.io/en/stable/)>=3.1.2
 
-## Contributors
-### Design
-* Thomas Firmin: thomas.firmin@univ-lille.fr
-* El-Ghazali Talbi: el-ghazali.talbi@univ-lille.fr
+## Examples
 
-## References
-<a id="1">[1]</a>
-Nakib, A., Ouchraa, S., Shvai, N., Souquet, L. & Talbi, E.-G. Deterministic metaheuristic based on fractal decomposition for large-scale optimization. Applied Soft Computing 61, 468–485 (2017).
-
-<a id="2">[2]</a>
-Demirhan, M., Özdamar, L., Helvacıoğlu, L. & Birbil, Ş. I. FRACTOP: A Geometric Partitioning Metaheuristic for Global Optimization. Journal of Global Optimization 14, 415–436 (1999).
-
-<a id="3">[3]</a>
-Félix-Antoine Fortin, François-Michel De Rainville, Marc-André Gardner, Marc Parizeau and Christian Gagné, "DEAP: Evolutionary Algorithms Made Easy", Journal of Machine Learning Research, vol. 13, pp. 2171-2175, jul 2012.
-
-<a id="4">[4]</a>
-M. Balandat, B. Karrer, D. R. Jiang, S. Daulton, B. Letham, A. G. Wilson, and E. Bakshy. BoTorch: A Framework for Efficient Monte-Carlo Bayesian Optimization. Advances in Neural Information Processing Systems 33, 2020.
+For this freezed version the documentation is not up-to-date. Check the [examples](https://github.com/ThomasFirmin/zellij/tree/thesis_freeze/examples), or the [gitlab](https://gitlab.cristal.univ-lille.fr/tfirmin/mythesis) of the thesis.
